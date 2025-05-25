@@ -1,0 +1,839 @@
+// Tipos para internacionalização
+export type Language = "en" | "pt"
+
+export interface AirdropTranslations {
+  title?: string
+  subtitle?: string
+  contractBalance?: string
+  dailyAirdrop?: string
+  nextClaimIn?: string
+  claimButton?: string
+  processing?: string
+  tokensClaimedSuccess?: string
+  availableForAirdrop?: string
+}
+
+export interface HistoryTranslations {
+  title?: string
+  all?: string
+  loading?: string
+  loadMore?: string
+  noTransactions?: string
+  showAllTransactions?: string
+  received?: string
+  sent?: string
+  from?: string
+  to?: string
+  block?: string
+  txHash?: string
+  today?: string
+  yesterday?: string
+}
+
+// Adicionar "projects" à interface NavTranslations:
+export interface NavTranslations {
+  home?: string
+  wallet?: string
+  learn?: string
+  profile?: string
+  news?: string
+  agenda?: string
+  winners?: string
+  games?: string
+  storm?: string
+  projects?: string
+  about?: string
+  menu?: string
+  close?: string
+}
+
+export interface GamesTranslations {
+  title?: string
+  subtitle?: string
+  allGames?: string
+  action?: string
+  adventure?: string
+  strategy?: string
+  puzzle?: string
+  rpg?: string
+  comingSoon?: string
+  enterNow?: string
+  moreGames?: string
+  featuredGame?: string
+  back?: string
+  start?: string
+  score?: string
+  round?: string
+  lives?: string
+  shots?: string
+  gameOver?: string
+  playAgain?: string
+  loading?: string
+  developed?: string
+}
+
+export interface WalletTranslations {
+  title?: string
+  balance?: string
+  send?: string
+  receive?: string
+  otherTokens?: string
+  errorMessage?: string
+}
+
+export interface WinnersTranslations {
+  title?: string
+  subtitle?: string
+  noWinners?: string
+  noWinnersDesc?: string
+}
+
+// Expandir a interface AgendaTranslations para incluir todas as strings necessárias
+export interface AgendaTranslations {
+  title?: string
+  subtitle?: string
+  today?: string
+  event?: string
+  noEvents?: string
+  howToParticipate?: string
+  incentivePeriod?: string
+  eventsAndActivities?: string
+  online?: string
+  participants?: string
+  days?: string[] // Array com os nomes dos dias da semana
+  months?: string[] // Array com os nomes dos meses
+  eventTypes?: {
+    airdrop?: string
+    community?: string
+    competition?: string
+    education?: string
+  }
+  // Traduções específicas para eventos
+  events?: {
+    topHoldersIncentive?: {
+      title?: string
+      description?: string
+      howToParticipate?: string[]
+    }
+  }
+}
+
+export interface FurnaceTranslations {
+  title?: string
+  subtitle?: string
+  totalBurned?: string
+  amountToBurn?: string
+  startBurn?: string
+  openFurnace?: string
+  burning?: string
+  burnCompleted?: string
+  instructions?: string
+  furnaceInfo?: string
+  deflation?: string
+  lastTransaction?: string
+}
+
+export interface LearnTranslations {
+  title?: string
+  search?: string
+  searchTerms?: string
+  searchInGlossary?: string
+  didYouKnow?: string
+  bitcoinPizza?: string
+  tokenomics?: string
+  tokenomicsDesc?: string
+  glossary?: string
+  glossaryDesc?: string
+  // Glossary sections
+  glossaryTitle?: string
+  tokenomicsTitle?: string
+  tokenomicsIntro?: string
+  supplyDistribution?: string
+  supplyDistributionDesc?: string
+  tokenUtility?: string
+  tokenUtilityDesc?: string
+  valueMechanisms?: string
+  valueMechanismsDesc?: string
+  tpfTokenomics?: string
+  totalSupply?: string
+  liquidity?: string
+  staking?: string
+  team?: string
+  marketing?: string
+  reserve?: string
+  // Trading simulator
+  tradingSimulator?: string
+}
+
+export interface AboutTranslations {
+  title?: string
+  subtitle?: string
+  about?: string
+  roadmap?: string
+  tokenomics?: string
+  whyChoose?: string
+  airdrops?: string
+  community?: string
+  utility?: string
+  longTerm?: string
+  growthStrategy?: string
+  marketing?: string
+  incentives?: string
+  governance?: string
+  phase1?: string
+  phase1Completed?: string
+  phase2?: string
+  phase2Development?: string
+  phase3?: string
+  phase3Future?: string
+  tokenLaunch?: string
+  websiteDocs?: string
+  communityGrowth?: string
+  miniApp?: string
+  airdropCampaigns?: string
+  fiGames?: string
+  fiStaking?: string
+  pulseGame?: string
+  fiPay?: string
+  enhancedSecurity?: string
+  exchangeListings?: string
+  ecosystem?: string
+  partnerships?: string
+  mobileApp?: string
+  tokenDetails?: string
+  holderBenefits?: string
+  buyTPF?: string
+}
+
+export interface SendTokenTranslations {
+  title?: string
+  subtitle?: string
+  address?: string
+  amount?: string
+  selectToken?: string
+  send?: string
+  processing?: string
+  addressRequired?: string
+  invalidAmount?: string
+  error?: string
+  transactionSuccess?: string
+  transactionFailed?: string
+  sentTo?: string
+  viewTx?: string
+  minikitNotInstalled?: string
+  tokenNotSupported?: string
+  warning?: string
+  warningWorldchain?: string
+  hideWarning?: string
+  transactionPending?: string
+}
+
+export interface ConnectButtonTranslations {
+  connect?: string
+  connecting?: string
+  connected?: string
+  installMiniKit?: string
+  errorConnecting?: string
+}
+
+// Adicionar StormTranslations:
+export interface StormTranslations {
+  title?: string
+  subtitle?: string
+  placeholder?: string
+  publish?: string
+  connectWallet?: string
+  wordPublished?: string
+  enterWord?: string
+  publishing?: string
+}
+
+// Adicionar ProjectsTranslations:
+export interface ProjectsTranslations {
+  title?: string
+  subtitle?: string
+  tpulselink?: string
+  buyToken?: string
+  symbol?: string
+  description?: string
+}
+
+// Adicionar projects à interface Translations:
+export interface Translations {
+  airdrop?: AirdropTranslations
+  history?: HistoryTranslations
+  nav?: NavTranslations
+  games?: GamesTranslations
+  wallet?: WalletTranslations
+  winners?: WinnersTranslations
+  agenda?: AgendaTranslations
+  furnace?: FurnaceTranslations
+  learn?: LearnTranslations
+  about?: AboutTranslations
+  sendToken?: SendTokenTranslations
+  connectButton?: ConnectButtonTranslations
+  storm?: StormTranslations
+  projects?: ProjectsTranslations
+}
+
+// Função para obter o idioma atual do navegador ou o padrão (inglês)
+export function getCurrentLanguage(): Language {
+  if (typeof window === "undefined") return "en"
+
+  // Verificar se há um idioma salvo no localStorage
+  const savedLanguage = localStorage.getItem("tpf_language")
+  if (savedLanguage && (savedLanguage === "en" || savedLanguage === "pt")) {
+    return savedLanguage as Language
+  }
+
+  // Se não houver idioma salvo, usar inglês como padrão
+  return "en"
+}
+
+// Função para definir o idioma atual
+export function setCurrentLanguage(lang: Language): void {
+  if (typeof window === "undefined") return
+
+  localStorage.setItem("tpf_language", lang)
+
+  // Disparar um evento para notificar componentes sobre a mudança de idioma
+  const event = new Event("languageChange")
+  window.dispatchEvent(event)
+}
+
+// Função para obter as traduções para um idioma específico
+export function getTranslations(lang: Language): Translations {
+  switch (lang) {
+    // Adicionar traduções em português:
+    case "pt":
+      return {
+        airdrop: {
+          title: "Airdrop",
+          subtitle: "Receba seus tokens TPF diários",
+          contractBalance: "Saldo do contrato:",
+          dailyAirdrop: "Airdrop diário:",
+          nextClaimIn: "Próximo claim em:",
+          claimButton: "Resgate o seu TPF",
+          processing: "Processando...",
+          tokensClaimedSuccess: "Tokens reivindicados com sucesso!",
+          availableForAirdrop: "Disponível para Airdrop:",
+        },
+        history: {
+          title: "Histórico de Transações",
+          all: "Todos",
+          loading: "Carregando...",
+          loadMore: "Carregar mais",
+          noTransactions: "Nenhuma transação encontrada",
+          showAllTransactions: "Mostrar todas as transações",
+          received: "Recebido",
+          sent: "Enviado",
+          from: "De",
+          to: "Para",
+          block: "Bloco",
+          txHash: "Hash da transação",
+          today: "Hoje",
+          yesterday: "Ontem",
+        },
+        nav: {
+          home: "Início",
+          wallet: "Carteira",
+          learn: "Aprender",
+          profile: "Perfil",
+          news: "Notícias",
+          agenda: "Agenda",
+          winners: "Vencedores",
+          games: "Jogos",
+          storm: "Storm",
+          projects: "Projetos",
+          about: "Sobre",
+          menu: "Menu",
+          close: "Fechar",
+        },
+        games: {
+          title: "FiGames",
+          subtitle: "Jogue e ganhe TPF",
+          allGames: "Todos",
+          action: "Ação",
+          adventure: "Aventura",
+          strategy: "Estratégia",
+          puzzle: "Puzzle",
+          rpg: "RPG",
+          comingSoon: "Em Breve",
+          enterNow: "Entrar Agora",
+          moreGames: "Mais jogos em breve",
+          featuredGame: "Destaque da Semana",
+          back: "Voltar",
+          start: "Iniciar Jogo",
+          score: "Pontuação",
+          round: "Rodada",
+          lives: "Vidas",
+          shots: "Tiros",
+          gameOver: "Fim de Jogo",
+          playAgain: "Jogar Novamente",
+          loading: "Carregando",
+          developed: "Desenvolvido por TPulseFi",
+        },
+        wallet: {
+          title: "Carteira",
+          balance: "Saldo TPF",
+          send: "Enviar",
+          receive: "Receber",
+          otherTokens: "Outros Tokens Confiáveis",
+          errorMessage: "Não foi possível obter o saldo real. Tente definir manualmente.",
+        },
+        winners: {
+          title: "Vencedores",
+          subtitle: "Participantes premiados nos nossos eventos",
+          noWinners: "Nenhum vencedor ainda",
+          noWinnersDesc:
+            "Os vencedores dos nossos eventos serão exibidos aqui. Fique atento aos próximos eventos para participar!",
+        },
+        agenda: {
+          title: "Agenda",
+          subtitle: "Eventos e atividades da comunidade",
+          today: "Hoje",
+          event: "Evento",
+          noEvents: "Nenhum evento para esta data",
+          howToParticipate: "Como participar:",
+          incentivePeriod: "Período de Incentivo",
+          eventsAndActivities: "Eventos e atividades da comunidade",
+          online: "Online",
+          participants: "participantes",
+          days: ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"],
+          months: [
+            "Janeiro",
+            "Fevereiro",
+            "Março",
+            "Abril",
+            "Maio",
+            "Junho",
+            "Julho",
+            "Agosto",
+            "Setembro",
+            "Outubro",
+            "Novembro",
+            "Dezembro",
+          ],
+          eventTypes: {
+            airdrop: "Airdrop",
+            community: "Comunidade",
+            competition: "Competição",
+            education: "Educação",
+          },
+          events: {
+            topHoldersIncentive: {
+              title: "10% de Incentivo para os Top 10 Holders de TPF",
+              description:
+                "Ganhe 10% de tokens bônus se você estiver entre os 10 maiores holders de TPF durante o período do evento. Exemplo: 10M TPF = 1M tokens bônus",
+              howToParticipate: [
+                "Compre e mantenha tokens TPF",
+                "Alcance uma posição entre os 10 maiores holders",
+                "Mantenha a posição até 9 de Junho",
+              ],
+            },
+          },
+        },
+        furnace: {
+          title: "Fornalha",
+          subtitle: "Queime tokens TPF e contribua para a substabilidade do token",
+          totalBurned: "Total queimado",
+          amountToBurn: "Quantidade de TPF para queimar",
+          startBurn: "Iniciar Queima",
+          openFurnace: "Abrir a Fornalha",
+          burning: "Queimando...",
+          burnCompleted: "Queima Concluída!",
+          instructions: "Clique no botão para abrir a fornalha",
+          furnaceInfo: "Informações sobre a Fornalha",
+          deflation:
+            "Deflação: Cada token queimado é enviado para uma carteira morta (0x000...dEaD) e removido permanentemente da circulação.",
+          lastTransaction: "Última Transação",
+        },
+        learn: {
+          title: "Aprenda",
+          search: "Buscar conteúdo...",
+          searchTerms: "Buscar termos...",
+          searchInGlossary: "Buscar no Glossário",
+          didYouKnow: "Você sabia?",
+          bitcoinPizza:
+            "Em 22 de maio de 2010, Laszlo Hanyecz fez a primeira compra com Bitcoin: duas pizzas por 10.000 BTC. Hoje, esse valor equivaleria a milhões de dólares!",
+          tokenomics: "Tokenomics",
+          tokenomicsDesc: "Entenda a economia dos tokens e como ela afeta o valor e a utilidade dos projetos crypto.",
+          glossary: "Glossário Crypto",
+          glossaryDesc: "Guia completo de termos e conceitos do mundo das criptomoedas para iniciantes e experts.",
+          // Glossary sections
+          glossaryTitle: "Glossário Crypto",
+          tokenomicsTitle: "Tokenomics",
+          tokenomicsIntro:
+            "Tokenomics refere-se à economia dos tokens criptográficos. Compreender a tokenomics de um projeto é essencial para avaliar seu valor e potencial de longo prazo.",
+          supplyDistribution: "Oferta e Distribuição",
+          supplyDistributionDesc:
+            "A oferta total, circulante e máxima de tokens, bem como sua distribuição entre equipe, investidores e comunidade.",
+          tokenUtility: "Utilidade do Token",
+          tokenUtilityDesc: "Como o token é usado dentro do ecossistema e quais benefícios ele oferece aos detentores.",
+          valueMechanisms: "Mecanismos de Valor",
+          valueMechanismsDesc: "Queima de tokens, staking, governança e outros mecanismos que afetam o valor do token.",
+          tpfTokenomics: "Tokenomics do TPF",
+          totalSupply: "Oferta Total:",
+          liquidity: "Liquidez:",
+          staking: "Staking:",
+          team: "Equipe:",
+          marketing: "Marketing:",
+          reserve: "Reserva:",
+          // Trading simulator
+          tradingSimulator: "Simulador de Trading",
+        },
+        about: {
+          title: "Sobre Nós",
+          subtitle: "Conheça o projeto TPulseFi",
+          about: "Sobre",
+          roadmap: "Roadmap",
+          tokenomics: "Tokenomics",
+          whyChoose: "Por que escolher TPulseFi?",
+          airdrops: "Airdrops Diários",
+          community: "Comunidade Ativa",
+          utility: "Utilidade",
+          longTerm: "Visão de Longo Prazo",
+          growthStrategy: "Estratégia de Crescimento",
+          marketing: "Marketing",
+          incentives: "Incentivos",
+          governance: "Governança",
+          phase1: "Fase 1",
+          phase1Completed: "Concluída",
+          phase2: "Fase 2",
+          phase2Development: "Em Desenvolvimento",
+          phase3: "Fase 3",
+          phase3Future: "Objetivos Futuros",
+          tokenLaunch: "Lançamento do Token",
+          websiteDocs: "Website e Documentação",
+          communityGrowth: "Crescimento da Comunidade",
+          miniApp: "Mini-App (Worldcoin AppStore)",
+          airdropCampaigns: "Campanhas de Airdrop",
+          fiGames: "Fi Games",
+          fiStaking: "FiStaking (12% APY)",
+          pulseGame: "Pulse Game",
+          fiPay: "FiPay",
+          enhancedSecurity: "Segurança Aprimorada",
+          exchangeListings: "Listagens em Exchanges",
+          ecosystem: "Expansão do Ecossistema TPulseFi",
+          partnerships: "Parcerias",
+          mobileApp: "App Mobile",
+          tokenDetails: "Detalhes do Token",
+          holderBenefits: "Vantagens para Holders",
+          buyTPF: "Comprar TPF",
+        },
+        sendToken: {
+          title: "Enviar Tokens",
+          subtitle: "Envie tokens para outro endereço",
+          address: "Endereço",
+          amount: "Quantidade",
+          selectToken: "Selecione o Token",
+          send: "Enviar",
+          processing: "Processando...",
+          addressRequired: "Endereço é obrigatório",
+          invalidAmount: "Quantidade inválida",
+          error: "Erro ao enviar tokens. Tente novamente.",
+          transactionSuccess: "Transação enviada com sucesso!",
+          transactionFailed: "Falha na transação",
+          sentTo: "enviado para",
+          viewTx: "Ver TX",
+          minikitNotInstalled: "MiniKit não está instalado",
+          tokenNotSupported: "Token não suportado",
+          warning: "Por favor, verifique o endereço do destinatário antes de enviar tokens.",
+          warningWorldchain:
+            "Não envie para carteiras que não suportem Worldchain, caso contrário poderá perder seus ativos. Não envie para exchanges.",
+          hideWarning: "Ocultar aviso",
+          transactionPending: "Transação pendente. Por favor, aguarde...",
+        },
+        connectButton: {
+          connect: "Conectar Carteira",
+          connecting: "Conectando...",
+          connected: "Conectado",
+          installMiniKit: "Por favor, instale a Worldcoin App para conectar sua carteira",
+          errorConnecting: "Erro ao conectar carteira. Tente novamente.",
+        },
+        storm: {
+          title: "Storm",
+          subtitle: "Publique palavras que aparecem na tela por alguns segundos",
+          placeholder: "Digite uma palavra...",
+          publish: "Publicar",
+          connectWallet: "Conecte sua carteira para participar",
+          wordPublished: "Palavra publicada!",
+          enterWord: "Digite uma palavra",
+          publishing: "Publicando...",
+        },
+        projects: {
+          title: "Projetos",
+          subtitle: "Explore nossos projetos e tokens",
+          tpulselink: "TPulseLink",
+          buyToken: "Comprar Token",
+          symbol: "TPL",
+          description: "Token de conectividade do ecossistema TPulseFi",
+        },
+      }
+    // Adicionar traduções em inglês:
+    default: // Inglês (padrão)
+      return {
+        airdrop: {
+          title: "Airdrop",
+          subtitle: "Receive your daily TPF tokens",
+          contractBalance: "Contract balance:",
+          dailyAirdrop: "Daily airdrop:",
+          nextClaimIn: "Next claim in:",
+          claimButton: "Claim your TPF",
+          processing: "Processing...",
+          tokensClaimedSuccess: "Tokens claimed successfully!",
+          availableForAirdrop: "Available for Airdrop:",
+        },
+        history: {
+          title: "Transaction History",
+          all: "All",
+          loading: "Loading...",
+          loadMore: "Load more",
+          noTransactions: "No transactions found",
+          showAllTransactions: "Show all transactions",
+          received: "Received",
+          sent: "Sent",
+          from: "From",
+          to: "To",
+          block: "Block",
+          txHash: "Transaction Hash",
+          today: "Today",
+          yesterday: "Yesterday",
+        },
+        nav: {
+          home: "Home",
+          wallet: "Wallet",
+          learn: "Learn",
+          profile: "Profile",
+          news: "News",
+          agenda: "Agenda",
+          winners: "Winners",
+          games: "Games",
+          storm: "Storm",
+          projects: "Projects",
+          about: "About",
+          menu: "Close",
+        },
+        games: {
+          title: "FiGames",
+          subtitle: "Play and earn TPF",
+          allGames: "All",
+          action: "Action",
+          adventure: "Adventure",
+          strategy: "Strategy",
+          puzzle: "Puzzle",
+          rpg: "RPG",
+          comingSoon: "Coming Soon",
+          enterNow: "Enter Now",
+          moreGames: "More games coming soon",
+          featuredGame: "Featured Game",
+          back: "Back",
+          start: "Start Game",
+          score: "Score",
+          round: "Round",
+          lives: "Lives",
+          shots: "Shots",
+          gameOver: "Game Over",
+          playAgain: "Play Again",
+          loading: "Loading",
+          developed: "Developed by TPulseFi",
+        },
+        wallet: {
+          title: "Wallet",
+          balance: "TPF Balance",
+          send: "Send",
+          receive: "Receive",
+          otherTokens: "Other Trusted Tokens",
+          errorMessage: "Could not get real balance. Try setting it manually.",
+        },
+        winners: {
+          title: "Winners",
+          subtitle: "Participants rewarded in our events",
+          noWinners: "No winners yet",
+          noWinnersDesc: "Winners of our events will be displayed here. Stay tuned for upcoming events to participate!",
+        },
+        agenda: {
+          title: "Agenda",
+          subtitle: "Events and community activities",
+          today: "Today",
+          event: "Event",
+          noEvents: "No events for this date",
+          howToParticipate: "How to participate:",
+          incentivePeriod: "Incentive Period",
+          eventsAndActivities: "Events and community activities",
+          online: "Online",
+          participants: "participants",
+          days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+          months: [
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+          ],
+          eventTypes: {
+            airdrop: "Airdrop",
+            community: "Community",
+            competition: "Competition",
+            education: "Education",
+          },
+          events: {
+            topHoldersIncentive: {
+              title: "10% Incentive for Top 10 TPF Holders",
+              description:
+                "Earn 10% bonus tokens if you are among the top 10 TPF holders during the event period. Example: 10M TPF = 1M bonus tokens",
+              howToParticipate: [
+                "Buy and hold TPF tokens",
+                "Reach a position among the top 10 holders",
+                "Maintain the position until June 9th",
+              ],
+            },
+          },
+        },
+        furnace: {
+          title: "Furnace",
+          subtitle: "Burn TPF tokens and contribute to token stability",
+          totalBurned: "Total burned",
+          amountToBurn: "Amount of TPF to burn",
+          startBurn: "Start Burn",
+          openFurnace: "Open the Furnace",
+          burning: "Burning...",
+          burnCompleted: "Burn Completed!",
+          instructions: "Click the button to open the furnace",
+          furnaceInfo: "Furnace Information",
+          deflation:
+            "Deflation: Each burned token is sent to a dead wallet (0x000...dEaD) and permanently removed from circulation.",
+          lastTransaction: "Last Transaction",
+        },
+        learn: {
+          title: "Learn",
+          search: "Search content...",
+          searchTerms: "Search terms...",
+          searchInGlossary: "Search in Glossary",
+          didYouKnow: "Did you know?",
+          bitcoinPizza:
+            "On May 22, 2010, Laszlo Hanyecz made the first Bitcoin purchase: two pizzas for 10,000 BTC. Today, that amount would be worth millions of dollars!",
+          tokenomics: "Tokenomics",
+          tokenomicsDesc: "Understand token economics and how it affects the value and utility of crypto projects.",
+          glossary: "Crypto Glossary",
+          glossaryDesc: "Complete guide to terms and concepts from the cryptocurrency world for beginners and experts.",
+          // Glossary sections
+          glossaryTitle: "Crypto Glossary",
+          tokenomicsTitle: "Tokenomics",
+          tokenomicsIntro:
+            "Tokenomics refers to the economics of cryptocurrency tokens. Understanding a project's tokenomics is essential for evaluating its value and long-term potential.",
+          supplyDistribution: "Supply and Distribution",
+          supplyDistributionDesc:
+            "The total, circulating, and maximum supply of tokens, as well as their distribution among team, investors, and community.",
+          tokenUtility: "Token Utility",
+          tokenUtilityDesc: "How the token is used within the ecosystem and what benefits it offers to holders.",
+          valueMechanisms: "Value Mechanisms",
+          valueMechanismsDesc:
+            "Token burning, staking, governance, and other mechanisms that affect the token's value.",
+          tpfTokenomics: "TPF Tokenomics",
+          totalSupply: "Total Supply:",
+          liquidity: "Liquidity:",
+          staking: "Staking:",
+          team: "Team:",
+          marketing: "Marketing:",
+          reserve: "Reserve:",
+          // Trading simulator
+          tradingSimulator: "Trading Simulator",
+        },
+        about: {
+          title: "About Us",
+          subtitle: "Learn about the TPulseFi project",
+          about: "About",
+          roadmap: "Roadmap",
+          tokenomics: "Tokenomics",
+          whyChoose: "Why choose TPulseFi?",
+          airdrops: "Daily Airdrops",
+          community: "Active Community",
+          utility: "Utility",
+          longTerm: "Long-Term Vision",
+          growthStrategy: "Growth Strategy",
+          marketing: "Marketing",
+          incentives: "Incentives",
+          governance: "Governance",
+          phase1: "Phase 1",
+          phase1Completed: "Completed",
+          phase2: "Phase 2",
+          phase2Development: "In Development",
+          phase3: "Phase 3",
+          phase3Future: "Future Goals",
+          tokenLaunch: "Token Launch",
+          websiteDocs: "Website and Documentation",
+          communityGrowth: "Community Growth",
+          miniApp: "Mini-App (Worldcoin AppStore)",
+          airdropCampaigns: "Airdrop Campaigns",
+          fiGames: "Fi Games",
+          fiStaking: "FiStaking (12% APY)",
+          pulseGame: "Pulse Game",
+          fiPay: "FiPay",
+          enhancedSecurity: "Enhanced Security",
+          exchangeListings: "Exchange Listings",
+          ecosystem: "TPulseFi Ecosystem Expansion",
+          partnerships: "Partnerships",
+          mobileApp: "Mobile App",
+          tokenDetails: "Token Details",
+          holderBenefits: "Holder Benefits",
+          buyTPF: "Buy TPF",
+        },
+        sendToken: {
+          title: "Send Tokens",
+          subtitle: "Send tokens to another address",
+          address: "Address",
+          amount: "Amount",
+          selectToken: "Select Token",
+          send: "Send",
+          processing: "Processing...",
+          addressRequired: "Address is required",
+          invalidAmount: "Invalid amount",
+          error: "Error sending tokens. Please try again.",
+          transactionSuccess: "Transaction sent successfully!",
+          transactionFailed: "Transaction failed",
+          sentTo: "sent to",
+          viewTx: "View TX",
+          minikitNotInstalled: "MiniKit is not installed",
+          tokenNotSupported: "Token not supported",
+          warning: "Please verify the recipient address before sending tokens.",
+          warningWorldchain:
+            "Do not send to wallets that don't support Worldchain, otherwise you may lose your assets. Do not send to exchanges.",
+          hideWarning: "Hide warning",
+          transactionPending: "Transaction pending. Please wait...",
+        },
+        connectButton: {
+          connect: "Connect Wallet",
+          connecting: "Connecting...",
+          connected: "Connected",
+          installMiniKit: "Please install the Worldcoin App to connect your wallet",
+          errorConnecting: "Error connecting wallet. Please try again.",
+        },
+        storm: {
+          title: "Storm",
+          subtitle: "Publish words that appear on screen for a few seconds",
+          placeholder: "Type a word...",
+          publish: "Publish",
+          connectWallet: "Connect your wallet to participate",
+          wordPublished: "Word published!",
+          enterWord: "Enter a word",
+          publishing: "Publishing...",
+        },
+        projects: {
+          title: "Projects",
+          subtitle: "Explore our projects and tokens",
+          tpulselink: "TPulseLink",
+          buyToken: "Buy Token",
+          symbol: "TPL",
+          description: "TPulseFi ecosystem connectivity token",
+        },
+      }
+  }
+}
