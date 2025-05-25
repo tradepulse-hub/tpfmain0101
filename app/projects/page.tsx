@@ -25,7 +25,7 @@ export default function ProjectsPage() {
 
   const handleBuyTPL = () => {
     window.open(
-      "https://worldcoin.org/mini-app?app_id=app_15daccf5b7d4ec9b7dbba044a8fdeab5&path=app/token/0xf11Dd4551A334A0Bb3CD9A6C7c5eCfb14D09C2b4",
+      "https://worldcoin.org/mini-app?app_id=app_15daccf5b7d4ec9b7dbba044a8fdeab5&path=app/token/0x460b7B7ade9B02C4aEB8281bbb301Fc57Aa14230",
       "_blank",
     )
   }
