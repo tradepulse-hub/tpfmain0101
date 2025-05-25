@@ -41,7 +41,6 @@ export interface NavTranslations {
   winners?: string
   games?: string
   storm?: string
-  projects?: string
   about?: string
   menu?: string
   close?: string
@@ -248,16 +247,6 @@ export interface StormTranslations {
   publishing?: string
 }
 
-// Adicionar ProjectsTranslations:
-export interface ProjectsTranslations {
-  title?: string
-  subtitle?: string
-  tpulselink?: string
-  buyToken?: string
-  symbol?: string
-  description?: string
-}
-
 // Adicionar projects à interface Translations:
 export interface Translations {
   airdrop?: AirdropTranslations
@@ -273,7 +262,6 @@ export interface Translations {
   sendToken?: SendTokenTranslations
   connectButton?: ConnectButtonTranslations
   storm?: StormTranslations
-  projects?: ProjectsTranslations
 }
 
 // Função para obter o idioma atual do navegador ou o padrão (inglês)
@@ -344,7 +332,6 @@ export function getTranslations(lang: Language): Translations {
           winners: "Vencedores",
           games: "Jogos",
           storm: "Storm",
-          projects: "Projetos",
           about: "Sobre",
           menu: "Menu",
           close: "Fechar",
@@ -561,14 +548,6 @@ export function getTranslations(lang: Language): Translations {
           enterWord: "Digite uma palavra",
           publishing: "Publicando...",
         },
-        projects: {
-          title: "Projetos",
-          subtitle: "Explore nossos projetos e tokens",
-          tpulselink: "TPulseLink",
-          buyToken: "Comprar Token",
-          symbol: "TPL",
-          description: "Token de conectividade do ecossistema TPulseFi",
-        },
       }
     // Adicionar traduções em inglês:
     default: // Inglês (padrão)
@@ -610,7 +589,6 @@ export function getTranslations(lang: Language): Translations {
           winners: "Winners",
           games: "Games",
           storm: "Storm",
-          projects: "Projects",
           about: "About",
           menu: "Close",
         },
@@ -825,14 +803,6 @@ export function getTranslations(lang: Language): Translations {
           wordPublished: "Word published!",
           enterWord: "Enter a word",
           publishing: "Publishing...",
-        },
-        projects: {
-          title: "Projects",
-          subtitle: "Explore our projects and tokens",
-          tpulselink: "TPulseLink",
-          buyToken: "Buy Token",
-          symbol: "TPL",
-          description: "TPulseFi ecosystem connectivity token",
         },
       }
   }

@@ -21,7 +21,7 @@ interface BottomNavProps {
     | "winners"
     | "news"
     | "learn"
-    | "projects"
+  // | "projects"  <- Remover esta linha
 }
 
 export function BottomNav({ activeTab = "agenda" }: BottomNavProps) {
@@ -96,7 +96,7 @@ export function BottomNav({ activeTab = "agenda" }: BottomNavProps) {
                   { name: translations.nav?.learn || "Aprende", icon: "book", path: "/learn" },
                   { name: translations.nav?.games || "Fi Games", icon: "gamepad", path: "/games" },
                   { name: translations.nav?.storm || "Storm", icon: "zap", path: "/storm" },
-                  { name: translations.nav?.projects || "Projects", icon: "projects", path: "/projects" },
+                  // { name: translations.nav?.projects || "Projects", icon: "projects", path: "/projects" },  <- Remover esta linha
                   { name: translations.nav?.about || "Sobre", icon: "info", path: "/about" },
                 ].map((item) => (
                   <Link href={item.path} key={item.name}>
@@ -161,11 +161,6 @@ export function BottomNav({ activeTab = "agenda" }: BottomNavProps) {
                                 d="M14.615 1.595a.75.75 0 01.359.852L12.982 9.75h7.268a.75.75 0 01.548 1.262l-10.5 11.25a.75.75 0 01-1.272-.71L10.018 14.25H2.75a.75.75 0 01-.548-1.262l10.5-11.25a.75.75 0 01.913-.143z"
                                 clipRule="evenodd"
                               />
-                            </svg>
-                          )}
-                          {item.icon === "projects" && (
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-15a3 3 0 00-3 3V18a3 3 0 003 3h15zM1.5 10.146V6a3 3 0 013-3h5.379a2.25 2.25 0 011.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 013 3v1.146A4.483 4.483 0 0019.5 9h-15a4.483 4.483 0 00-3 1.146z" />
                             </svg>
                           )}
                           {item.icon === "info" && (
