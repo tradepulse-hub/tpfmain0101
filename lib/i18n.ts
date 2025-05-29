@@ -277,6 +277,11 @@ export interface DailyCheckInTranslations {
   yesterday?: string
   daysAgo?: string
   consecutiveDays?: string
+  nextCheckIn?: string
+  hours?: string
+  minutes?: string
+  seconds?: string
+  availableNow?: string
 }
 
 // Adicionar projects à interface Translations:
@@ -609,6 +614,11 @@ export function getTranslations(lang: Language): Translations {
           yesterday: "Ontem",
           daysAgo: "dias atrás",
           consecutiveDays: "dias consecutivos",
+          nextCheckIn: "Próximo check-in em:",
+          hours: "h",
+          minutes: "m",
+          seconds: "s",
+          availableNow: "Disponível agora!",
         },
       }
     // Adicionar traduções em inglês:
@@ -893,6 +903,11 @@ export function getTranslations(lang: Language): Translations {
           yesterday: "Yesterday",
           daysAgo: "days ago",
           consecutiveDays: "consecutive days",
+          nextCheckIn: "Next check-in in:",
+          hours: "h",
+          minutes: "m",
+          seconds: "s",
+          availableNow: "Available now!",
         },
       }
   }

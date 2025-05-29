@@ -2,13 +2,19 @@
 
 import { motion, AnimatePresence } from "framer-motion"
 import { useState, useEffect } from "react"
-import { Calendar, Flame, ChevronDown, ChevronUp } from "lucide-react"
+import { Calendar, Flame, ChevronDown, ChevronUp, Clock } from "lucide-react"
 import { getCurrentLanguage, getTranslations, type Language } from "@/lib/i18n"
 
 interface CheckInData {
   date: string
   points: number
   streak: number
+}
+
+interface TimeRemaining {
+  hours: number
+  minutes: number
+  seconds: number
 }
 
 export function DailyCheckIn() {
@@ -20,6 +26,7 @@ export function DailyCheckIn() {
   const [checkInHistory, setCheckInHistory] = useState<CheckInData[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [isAnimating, setIsAnimating] = useState(false)
+  const [timeUntilNextCheckIn, setTimeUntilNextCheckIn] = useState<TimeRemaining>({ hours: 0, minutes: 0, seconds: 0 })
 
   // Carregar idioma e traduções
   useEffect(() => {
@@ -42,6 +49,37 @@ export function DailyCheckIn() {
   useEffect(() => {
     loadCheckInData()
   }, [])
+
+  // Countdown timer
+  useEffect(() => {
+    if (!hasCheckedInToday) return
+
+    const updateCountdown = () => {
+      const now = new Date()
+      const tomorrow = new Date(now)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      tomorrow.setHours(0, 0, 0, 0)
+
+      const timeDiff = tomorrow.getTime() - now.getTime()
+
+      if (timeDiff <= 0) {
+        setHasCheckedInToday(false)
+        setTimeUntilNextCheckIn({ hours: 0, minutes: 0, seconds: 0 })
+        return
+      }
+
+      const hours = Math.floor(timeDiff / (1000 * 60 * 60))
+      const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60))
+      const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000)
+
+      setTimeUntilNextCheckIn({ hours, minutes, seconds })
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 1000)
+
+    return () => clearInterval(interval)
+  }, [hasCheckedInToday])
 
   const loadCheckInData = () => {
     try {
@@ -156,11 +194,24 @@ export function DailyCheckIn() {
     }
   }
 
+  const formatCountdown = (time: TimeRemaining): string => {
+    const { hours, minutes, seconds } = time
+    const h = translations.dailyCheckIn?.hours || "h"
+    const m = translations.dailyCheckIn?.minutes || "m"
+    const s = translations.dailyCheckIn?.seconds || "s"
+
+    if (hours > 0) {
+      return `${hours.toString().padStart(2, "0")}${h} ${minutes.toString().padStart(2, "0")}${m} ${seconds.toString().padStart(2, "0")}${s}`
+    } else {
+      return `${minutes.toString().padStart(2, "0")}${m} ${seconds.toString().padStart(2, "0")}${s}`
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="w-full bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700/50 p-4"
+      className="w-full bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700/50 p-4 relative overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
@@ -188,6 +239,31 @@ export function DailyCheckIn() {
         </div>
       </div>
 
+      {/* Countdown Timer */}
+      {hasCheckedInToday && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="mb-4 p-3 bg-gray-700/30 rounded-lg border border-gray-600/30"
+        >
+          <div className="flex items-center justify-center gap-2 text-center">
+            <Clock className="w-4 h-4 text-blue-400" />
+            <div>
+              <div className="text-xs text-gray-400 mb-1">
+                {translations.dailyCheckIn?.nextCheckIn || "Next check-in in:"}
+              </div>
+              <div className="text-lg font-mono font-bold text-blue-400">
+                {timeUntilNextCheckIn.hours === 0 &&
+                timeUntilNextCheckIn.minutes === 0 &&
+                timeUntilNextCheckIn.seconds === 0
+                  ? translations.dailyCheckIn?.availableNow || "Available now!"
+                  : formatCountdown(timeUntilNextCheckIn)}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Check-in Button */}
       <motion.button
         onClick={handleCheckIn}
@@ -199,7 +275,7 @@ export function DailyCheckIn() {
             ? "bg-green-600/50 text-green-200 cursor-not-allowed"
             : isAnimating
               ? "bg-blue-600 text-white"
-              : "bg-blue-600 hover:bg-blue-500 text-white"
+              : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-blue-500/25"
         }`}
       >
         <AnimatePresence mode="wait">
