@@ -30,7 +30,7 @@ export interface HistoryTranslations {
   yesterday?: string
 }
 
-// Adicionar "projects" à interface NavTranslations:
+// Adicionar "finances" à interface NavTranslations:
 export interface NavTranslations {
   home?: string
   wallet?: string
@@ -42,6 +42,7 @@ export interface NavTranslations {
   games?: string
   storm?: string
   about?: string
+  finances?: string
   menu?: string
   close?: string
 }
@@ -284,7 +285,29 @@ export interface DailyCheckInTranslations {
   availableNow?: string
 }
 
-// Adicionar projects à interface Translations:
+// Adicionar interface para traduções das finanças
+export interface FinancesTranslations {
+  title?: string
+  subtitle?: string
+  transparencyMessage?: string
+  incentivesReceived?: string
+  transactionFees?: string
+  tradingRevenue?: string
+  projectExpenses?: string
+  lastUpdated?: string
+  overview?: string
+  revenue?: string
+  expenses?: string
+  netBalance?: string
+  financialChart?: string
+  revenueBreakdown?: string
+  expenseBreakdown?: string
+  noData?: string
+  totalRevenue?: string
+  totalExpenses?: string
+}
+
+// Adicionar finances à interface Translations:
 export interface Translations {
   airdrop?: AirdropTranslations
   history?: HistoryTranslations
@@ -301,6 +324,7 @@ export interface Translations {
   storm?: StormTranslations
   profile?: ProfileTranslations
   dailyCheckIn?: DailyCheckInTranslations
+  finances?: FinancesTranslations
 }
 
 // Função para obter o idioma atual do navegador ou o padrão (inglês)
@@ -372,6 +396,7 @@ export function getTranslations(lang: Language): Translations {
           games: "Jogos",
           storm: "Storm",
           about: "Sobre",
+          finances: "Finanças",
           menu: "Menu",
           close: "Fechar",
         },
@@ -620,6 +645,27 @@ export function getTranslations(lang: Language): Translations {
           seconds: "s",
           availableNow: "Disponível agora!",
         },
+        finances: {
+          title: "Finanças",
+          subtitle: "Transparência financeira do projeto",
+          transparencyMessage:
+            "Como a nossa prioridade é a transparência, procuramos alinhar esse princípio com os nossos usuários e investidores",
+          incentivesReceived: "Incentivos conseguidos para progressão do projeto",
+          transactionFees: "Rendimentos obtidos por taxas de transação",
+          tradingRevenue: "Rendimentos obtidos pela nossa equipa de Trading",
+          projectExpenses: "Gastos no projeto",
+          lastUpdated: "Última atualização",
+          overview: "Visão Geral",
+          revenue: "Receitas",
+          expenses: "Despesas",
+          netBalance: "Saldo Líquido",
+          financialChart: "Gráfico Financeiro",
+          revenueBreakdown: "Detalhamento de Receitas",
+          expenseBreakdown: "Detalhamento de Despesas",
+          noData: "Sem dados disponíveis",
+          totalRevenue: "Total de Receitas",
+          totalExpenses: "Total de Despesas",
+        },
       }
     // Adicionar traduções em inglês:
     default: // Inglês (padrão)
@@ -662,6 +708,7 @@ export function getTranslations(lang: Language): Translations {
           games: "Games",
           storm: "Storm",
           about: "About",
+          finances: "Finances",
           menu: "Close",
         },
         games: {
@@ -908,6 +955,27 @@ export function getTranslations(lang: Language): Translations {
           minutes: "m",
           seconds: "s",
           availableNow: "Available now!",
+        },
+        finances: {
+          title: "Finances",
+          subtitle: "Project financial transparency",
+          transparencyMessage:
+            "As our priority is transparency, we seek to align this principle with our users and investors",
+          incentivesReceived: "Incentives received for project progression",
+          transactionFees: "Revenue obtained from transaction fees",
+          tradingRevenue: "Revenue obtained by our Trading team",
+          projectExpenses: "Project expenses",
+          lastUpdated: "Last updated",
+          overview: "Overview",
+          revenue: "Revenue",
+          expenses: "Expenses",
+          netBalance: "Net Balance",
+          financialChart: "Financial Chart",
+          revenueBreakdown: "Revenue Breakdown",
+          expenseBreakdown: "Expense Breakdown",
+          noData: "No data available",
+          totalRevenue: "Total Revenue",
+          totalExpenses: "Total Expenses",
         },
       }
   }
