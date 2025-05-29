@@ -247,6 +247,38 @@ export interface StormTranslations {
   publishing?: string
 }
 
+// Adicionar interface para traduções do perfil
+export interface ProfileTranslations {
+  inviteBanner?: string
+  shareButton?: string
+  profile?: string
+  logOut?: string
+  shareWithFriends?: string
+  followUs?: string
+  notConnected?: string
+}
+
+// Adicionar interface para traduções do check-in diário
+export interface DailyCheckInTranslations {
+  title?: string
+  subtitle?: string
+  checkInButton?: string
+  alreadyCheckedIn?: string
+  points?: string
+  totalPoints?: string
+  streak?: string
+  days?: string
+  checkInSuccess?: string
+  history?: string
+  showHistory?: string
+  hideHistory?: string
+  noHistory?: string
+  today?: string
+  yesterday?: string
+  daysAgo?: string
+  consecutiveDays?: string
+}
+
 // Adicionar projects à interface Translations:
 export interface Translations {
   airdrop?: AirdropTranslations
@@ -262,6 +294,8 @@ export interface Translations {
   sendToken?: SendTokenTranslations
   connectButton?: ConnectButtonTranslations
   storm?: StormTranslations
+  profile?: ProfileTranslations
+  dailyCheckIn?: DailyCheckInTranslations
 }
 
 // Função para obter o idioma atual do navegador ou o padrão (inglês)
@@ -548,6 +582,34 @@ export function getTranslations(lang: Language): Translations {
           enterWord: "Digite uma palavra",
           publishing: "Publicando...",
         },
+        profile: {
+          inviteBanner: "Convide amigos e familiares para experimentarem o nosso aplicativo",
+          shareButton: "Compartilhar",
+          profile: "Perfil",
+          logOut: "Sair da conta",
+          shareWithFriends: "Compartilhar com amigos e família",
+          followUs: "Siga-nos",
+          notConnected: "Não conectado",
+        },
+        dailyCheckIn: {
+          title: "Check-in Diário",
+          subtitle: "Ganhe 1 ponto por dia",
+          checkInButton: "Fazer Check-in",
+          alreadyCheckedIn: "Check-in feito hoje!",
+          points: "pontos",
+          totalPoints: "Total de pontos",
+          streak: "Sequência",
+          days: "dias",
+          checkInSuccess: "Check-in realizado! +1 ponto",
+          history: "Histórico",
+          showHistory: "Ver histórico",
+          hideHistory: "Ocultar histórico",
+          noHistory: "Nenhum check-in ainda",
+          today: "Hoje",
+          yesterday: "Ontem",
+          daysAgo: "dias atrás",
+          consecutiveDays: "dias consecutivos",
+        },
       }
     // Adicionar traduções em inglês:
     default: // Inglês (padrão)
@@ -803,6 +865,34 @@ export function getTranslations(lang: Language): Translations {
           wordPublished: "Word published!",
           enterWord: "Enter a word",
           publishing: "Publishing...",
+        },
+        profile: {
+          inviteBanner: "Invite friends and family to try our app",
+          shareButton: "Share",
+          profile: "Profile",
+          logOut: "Log out",
+          shareWithFriends: "Share with friends and family",
+          followUs: "Follow us",
+          notConnected: "Not connected",
+        },
+        dailyCheckIn: {
+          title: "Daily Check-in",
+          subtitle: "Earn 1 point per day",
+          checkInButton: "Check In",
+          alreadyCheckedIn: "Already checked in today!",
+          points: "points",
+          totalPoints: "Total points",
+          streak: "Streak",
+          days: "days",
+          checkInSuccess: "Check-in completed! +1 point",
+          history: "History",
+          showHistory: "Show history",
+          hideHistory: "Hide history",
+          noHistory: "No check-ins yet",
+          today: "Today",
+          yesterday: "Yesterday",
+          daysAgo: "days ago",
+          consecutiveDays: "consecutive days",
         },
       }
   }

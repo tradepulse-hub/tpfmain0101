@@ -12,7 +12,8 @@ import { TransactionHistory } from "@/components/transaction-history"
 import { Settings, Share2, LogOut, Globe, ChevronDown, Check, ExternalLink } from "lucide-react"
 
 // Importar as funções de idioma
-import { getCurrentLanguage, setCurrentLanguage, type Language } from "@/lib/i18n"
+import { getCurrentLanguage, setCurrentLanguage, getTranslations, type Language } from "@/lib/i18n"
+import { DailyCheckIn } from "@/components/daily-check-in"
 
 export default function ProfilePage() {
   // User state with profile data
@@ -40,6 +41,9 @@ export default function ProfilePage() {
 
   // Dentro da função ProfilePage, adicionar estado para o idioma
   const [currentLanguage, setLanguage] = useState<Language>("en")
+
+  // Dentro da função ProfilePage, adicionar estado para as traduções
+  const [translations, setTranslations] = useState(getTranslations("en"))
 
   // Handle profile updates
   const handleProfileUpdate = (newData: { nickname?: string; profileImage?: string }) => {
@@ -132,6 +136,7 @@ export default function ProfilePage() {
   const toggleLanguage = (lang: Language) => {
     setCurrentLanguage(lang)
     setLanguage(lang)
+    setTranslations(getTranslations(lang))
     setIsLanguageMenuOpen(false)
   }
 
@@ -214,10 +219,22 @@ export default function ProfilePage() {
     }
   }, [router])
 
-  // Adicionar useEffect para carregar o idioma atual
+  // Atualizar o useEffect para carregar traduções
   useEffect(() => {
-    // Carregar idioma atual
-    setLanguage(getCurrentLanguage())
+    // Carregar idioma atual e traduções
+    const lang = getCurrentLanguage()
+    setLanguage(lang)
+    setTranslations(getTranslations(lang))
+
+    // Escutar mudanças de idioma
+    const handleLanguageChange = () => {
+      const newLang = getCurrentLanguage()
+      setLanguage(newLang)
+      setTranslations(getTranslations(newLang))
+    }
+
+    window.addEventListener("languageChange", handleLanguageChange)
+    return () => window.removeEventListener("languageChange", handleLanguageChange)
   }, [])
 
   return (
@@ -250,7 +267,7 @@ export default function ProfilePage() {
           >
             <h1 className="text-2xl font-bold tracking-tighter">
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-200 via-white to-gray-300">
-                {currentLanguage === "pt" ? "Perfil" : "Profile"}
+                {translations.profile?.profile || "Profile"}
               </span>
             </h1>
           </motion.div>
@@ -328,13 +345,13 @@ export default function ProfilePage() {
                     className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center"
                   >
                     <Share2 className="w-4 h-4 mr-2" />
-                    {currentLanguage === "pt" ? "Compartilhar com amigos e família" : "Share with friends and family"}
+                    {translations.profile?.shareWithFriends || "Share with friends and family"}
                   </button>
 
                   {/* Seção Follow Us */}
                   <div className="border-t border-gray-700 pt-1 mt-1">
                     <div className="px-4 py-1 text-xs text-gray-500">
-                      {currentLanguage === "pt" ? "Siga-nos" : "Follow us"}
+                      {translations.profile?.followUs || "Follow us"}
                     </div>
 
                     <a
@@ -371,7 +388,7 @@ export default function ProfilePage() {
                     className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 flex items-center border-t border-gray-700"
                   >
                     <LogOut className="w-4 h-4 mr-2" />
-                    {currentLanguage === "pt" ? "Sair da conta" : "Log out"}
+                    {translations.profile?.logOut || "Log out"}
                   </button>
                 </div>
               </motion.div>
@@ -379,11 +396,51 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Letreiro de convite */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="w-full"
+        >
+          <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-3 shadow-lg">
+            <div className="absolute inset-0 bg-black/10" />
+
+            {/* Efeito de brilho animado */}
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+              animate={{
+                x: ["-100%", "200%"],
+              }}
+              transition={{
+                repeat: Number.POSITIVE_INFINITY,
+                duration: 2.5,
+                ease: "linear",
+              }}
+            />
+
+            <div className="relative flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-white font-medium text-sm md:text-base">
+                  {translations.profile?.inviteBanner || "Invite friends and family to try our app"}
+                </p>
+              </div>
+              <button
+                onClick={shareApp}
+                className="ml-3 flex-shrink-0 bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-full text-xs font-medium transition-colors"
+              >
+                <Share2 className="w-4 h-4 inline mr-1" />
+                {translations.profile?.shareButton || "Share"}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+
         {/* TPulseFi title */}
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
           className="text-center"
         >
           <h1 className="text-3xl font-bold tracking-tighter">
@@ -399,7 +456,7 @@ export default function ProfilePage() {
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
           className="relative"
         >
           <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-gray-700 relative">
@@ -474,7 +531,7 @@ export default function ProfilePage() {
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
           className="text-center relative"
         >
           <div className="flex items-center justify-center gap-2">
@@ -496,12 +553,18 @@ export default function ProfilePage() {
             </motion.button>
           </div>
           <div className="mt-1 px-3 py-1 bg-gray-800/50 rounded-full text-xs text-gray-400 border border-gray-700/50">
-            {walletAddress
-              ? formatAddress(walletAddress)
-              : currentLanguage === "pt"
-                ? "Não conectado"
-                : "Not connected"}
+            {walletAddress ? formatAddress(walletAddress) : translations.profile?.notConnected || "Not connected"}
           </div>
+        </motion.div>
+
+        {/* Daily Check-in Component */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
+          className="w-full max-w-xs"
+        >
+          <DailyCheckIn />
         </motion.div>
 
         {/* Transaction History */}
