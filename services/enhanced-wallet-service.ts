@@ -1,9 +1,11 @@
-// Serviço de carteira simulado (versão original)
+import { ethers } from "ethers"
+
+// Serviço de carteira simulado com ethers
 class EnhancedWalletService {
   private initialized = true
 
   constructor() {
-    console.log("Enhanced wallet service initialized (simulated)")
+    console.log("Enhanced wallet service initialized (simulated with ethers)")
   }
 
   // Obter saldo simulado de TPF
@@ -65,7 +67,7 @@ class EnhancedWalletService {
         {
           id: "tx-1",
           type: "receive",
-          amount: "100",
+          amount: ethers.utils.formatEther("100000000000000000000"), // 100 TPF
           date: new Date(Date.now() - 86400000).toISOString(), // 1 dia atrás
           from: "0x1234...5678",
           to: walletAddress,
@@ -77,7 +79,7 @@ class EnhancedWalletService {
         {
           id: "tx-2",
           type: "send",
-          amount: "50",
+          amount: ethers.utils.formatEther("50000000000000000000"), // 50 WLD
           date: new Date(Date.now() - 172800000).toISOString(), // 2 dias atrás
           from: walletAddress,
           to: "0x9876...5432",
@@ -89,7 +91,7 @@ class EnhancedWalletService {
         {
           id: "tx-3",
           type: "swap",
-          amount: "25",
+          amount: ethers.utils.formatEther("25000000000000000000"), // 25 WETH
           date: new Date(Date.now() - 259200000).toISOString(), // 3 dias atrás
           from: walletAddress,
           to: "0xSwapContract",
@@ -136,9 +138,13 @@ class EnhancedWalletService {
   // Obter cotação simulada para swap
   async getSwapQuote(tokenIn: string, tokenOut: string, amountIn: string) {
     try {
-      // Cotação simulada
+      // Converter amountIn para wei e calcular amountOut
+      const amountInWei = ethers.utils.parseEther(amountIn)
+      const amountOutWei = amountInWei.mul(95).div(100) // 5% de slippage simulado
+      const amountOut = ethers.utils.formatEther(amountOutWei)
+
       const quote = {
-        amountOut: (Number(amountIn) * 0.95).toString(), // 5% de slippage simulado
+        amountOut,
         priceImpact: "0.1",
         fee: "0.3",
         data: "0x",
@@ -164,7 +170,7 @@ class EnhancedWalletService {
 
       // Simular resultado de swap
       const result = {
-        hash: "0xswap123...",
+        hash: ethers.utils.keccak256(ethers.utils.toUtf8Bytes("simulated-swap")),
         success: true,
         message: "Swap executed successfully (simulated)",
       }
@@ -181,9 +187,14 @@ class EnhancedWalletService {
     try {
       console.log("Sending simulated token:", params)
 
+      // Validar endereço usando ethers
+      if (!ethers.utils.isAddress(params.to)) {
+        throw new Error("Invalid recipient address")
+      }
+
       // Simular resultado de envio
       const result = {
-        hash: "0xsend123...",
+        hash: ethers.utils.keccak256(ethers.utils.toUtf8Bytes("simulated-send")),
         success: true,
         message: "Token sent successfully (simulated)",
       }
@@ -201,12 +212,15 @@ class EnhancedWalletService {
       const details: Record<string, any> = {}
 
       tokenAddresses.forEach((address) => {
-        details[address] = {
-          address,
-          name: "Simulated Token",
-          symbol: "SIM",
-          decimals: 18,
-          chainId: 480,
+        // Validar endereço usando ethers
+        if (ethers.utils.isAddress(address)) {
+          details[address] = {
+            address: ethers.utils.getAddress(address), // Normalizar endereço
+            name: "Simulated Token",
+            symbol: "SIM",
+            decimals: 18,
+            chainId: 480,
+          }
         }
       })
 
@@ -220,6 +234,11 @@ class EnhancedWalletService {
   // Obter tokens simulados da carteira
   async getWalletTokens(walletAddress: string) {
     try {
+      // Validar endereço da carteira
+      if (!ethers.utils.isAddress(walletAddress)) {
+        throw new Error("Invalid wallet address")
+      }
+
       // Lista simulada de tokens
       const tokens = [
         "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45", // TPF
@@ -247,6 +266,32 @@ class EnhancedWalletService {
       name: "worldchain",
       rpcUrl: "https://worldchain-mainnet.g.alchemy.com/public",
     }
+  }
+
+  // Criar provider ethers
+  createProvider(rpcUrl?: string) {
+    const url = rpcUrl || "https://worldchain-mainnet.g.alchemy.com/public"
+    return new ethers.providers.JsonRpcProvider(url, {
+      chainId: 480,
+      name: "worldchain",
+    })
+  }
+
+  // Formatar valores usando ethers
+  formatEther(value: string) {
+    return ethers.utils.formatEther(value)
+  }
+
+  parseEther(value: string) {
+    return ethers.utils.parseEther(value)
+  }
+
+  formatUnits(value: string, decimals: number) {
+    return ethers.utils.formatUnits(value, decimals)
+  }
+
+  parseUnits(value: string, decimals: number) {
+    return ethers.utils.parseUnits(value, decimals)
   }
 }
 
