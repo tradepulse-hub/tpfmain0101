@@ -6,32 +6,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import { ChevronDown, ChevronUp, X, AlertCircle } from "lucide-react"
 import { getCurrentLanguage, getTranslations } from "../lib/i18n"
-import { MiniKit } from "@worldcoin/minikit-js"
-import { ethers } from "ethers"
+import { enhancedWalletService } from "@/services/enhanced-wallet-service"
 import { toast } from "sonner"
-
-// ABI simplificado para tokens ERC20 (apenas para a função transfer)
-const ERC20_ABI = [
-  {
-    inputs: [
-      { internalType: "address", name: "to", type: "address" },
-      { internalType: "uint256", name: "amount", type: "uint256" },
-    ],
-    name: "transfer",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-]
-
-// Endereços dos contratos de tokens
-const TOKEN_ADDRESSES = {
-  TPF: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
-  WLD: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
-  DNA: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113",
-  CASH: "0xbfdA4F50a2d5B9b864511579D7dfa1C72f118575",
-  WDD: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B",
-}
 
 interface SendTokenModalProps {
   isOpen: boolean
@@ -77,53 +53,25 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
 
     setIsLoading(true)
     try {
-      if (!MiniKit.isInstalled()) {
-        throw new Error(translations.minikitNotInstalled || "MiniKit is not installed")
-      }
+      console.log(`Sending ${amount} ${token} to ${address} using REAL Holdstation SDK`)
 
-      // Verificar se o valor é válido
-      const sendAmount = Number.parseFloat(amount)
-      if (isNaN(sendAmount) || sendAmount <= 0) {
-        throw new Error(translations.invalidAmount || "Invalid amount")
-      }
+      // Usar o serviço REAL para enviar tokens
+      const tokenAddress = token === "ETH" ? undefined : getTokenAddress(token)
 
-      // Converter o valor para wei (18 casas decimais)
-      const amountInWei = ethers.parseUnits(amount, 18).toString()
-
-      // Obter o endereço do contrato do token selecionado
-      const tokenAddress = TOKEN_ADDRESSES[token as keyof typeof TOKEN_ADDRESSES]
-      if (!tokenAddress) {
-        throw new Error(translations.tokenNotSupported || "Token not supported")
-      }
-
-      console.log(`Sending ${amount} ${token} to ${address}`)
-      console.log("Token address:", tokenAddress)
-      console.log("Amount in wei:", amountInWei)
-
-      // Enviar a transação usando o MiniKit
-      const { finalPayload } = await MiniKit.commandsAsync.sendTransaction({
-        transaction: [
-          {
-            address: tokenAddress,
-            abi: ERC20_ABI,
-            functionName: "transfer",
-            args: [address, amountInWei],
-          },
-        ],
+      const result = await enhancedWalletService.sendToken({
+        to: address,
+        amount: Number.parseFloat(amount),
+        token: tokenAddress,
       })
 
-      if (finalPayload.status === "error") {
-        throw new Error(finalPayload.message || translations.transactionFailed || "Transaction failed")
-      }
-
-      console.log("Transaction sent successfully:", finalPayload)
+      console.log("REAL transaction sent successfully:", result)
 
       // Mostrar notificação de sucesso
       toast.success(translations.transactionSuccess || "Transaction sent successfully!", {
         description: `${amount} ${token} ${translations.sentTo || "sent to"} ${address.substring(0, 6)}...${address.substring(address.length - 4)}`,
         action: {
           label: translations.viewTx || "View TX",
-          onClick: () => window.open(`https://worldscan.org/tx/${finalPayload.transaction_id}`, "_blank"),
+          onClick: () => window.open(`https://worldscan.org/tx/${result.hash}`, "_blank"),
         },
       })
 
@@ -136,9 +84,9 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
       const event = new CustomEvent("token_transfer_completed", {
         detail: {
           token,
-          amount: sendAmount,
+          amount: Number.parseFloat(amount),
           to: address,
-          txHash: finalPayload.transaction_id,
+          txHash: result.hash,
           from: walletAddress,
           type: "send",
           date: new Date().toISOString(),
@@ -148,7 +96,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
       })
       window.dispatchEvent(event)
     } catch (error) {
-      console.error("Error sending tokens:", error)
+      console.error("Error sending REAL tokens:", error)
       setError(error instanceof Error ? error.message : translations.error || "Error sending tokens. Please try again.")
 
       // Mostrar notificação de erro
@@ -161,12 +109,23 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
     }
   }
 
+  // Obter endereço do token
+  const getTokenAddress = (symbol: string): string => {
+    const TOKEN_ADDRESSES: Record<string, string> = {
+      TPF: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
+      WLD: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+      WETH: "0x4200000000000000000000000000000000000006",
+      USDCe: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
+    }
+    return TOKEN_ADDRESSES[symbol] || ""
+  }
+
   const tokens = [
     { id: "TPF", name: "TPulseFi", icon: "/logo-tpf.png" },
     { id: "WLD", name: "Worldcoin", icon: "/worldcoin.jpeg" },
-    { id: "DNA", name: "DNA Token", icon: "/dna-token.png" },
-    { id: "WDD", name: "Drachma", icon: "/drachma-token.png" },
-    { id: "CASH", name: "Cash", icon: "/cash-token.png" },
+    { id: "WETH", name: "Wrapped Ether", icon: "/ethereum-abstract.png" },
+    { id: "USDCe", name: "USD Coin", icon: "/usdc-coins.png" },
+    { id: "ETH", name: "Ethereum", icon: "/ethereum-abstract.png" },
   ]
 
   const selectedToken = tokens.find((t) => t.id === token) || tokens[0]
@@ -209,8 +168,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
                   <div>
                     <p>{translations.warning || "Please verify the recipient address before sending tokens."}</p>
                     <p className="mt-1">
-                      {translations.warningWorldchain ||
-                        "Do not send to wallets that don't support Worldchain, otherwise you may lose your assets. Do not send to exchanges."}
+                      {translations.warningWorldchain || "Using REAL Holdstation SDK. Transactions are irreversible."}
                     </p>
                     <button
                       type="button"

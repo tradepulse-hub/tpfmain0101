@@ -1,31 +1,7 @@
 import { ethers } from "ethers"
-
-// Interfaces para tipagem
-interface TokenDetails {
-  address: string
-  chainId: number
-  decimals: number
-  symbol: string
-  name: string
-}
-
-interface SwapQuoteParams {
-  tokenIn: string
-  tokenOut: string
-  amountIn: string
-  slippage?: string
-  fee?: string
-}
-
-interface SwapExecuteParams {
-  tokenIn: string
-  tokenOut: string
-  amountIn: string
-  tx: any
-  fee?: string
-  feeAmountOut?: string
-  feeReceiver?: string
-}
+import { Client, Multicall3, Quoter, SwapHelper } from "@holdstation/worldchain-ethers-v5"
+import { config, inmemoryTokenStorage, TokenProvider, Manager } from "@holdstation/worldchain-sdk"
+import { Sender } from "@holdstation/worldchain-ethers-v5"
 
 // Configuração da rede Worldchain
 const RPC_URL = "https://worldchain-mainnet.g.alchemy.com/public"
@@ -41,6 +17,13 @@ const KNOWN_TOKENS = {
 
 class HoldstationService {
   private provider: ethers.providers.StaticJsonRpcProvider | null = null
+  private client: Client | null = null
+  private multicall: Multicall3 | null = null
+  private tokenProvider: TokenProvider | null = null
+  private quoter: Quoter | null = null
+  private swapHelper: SwapHelper | null = null
+  private sender: Sender | null = null
+  private historyManager: Manager | null = null
   private initialized = false
 
   constructor() {
@@ -54,7 +37,7 @@ class HoldstationService {
     if (this.initialized) return
 
     try {
-      console.log("Initializing Holdstation service...")
+      console.log("Initializing REAL Holdstation SDK...")
 
       // Configurar provider para Worldchain usando ethers v5
       this.provider = new ethers.providers.StaticJsonRpcProvider(RPC_URL, {
@@ -63,97 +46,97 @@ class HoldstationService {
       })
 
       // Verificar conexão
-      await this.provider.getNetwork()
+      const network = await this.provider.getNetwork()
+      console.log("Connected to network:", network)
 
-      console.log("Holdstation service initialized successfully")
+      // Inicializar cliente Holdstation
+      this.client = new Client(this.provider)
+      this.multicall = new Multicall3(this.provider)
+
+      // Configurar SDK global
+      config.client = this.client
+      config.multicall3 = this.multicall
+
+      // Inicializar providers
+      this.tokenProvider = new TokenProvider()
+      this.quoter = new Quoter(this.client)
+      this.swapHelper = new SwapHelper(this.client, {
+        tokenStorage: inmemoryTokenStorage,
+      })
+      this.sender = new Sender(this.provider)
+      this.historyManager = new Manager(this.provider, CHAIN_ID)
+
+      console.log("REAL Holdstation SDK initialized successfully")
       this.initialized = true
     } catch (error) {
-      console.error("Failed to initialize Holdstation service:", error)
-      // Marcar como inicializado mesmo com erro para evitar loops
-      this.initialized = true
+      console.error("Failed to initialize REAL Holdstation SDK:", error)
+      // Não marcar como inicializado em caso de erro real
+      throw error
     }
   }
 
-  // Simular obtenção de detalhes de tokens (preparado para SDK real)
-  async getTokenDetails(tokenAddresses: string[]): Promise<Record<string, TokenDetails>> {
+  // Obter detalhes REAIS de tokens
+  async getTokenDetails(tokenAddresses: string[]): Promise<Record<string, any>> {
     try {
       if (!this.initialized) await this.initialize()
+      if (!this.tokenProvider) throw new Error("TokenProvider not initialized")
 
-      console.log("Fetching token details for:", tokenAddresses)
+      console.log("Fetching REAL token details for:", tokenAddresses)
 
-      // Por enquanto, simular dados até a SDK estar funcionando
-      const details: Record<string, TokenDetails> = {}
+      // Usar a SDK real para obter detalhes
+      const details = await this.tokenProvider.details(...tokenAddresses)
 
-      for (const address of tokenAddresses) {
-        const symbol = Object.keys(KNOWN_TOKENS).find(
-          (key) => KNOWN_TOKENS[key as keyof typeof KNOWN_TOKENS] === address,
-        )
-
-        if (symbol) {
-          details[address] = {
-            address,
-            chainId: CHAIN_ID,
-            decimals: symbol === "USDCe" ? 6 : 18,
-            symbol,
-            name: this.getTokenName(symbol),
-          }
-        }
-      }
-
-      console.log("Token details:", details)
+      console.log("REAL token details:", details)
       return details
     } catch (error) {
-      console.error("Error fetching token details:", error)
-      return {}
+      console.error("Error fetching REAL token details:", error)
+      throw error
     }
   }
 
-  // Simular obtenção de tokens de uma carteira
+  // Obter tokens REAIS de uma carteira
   async getWalletTokens(walletAddress: string): Promise<string[]> {
     try {
       if (!this.initialized) await this.initialize()
+      if (!this.tokenProvider) throw new Error("TokenProvider not initialized")
 
-      console.log("Fetching tokens for wallet:", walletAddress)
+      console.log("Fetching REAL tokens for wallet:", walletAddress)
 
-      // Retornar tokens conhecidos
-      const tokens = Object.values(KNOWN_TOKENS)
-      console.log("Wallet tokens:", tokens)
+      // Usar a SDK real para obter tokens da carteira
+      const tokens = await this.tokenProvider.tokenOf(walletAddress)
+
+      console.log("REAL wallet tokens:", tokens)
       return tokens
     } catch (error) {
-      console.error("Error fetching wallet tokens:", error)
-      return []
+      console.error("Error fetching REAL wallet tokens:", error)
+      // Fallback para tokens conhecidos
+      return Object.values(KNOWN_TOKENS)
     }
   }
 
-  // Simular obtenção de saldos de múltiplos tokens
+  // Obter saldos REAIS de múltiplos tokens
   async getTokenBalances(walletAddress: string, tokenAddresses: string[]): Promise<Record<string, string>> {
     try {
       if (!this.initialized) await this.initialize()
+      if (!this.tokenProvider) throw new Error("TokenProvider not initialized")
 
-      console.log("Fetching balances for:", { walletAddress, tokenAddresses })
+      console.log("Fetching REAL balances for:", { walletAddress, tokenAddresses })
 
-      const balances: Record<string, string> = {}
+      // Usar a SDK real para obter saldos
+      const balances = await this.tokenProvider.balanceOf({
+        wallet: walletAddress,
+        tokens: tokenAddresses,
+      })
 
-      // Simular saldos realistas
-      for (const address of tokenAddresses) {
-        const symbol = Object.keys(KNOWN_TOKENS).find(
-          (key) => KNOWN_TOKENS[key as keyof typeof KNOWN_TOKENS] === address,
-        )
-
-        if (symbol) {
-          balances[address] = this.getSimulatedBalance(symbol)
-        }
-      }
-
-      console.log("Token balances:", balances)
+      console.log("REAL token balances:", balances)
       return balances
     } catch (error) {
-      console.error("Error fetching token balances:", error)
-      return {}
+      console.error("Error fetching REAL token balances:", error)
+      throw error
     }
   }
 
-  // Simular obtenção de saldo de um token específico
+  // Obter saldo REAL de um token específico
   async getSingleTokenBalance(tokenAddress: string, walletAddress: string): Promise<string> {
     try {
       if (!this.initialized) await this.initialize()
@@ -161,164 +144,183 @@ class HoldstationService {
       const balances = await this.getTokenBalances(walletAddress, [tokenAddress])
       return balances[tokenAddress] || "0"
     } catch (error) {
-      console.error("Error fetching single token balance:", error)
-      return "0"
+      console.error("Error fetching REAL single token balance:", error)
+      throw error
     }
   }
 
-  // Simular cotação para swap
-  async getSwapQuote(params: SwapQuoteParams): Promise<any> {
+  // Obter cotação REAL para swap
+  async getSwapQuote(params: {
+    tokenIn: string
+    tokenOut: string
+    amountIn: string
+    slippage?: string
+    fee?: string
+  }): Promise<any> {
     try {
       if (!this.initialized) await this.initialize()
+      if (!this.swapHelper) throw new Error("SwapHelper not initialized")
 
-      console.log("Getting swap quote:", params)
+      console.log("Getting REAL swap quote:", params)
 
-      // Simular resposta de cotação
-      const quote = {
-        amountOut: (Number(params.amountIn) * 0.98).toString(),
-        data: "0x",
-        to: "0x0000000000000000000000000000000000000000",
-        value: "0",
-        gasEstimate: "150000",
-        addons: {
-          feeAmountOut: "0",
-        },
-      }
+      // Usar a SDK real para obter cotação
+      const quote = await this.swapHelper.quote({
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: params.amountIn,
+        slippage: params.slippage || "0.5",
+        fee: params.fee || "0.0",
+      })
 
-      console.log("Swap quote:", quote)
+      console.log("REAL swap quote:", quote)
       return quote
     } catch (error) {
-      console.error("Error getting swap quote:", error)
+      console.error("Error getting REAL swap quote:", error)
       throw error
     }
   }
 
-  // Simular execução de swap
-  async executeSwap(params: SwapExecuteParams): Promise<any> {
+  // Executar swap REAL
+  async executeSwap(params: {
+    tokenIn: string
+    tokenOut: string
+    amountIn: string
+    tx: any
+    fee?: string
+    feeAmountOut?: string
+    feeReceiver?: string
+  }): Promise<any> {
     try {
       if (!this.initialized) await this.initialize()
+      if (!this.swapHelper) throw new Error("SwapHelper not initialized")
 
-      console.log("Executing swap:", params)
+      console.log("Executing REAL swap:", params)
 
-      // Simular resultado de swap
-      const result = {
-        hash: "0x" + Math.random().toString(16).substr(2, 64),
-        success: true,
-        gasUsed: "145000",
-      }
+      // Usar a SDK real para executar swap
+      const result = await this.swapHelper.swap({
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: params.amountIn,
+        tx: params.tx,
+        fee: params.fee || "0.0",
+        feeAmountOut: params.feeAmountOut,
+        feeReceiver: params.feeReceiver || ethers.constants.AddressZero,
+      })
 
-      console.log("Swap result:", result)
+      console.log("REAL swap result:", result)
       return result
     } catch (error) {
-      console.error("Error executing swap:", error)
+      console.error("Error executing REAL swap:", error)
       throw error
     }
   }
 
-  // Simular envio de tokens
+  // Enviar tokens REAIS
   async sendToken(params: { to: string; amount: number; token?: string }): Promise<any> {
     try {
       if (!this.initialized) await this.initialize()
+      if (!this.sender) throw new Error("Sender not initialized")
 
-      console.log("Sending token:", params)
+      console.log("Sending REAL token:", params)
 
-      // Simular resultado de envio
-      const result = {
-        hash: "0x" + Math.random().toString(16).substr(2, 64),
-        success: true,
-        gasUsed: "21000",
-      }
+      // Usar a SDK real para enviar tokens
+      const result = await this.sender.send({
+        to: params.to,
+        amount: params.amount,
+        token: params.token, // Se undefined, envia ETH nativo
+      })
 
-      console.log("Send result:", result)
+      console.log("REAL send result:", result)
       return result
     } catch (error) {
-      console.error("Error sending token:", error)
+      console.error("Error sending REAL token:", error)
       throw error
     }
   }
 
-  // Simular monitoramento de histórico de transações
-  async watchTransactionHistory(walletAddress: string, callback: () => void): Promise<{ stop: () => void }> {
+  // Monitorar histórico REAL de transações
+  async watchTransactionHistory(
+    walletAddress: string,
+    callback: () => void,
+  ): Promise<{ start: () => Promise<void>; stop: () => void }> {
     try {
       if (!this.initialized) await this.initialize()
+      if (!this.historyManager) throw new Error("History manager not initialized")
 
-      console.log("Starting transaction history monitoring for:", walletAddress)
+      console.log("Starting REAL transaction history monitoring for:", walletAddress)
 
-      // Simular callback periódico
-      const interval = setInterval(callback, 30000)
+      // Usar a SDK real para monitorar histórico
+      const { start, stop } = await this.historyManager.watch(walletAddress, callback)
 
       return {
+        start: async () => {
+          await start()
+          console.log("REAL transaction monitoring started")
+        },
         stop: () => {
-          clearInterval(interval)
-          console.log("Stopped transaction history monitoring")
+          stop()
+          console.log("REAL transaction monitoring stopped")
         },
       }
     } catch (error) {
-      console.error("Error watching transaction history:", error)
-      return { stop: () => {} }
+      console.error("Error watching REAL transaction history:", error)
+      throw error
     }
   }
 
-  // Simular obtenção de histórico de transações
+  // Obter histórico REAL de transações
   async getTransactionHistory(walletAddress: string, offset = 0, limit = 50): Promise<any[]> {
     try {
       if (!this.initialized) await this.initialize()
+      if (!this.historyManager) throw new Error("History manager not initialized")
 
-      console.log("Fetching transaction history:", { walletAddress, offset, limit })
+      console.log("Fetching REAL transaction history:", { walletAddress, offset, limit })
 
-      // Simular algumas transações
-      const transactions = [
-        {
-          hash: "0x" + Math.random().toString(16).substr(2, 64),
-          type: "send",
-          amount: "100",
-          timestamp: Math.floor(Date.now() / 1000) - 3600,
-          from: walletAddress,
-          to: "0x" + Math.random().toString(16).substr(2, 40),
-          status: "completed",
-          blockNumber: 12345678,
-          token: "TPF",
-        },
-        {
-          hash: "0x" + Math.random().toString(16).substr(2, 64),
-          type: "receive",
-          amount: "50",
-          timestamp: Math.floor(Date.now() / 1000) - 7200,
-          from: "0x" + Math.random().toString(16).substr(2, 40),
-          to: walletAddress,
-          status: "completed",
-          blockNumber: 12345677,
-          token: "WLD",
-        },
-      ]
+      // Usar a SDK real para obter histórico
+      const transactions = await this.historyManager.find(offset, limit)
 
-      console.log("Transaction history:", transactions)
+      console.log("REAL transaction history:", transactions)
       return transactions
     } catch (error) {
-      console.error("Error fetching transaction history:", error)
-      return []
+      console.error("Error fetching REAL transaction history:", error)
+      throw error
     }
   }
 
-  // Métodos auxiliares
-  private getTokenName(symbol: string): string {
-    const names: Record<string, string> = {
-      WETH: "Wrapped Ether",
-      USDCe: "USD Coin",
-      WLD: "Worldcoin",
-      TPF: "TPulseFi Token",
+  // Obter cotação simples REAL
+  async getSimpleQuote(tokenIn: string, tokenOut: string): Promise<any> {
+    try {
+      if (!this.initialized) await this.initialize()
+      if (!this.quoter) throw new Error("Quoter not initialized")
+
+      console.log("Getting REAL simple quote:", { tokenIn, tokenOut })
+
+      const quote = await this.quoter.simple(tokenIn, tokenOut)
+
+      console.log("REAL simple quote:", quote)
+      return quote
+    } catch (error) {
+      console.error("Error getting REAL simple quote:", error)
+      throw error
     }
-    return names[symbol] || symbol
   }
 
-  private getSimulatedBalance(symbol: string): string {
-    const balances: Record<string, string> = {
-      TPF: ethers.utils.parseEther("1000").toString(),
-      WLD: ethers.utils.parseEther("42.67").toString(),
-      WETH: ethers.utils.parseEther("0.5").toString(),
-      USDCe: ethers.utils.parseUnits("125.45", 6).toString(),
+  // Obter cotação inteligente REAL
+  async getSmartQuote(tokenIn: string, options: { slippage: number; deadline: number }): Promise<any> {
+    try {
+      if (!this.initialized) await this.initialize()
+      if (!this.quoter) throw new Error("Quoter not initialized")
+
+      console.log("Getting REAL smart quote:", { tokenIn, options })
+
+      const quote = await this.quoter.smart(tokenIn, options)
+
+      console.log("REAL smart quote:", quote)
+      return quote
+    } catch (error) {
+      console.error("Error getting REAL smart quote:", error)
+      throw error
     }
-    return balances[symbol] || "0"
   }
 
   // Obter informações da rede
@@ -344,6 +346,11 @@ class HoldstationService {
   // Obter provider
   getProvider() {
     return this.provider
+  }
+
+  // Obter cliente
+  getClient() {
+    return this.client
   }
 }
 
