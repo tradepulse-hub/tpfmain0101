@@ -33,7 +33,7 @@ class EnhancedWalletService {
       const tpfAddress = "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45"
       const balance = await holdstationService.getSingleTokenBalance(tpfAddress, walletAddress)
 
-      // Converter de wei para unidades normais
+      // Converter de wei para unidades normais usando ethers v5
       const formattedBalance = Number(ethers.utils.formatEther(balance))
       console.log("TPF balance from Holdstation:", formattedBalance)
 
@@ -70,10 +70,11 @@ class EnhancedWalletService {
         const tokenInfo = tokenDetails[address]
 
         if (tokenInfo && tokenInfo.decimals) {
+          // Usar ethers v5 formatUnits
           const formattedBalance = Number(ethers.utils.formatUnits(rawBalance, tokenInfo.decimals))
           formattedBalances[symbol] = formattedBalance
         } else {
-          // Fallback para 18 decimais
+          // Fallback para 18 decimais usando ethers v5
           const formattedBalance = Number(ethers.utils.formatEther(rawBalance))
           formattedBalances[symbol] = formattedBalance
         }
