@@ -7,10 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
-import { Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, Zap } from "lucide-react"
+import { Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, Zap, Repeat } from "lucide-react"
 import { enhancedWalletService } from "@/services/enhanced-wallet-service"
 import { SendTokenModal } from "@/components/send-token-modal"
 import { ReceiveTokenModal } from "@/components/receive-token-modal"
+import { SwapModal } from "@/components/swap-modal"
 import Image from "next/image"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
 
@@ -23,6 +24,7 @@ export default function WalletPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSendModalOpen, setIsSendModalOpen] = useState(false)
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false)
   const [language, setLanguage] = useState<"en" | "pt">("en")
   const [isHoldstationEnabled, setIsHoldstationEnabled] = useState(false)
   const router = useRouter()
@@ -60,10 +62,6 @@ export default function WalletPage() {
 
         setWalletAddress(savedAddress)
 
-        // Verificar se o Holdstation está disponível
-        const holdstationReady = enhancedWalletService.isInitialized()
-        setIsHoldstationEnabled(holdstationReady)
-
         // Carregar saldo
         await fetchWalletData(savedAddress)
       } catch (error) {
@@ -93,47 +91,34 @@ export default function WalletPage() {
       setLoading(true)
       setError(null)
 
-      console.log("Fetching wallet data for address:", address)
+      console.log("Fetching REAL wallet data for address:", address)
 
-      // Tentar usar o serviço aprimorado com Holdstation
+      // Usar o serviço aprimorado com Holdstation REAL
       if (enhancedWalletService.isInitialized()) {
-        console.log("Using Holdstation enhanced service")
+        console.log("Using REAL Holdstation SDK")
 
         // Obter saldo TPF
         const tpfBalance = await enhancedWalletService.getTPFBalance(address)
-        console.log("TPF balance from enhanced service:", tpfBalance)
+        console.log("REAL TPF balance:", tpfBalance)
         setBalance(tpfBalance)
 
         // Obter saldos de todos os tokens
         const allBalances = await enhancedWalletService.getAllTokenBalances(address)
-        console.log("All token balances from enhanced service:", allBalances)
+        console.log("REAL token balances:", allBalances)
         setTokenBalances(allBalances)
 
         setIsHoldstationEnabled(true)
       } else {
-        console.log("Holdstation not available, using fallback")
-        // Fallback para valores padrão
-        setBalance(1000)
-        setTokenBalances({
-          TPF: 1000,
-          WLD: 42.67,
-          WETH: 0.5,
-          USDCe: 125.45,
-        })
-        setIsHoldstationEnabled(false)
+        throw new Error("Holdstation SDK not initialized")
       }
     } catch (error) {
-      console.error("Erro ao carregar dados da carteira:", error)
-      setError(translations.wallet?.errorMessage || "Não foi possível obter o saldo real. Tente definir manualmente.")
-
-      // Fallback para valores padrão
-      setBalance(1000)
-      setTokenBalances({
-        TPF: 1000,
-        WLD: 42.67,
-        WETH: 0.5,
-        USDCe: 125.45,
-      })
+      console.error("Erro ao carregar dados REAIS da carteira:", error)
+      setError(
+        language === "pt"
+          ? "Erro ao conectar com a blockchain. Verifique sua conexão."
+          : "Error connecting to blockchain. Check your connection.",
+      )
+      setIsHoldstationEnabled(false)
     } finally {
       setLoading(false)
     }
@@ -188,6 +173,8 @@ export default function WalletPage() {
         walletAddress={walletAddress}
       />
 
+      <SwapModal isOpen={isSwapModalOpen} onClose={() => setIsSwapModalOpen(false)} walletAddress={walletAddress} />
+
       <div className="z-10 w-full max-w-md mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -207,14 +194,16 @@ export default function WalletPage() {
             )}
           </div>
 
-          {/* Indicador Holdstation */}
+          {/* Indicador Holdstation REAL */}
           {isHoldstationEnabled && (
             <div className="w-full mb-4">
-              <div className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 rounded-lg p-3">
+              <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-500/30 rounded-lg p-3">
                 <div className="flex items-center justify-center space-x-2">
-                  <Zap className="w-4 h-4 text-blue-400" />
-                  <span className="text-sm text-blue-300 font-medium">
-                    {language === "pt" ? "Powered by Holdstation SDK" : "Powered by Holdstation SDK"}
+                  <Zap className="w-4 h-4 text-green-400" />
+                  <span className="text-sm text-green-300 font-medium">
+                    {language === "pt"
+                      ? "Conectado à Worldchain via Holdstation SDK"
+                      : "Connected to Worldchain via Holdstation SDK"}
                   </span>
                 </div>
               </div>
@@ -247,22 +236,30 @@ export default function WalletPage() {
               )}
             </CardHeader>
             <CardContent className="pb-4">
-              <div className="flex space-x-2">
+              <div className="grid grid-cols-3 gap-2">
                 <Button
                   variant="outline"
-                  className="flex-1 bg-gray-800 border-gray-700 hover:bg-gray-700 text-white"
+                  className="bg-gray-800 border-gray-700 hover:bg-gray-700 text-white"
                   onClick={() => setIsSendModalOpen(true)}
                 >
-                  <ArrowUpRight className="w-4 h-4 mr-2" />
+                  <ArrowUpRight className="w-4 h-4 mr-1" />
                   {translations.wallet?.send || "Enviar"}
                 </Button>
                 <Button
                   variant="outline"
-                  className="flex-1 bg-gray-800 border-gray-700 hover:bg-gray-700 text-white"
+                  className="bg-gray-800 border-gray-700 hover:bg-gray-700 text-white"
                   onClick={() => setIsReceiveModalOpen(true)}
                 >
-                  <ArrowDownLeft className="w-4 h-4 mr-2" />
+                  <ArrowDownLeft className="w-4 h-4 mr-1" />
                   {translations.wallet?.receive || "Receber"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="bg-blue-800 border-blue-700 hover:bg-blue-700 text-white"
+                  onClick={() => setIsSwapModalOpen(true)}
+                >
+                  <Repeat className="w-4 h-4 mr-1" />
+                  {language === "pt" ? "Trocar" : "Swap"}
                 </Button>
               </div>
             </CardContent>
@@ -271,7 +268,7 @@ export default function WalletPage() {
           {/* Outros Tokens */}
           <Card className="w-full bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 mt-4 mb-6">
             <CardHeader className="pb-2">
-              <CardDescription>{translations.wallet?.otherTokens || "Outros Tokens Confiáveis"}</CardDescription>
+              <CardDescription>{translations.wallet?.otherTokens || "Outros Tokens"}</CardDescription>
             </CardHeader>
             <CardContent className="pb-4">
               {loading ? (
@@ -309,7 +306,7 @@ export default function WalletPage() {
             </CardContent>
           </Card>
 
-          {/* Mensagem de erro ou informação */}
+          {/* Mensagem de erro */}
           {error && (
             <div className="w-full mb-6">
               <div className="bg-red-900/20 border border-red-800/30 rounded-lg p-4">
@@ -317,7 +314,7 @@ export default function WalletPage() {
                   <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 mr-3 flex-shrink-0" />
                   <div>
                     <h3 className="text-red-300 font-medium mb-1">
-                      {language === "en" ? "Error getting balance" : "Erro ao obter saldo"}
+                      {language === "en" ? "Connection Error" : "Erro de Conexão"}
                     </h3>
                     <p className="text-red-200/80 text-sm">{error}</p>
                   </div>

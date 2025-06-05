@@ -1,36 +1,12 @@
 import { ethers } from "ethers"
-
-// Interfaces para tipagem
-interface TokenDetails {
-  address: string
-  chainId: number
-  decimals: number
-  symbol: string
-  name: string
-}
-
-interface SwapQuoteParams {
-  tokenIn: string
-  tokenOut: string
-  amountIn: string
-  slippage?: string
-  fee?: string
-}
-
-interface SwapExecuteParams {
-  tokenIn: string
-  tokenOut: string
-  amountIn: string
-  tx: any
-  fee?: string
-  feeReceiver?: string
-}
+import { Client, Multicall3, Quoter, SwapHelper } from "@holdstation/worldchain-ethers-v5"
+import { config, inmemoryTokenStorage, TokenProvider, Manager, Sender } from "@holdstation/worldchain-sdk"
 
 // Configuração da rede Worldchain
 const RPC_URL = "https://worldchain-mainnet.g.alchemy.com/public"
 const CHAIN_ID = 480
 
-// Endereços de tokens conhecidos
+// Endereços de tokens conhecidos na Worldchain
 const KNOWN_TOKENS = {
   WETH: "0x4200000000000000000000000000000000000006",
   USDCe: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
@@ -39,7 +15,14 @@ const KNOWN_TOKENS = {
 }
 
 class HoldstationService {
-  private provider: ethers.JsonRpcProvider | null = null
+  private provider: ethers.providers.StaticJsonRpcProvider
+  private client: Client
+  private multicall: Multicall3
+  private tokenProvider: TokenProvider
+  private quoter: Quoter
+  private swapHelper: SwapHelper
+  private historyManager: Manager
+  private sender: Sender
   private initialized = false
 
   constructor() {
@@ -53,246 +36,255 @@ class HoldstationService {
     if (this.initialized) return
 
     try {
-      console.log("Initializing Holdstation service...")
+      console.log("Initializing Holdstation SDK...")
 
-      // Configurar provider usando ethers v6
-      this.provider = new ethers.JsonRpcProvider(RPC_URL, {
+      // Configurar provider para Worldchain
+      this.provider = new ethers.providers.StaticJsonRpcProvider(RPC_URL, {
         chainId: CHAIN_ID,
         name: "worldchain",
       })
 
+      // Configurar cliente e multicall
+      this.client = new Client(this.provider)
+      this.multicall = new Multicall3(this.provider)
+
+      // Configurar SDK global
+      config.client = this.client
+      config.multicall3 = this.multicall
+
+      // Inicializar serviços
+      this.tokenProvider = new TokenProvider({ client: this.client, multicall: this.multicall })
+      this.quoter = new Quoter(this.client)
+      this.swapHelper = new SwapHelper(this.client, {
+        tokenStorage: inmemoryTokenStorage,
+      })
+      this.historyManager = new Manager(this.provider, CHAIN_ID)
+      this.sender = new Sender(this.provider)
+
       // Verificar conexão
       await this.provider.getNetwork()
 
-      console.log("Holdstation service initialized successfully")
+      console.log("Holdstation SDK initialized successfully")
       this.initialized = true
     } catch (error) {
-      console.error("Failed to initialize Holdstation service:", error)
-      // Marcar como inicializado mesmo com erro para evitar loops
-      this.initialized = true
+      console.error("Failed to initialize Holdstation SDK:", error)
+      throw error
     }
   }
 
-  // Simular obtenção de detalhes de tokens
-  async getTokenDetails(tokenAddresses: string[]): Promise<Record<string, TokenDetails>> {
+  // Obter detalhes de tokens
+  async getTokenDetails(tokenAddresses: string[]) {
     try {
       if (!this.initialized) await this.initialize()
 
-      console.log("Simulating token details fetch for:", tokenAddresses)
-
-      const details: Record<string, TokenDetails> = {}
-
-      // Simular dados de tokens conhecidos
-      for (const address of tokenAddresses) {
-        const symbol = Object.keys(KNOWN_TOKENS).find(
-          (key) => KNOWN_TOKENS[key as keyof typeof KNOWN_TOKENS] === address,
-        )
-
-        if (symbol) {
-          details[address] = {
-            address,
-            chainId: CHAIN_ID,
-            decimals: 18,
-            symbol,
-            name: this.getTokenName(symbol),
-          }
-        }
-      }
-
-      console.log("Simulated token details:", details)
+      console.log("Fetching token details for:", tokenAddresses)
+      const details = await this.tokenProvider.details(...tokenAddresses)
+      console.log("Token details:", details)
       return details
     } catch (error) {
-      console.error("Error simulating token details:", error)
-      return {}
+      console.error("Error fetching token details:", error)
+      throw error
     }
   }
 
-  // Simular obtenção de tokens de uma carteira
-  async getWalletTokens(walletAddress: string): Promise<string[]> {
+  // Obter todos os tokens de uma carteira
+  async getWalletTokens(walletAddress: string) {
     try {
       if (!this.initialized) await this.initialize()
 
-      console.log("Simulating wallet tokens fetch for:", walletAddress)
-
-      // Retornar tokens conhecidos como simulação
-      const tokens = Object.values(KNOWN_TOKENS)
-      console.log("Simulated wallet tokens:", tokens)
+      console.log("Fetching tokens for wallet:", walletAddress)
+      const tokens = await this.tokenProvider.tokenOf(walletAddress)
+      console.log("Wallet tokens:", tokens)
       return tokens
     } catch (error) {
-      console.error("Error simulating wallet tokens:", error)
-      return []
+      console.error("Error fetching wallet tokens:", error)
+      throw error
     }
   }
 
-  // Simular obtenção de saldos de múltiplos tokens
-  async getTokenBalances(walletAddress: string, tokenAddresses: string[]): Promise<Record<string, string>> {
+  // Obter saldos de múltiplos tokens
+  async getTokenBalances(walletAddress: string, tokenAddresses: string[]) {
     try {
       if (!this.initialized) await this.initialize()
 
-      console.log("Simulating token balances for:", { walletAddress, tokenAddresses })
-
-      const balances: Record<string, string> = {}
-
-      // Simular saldos aleatórios
-      for (const address of tokenAddresses) {
-        const symbol = Object.keys(KNOWN_TOKENS).find(
-          (key) => KNOWN_TOKENS[key as keyof typeof KNOWN_TOKENS] === address,
-        )
-
-        if (symbol) {
-          balances[address] = this.getSimulatedBalance(symbol)
-        }
-      }
-
-      console.log("Simulated token balances:", balances)
+      console.log("Fetching balances for:", { walletAddress, tokenAddresses })
+      const balances = await this.tokenProvider.balanceOf({
+        wallet: walletAddress,
+        tokens: tokenAddresses,
+      })
+      console.log("Token balances:", balances)
       return balances
     } catch (error) {
-      console.error("Error simulating token balances:", error)
-      return {}
+      console.error("Error fetching token balances:", error)
+      throw error
     }
   }
 
-  // Simular obtenção de saldo de um token específico
-  async getSingleTokenBalance(tokenAddress: string, walletAddress: string): Promise<string> {
+  // Obter saldo de um token específico
+  async getSingleTokenBalance(tokenAddress: string, walletAddress: string) {
     try {
       if (!this.initialized) await this.initialize()
 
       const balances = await this.getTokenBalances(walletAddress, [tokenAddress])
       return balances[tokenAddress] || "0"
     } catch (error) {
-      console.error("Error simulating single token balance:", error)
-      return "0"
+      console.error("Error fetching single token balance:", error)
+      throw error
     }
   }
 
-  // Simular cotação para swap
-  async getSwapQuote(params: SwapQuoteParams): Promise<any> {
+  // Obter cotação simples para swap
+  async getSimpleQuote(tokenIn: string, tokenOut: string) {
     try {
       if (!this.initialized) await this.initialize()
 
-      console.log("Simulating swap quote:", params)
-
-      // Simular resposta de cotação
-      const quote = {
-        amountOut: (Number(params.amountIn) * 0.98).toString(), // Simular 2% de slippage
-        data: "0x",
-        to: "0x0000000000000000000000000000000000000000",
-        value: "0",
-        gasEstimate: "150000",
-      }
-
-      console.log("Simulated swap quote:", quote)
+      console.log("Getting simple quote:", { tokenIn, tokenOut })
+      const quote = await this.quoter.simple(tokenIn, tokenOut)
+      console.log("Simple quote:", quote)
       return quote
     } catch (error) {
-      console.error("Error simulating swap quote:", error)
+      console.error("Error getting simple quote:", error)
       throw error
     }
   }
 
-  // Simular execução de swap
-  async executeSwap(params: SwapExecuteParams): Promise<any> {
+  // Obter cotação inteligente para swap
+  async getSmartQuote(tokenIn: string, options: { slippage?: number; deadline?: number } = {}) {
     try {
       if (!this.initialized) await this.initialize()
 
-      console.log("Simulating swap execution:", params)
+      const { slippage = 3, deadline = 10 } = options
+      console.log("Getting smart quote:", { tokenIn, slippage, deadline })
 
-      // Simular resultado de swap
-      const result = {
-        hash: "0x" + Math.random().toString(16).substr(2, 64),
-        success: true,
-        gasUsed: "145000",
+      const quote = await this.quoter.smart(tokenIn, { slippage, deadline })
+      console.log("Smart quote:", quote)
+      return quote
+    } catch (error) {
+      console.error("Error getting smart quote:", error)
+      throw error
+    }
+  }
+
+  // Obter cotação para swap
+  async getSwapQuote(params: {
+    tokenIn: string
+    tokenOut: string
+    amountIn: string
+    slippage?: string
+    fee?: string
+  }) {
+    try {
+      if (!this.initialized) await this.initialize()
+
+      const quoteParams = {
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: params.amountIn,
+        slippage: params.slippage || "0.5",
+        fee: params.fee || "0.0",
       }
 
-      console.log("Simulated swap result:", result)
+      console.log("Getting swap quote:", quoteParams)
+      const quote = await this.swapHelper.quote(quoteParams)
+      console.log("Swap quote:", quote)
+      return quote
+    } catch (error) {
+      console.error("Error getting swap quote:", error)
+      throw error
+    }
+  }
+
+  // Executar swap
+  async executeSwap(params: {
+    tokenIn: string
+    tokenOut: string
+    amountIn: string
+    tx: any
+    fee?: string
+    feeAmountOut?: string
+    feeReceiver?: string
+  }) {
+    try {
+      if (!this.initialized) await this.initialize()
+
+      const swapParams = {
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: params.amountIn,
+        tx: params.tx,
+        fee: params.fee || "0.0",
+        feeAmountOut: params.feeAmountOut,
+        feeReceiver: params.feeReceiver || ethers.constants.AddressZero,
+      }
+
+      console.log("Executing swap:", swapParams)
+      const result = await this.swapHelper.swap(swapParams)
+      console.log("Swap result:", result)
       return result
     } catch (error) {
-      console.error("Error simulating swap execution:", error)
+      console.error("Error executing swap:", error)
       throw error
     }
   }
 
-  // Simular monitoramento de histórico de transações
-  async watchTransactionHistory(walletAddress: string, callback: () => void): Promise<{ stop: () => void }> {
+  // Enviar tokens
+  async sendToken(params: { to: string; amount: number; token?: string }) {
     try {
       if (!this.initialized) await this.initialize()
 
-      console.log("Simulating transaction history monitoring for:", walletAddress)
-
-      // Simular callback periódico
-      const interval = setInterval(callback, 30000) // A cada 30 segundos
-
-      return {
-        stop: () => {
-          clearInterval(interval)
-          console.log("Stopped transaction history monitoring")
-        },
-      }
+      console.log("Sending token:", params)
+      const result = await this.sender.send(params)
+      console.log("Send result:", result)
+      return result
     } catch (error) {
-      console.error("Error simulating transaction history monitoring:", error)
-      return { stop: () => {} }
+      console.error("Error sending token:", error)
+      throw error
     }
   }
 
-  // Simular obtenção de histórico de transações
-  async getTransactionHistory(walletAddress: string, offset = 0, limit = 50): Promise<any[]> {
+  // Monitorar histórico de transações
+  async watchTransactionHistory(walletAddress: string, callback: () => void) {
     try {
       if (!this.initialized) await this.initialize()
 
-      console.log("Simulating transaction history fetch:", { walletAddress, offset, limit })
+      console.log("Starting transaction history monitoring for:", walletAddress)
+      const { start, stop } = await this.historyManager.watch(walletAddress, callback)
 
-      // Simular algumas transações
-      const transactions = [
-        {
-          hash: "0x" + Math.random().toString(16).substr(2, 64),
-          type: "send",
-          amount: "100",
-          timestamp: Math.floor(Date.now() / 1000) - 3600,
-          from: walletAddress,
-          to: "0x" + Math.random().toString(16).substr(2, 40),
-          status: "completed",
-          blockNumber: 12345678,
-          token: "TPF",
-        },
-        {
-          hash: "0x" + Math.random().toString(16).substr(2, 64),
-          type: "receive",
-          amount: "50",
-          timestamp: Math.floor(Date.now() / 1000) - 7200,
-          from: "0x" + Math.random().toString(16).substr(2, 40),
-          to: walletAddress,
-          status: "completed",
-          blockNumber: 12345677,
-          token: "WLD",
-        },
-      ]
+      // Iniciar monitoramento
+      await start()
 
-      console.log("Simulated transaction history:", transactions)
+      return { stop }
+    } catch (error) {
+      console.error("Error watching transaction history:", error)
+      throw error
+    }
+  }
+
+  // Obter histórico de transações
+  async getTransactionHistory(walletAddress: string, offset = 0, limit = 50) {
+    try {
+      if (!this.initialized) await this.initialize()
+
+      console.log("Fetching transaction history:", { walletAddress, offset, limit })
+
+      // Primeiro, iniciar o monitoramento para garantir que os dados estejam atualizados
+      const { stop } = await this.watchTransactionHistory(walletAddress, () => {})
+
+      // Aguardar um pouco para os dados serem processados
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      // Buscar transações usando o manager
+      const transactions = await this.historyManager.find(offset, limit)
+      console.log("Transaction history:", transactions)
+
+      // Parar o monitoramento
+      stop()
+
       return transactions
     } catch (error) {
-      console.error("Error simulating transaction history:", error)
-      return []
+      console.error("Error fetching transaction history:", error)
+      throw error
     }
-  }
-
-  // Métodos auxiliares
-  private getTokenName(symbol: string): string {
-    const names: Record<string, string> = {
-      WETH: "Wrapped Ether",
-      USDCe: "USD Coin",
-      WLD: "Worldcoin",
-      TPF: "TPulseFi Token",
-    }
-    return names[symbol] || symbol
-  }
-
-  private getSimulatedBalance(symbol: string): string {
-    const balances: Record<string, string> = {
-      TPF: ethers.parseEther("1000").toString(),
-      WLD: ethers.parseEther("42.67").toString(),
-      WETH: ethers.parseEther("0.5").toString(),
-      USDCe: ethers.parseUnits("125.45", 6).toString(), // USDC tem 6 decimais
-    }
-    return balances[symbol] || "0"
   }
 
   // Obter informações da rede
@@ -313,6 +305,16 @@ class HoldstationService {
   // Verificar se o serviço está inicializado
   isInitialized() {
     return this.initialized
+  }
+
+  // Obter provider
+  getProvider() {
+    return this.provider
+  }
+
+  // Obter cliente
+  getClient() {
+    return this.client
   }
 }
 

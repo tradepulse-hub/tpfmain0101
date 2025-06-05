@@ -1,7 +1,7 @@
 import { ethers } from "ethers"
 import { holdstationService } from "./holdstation-service"
 
-// Serviço de carteira aprimorado com integração Holdstation
+// Serviço de carteira aprimorado com integração REAL da Holdstation
 class EnhancedWalletService {
   private initialized = false
 
@@ -16,38 +16,40 @@ class EnhancedWalletService {
 
     console.log("Initializing enhanced wallet service...")
 
-    // Aguardar inicialização do Holdstation
-    while (!holdstationService.isInitialized()) {
-      await new Promise((resolve) => setTimeout(resolve, 100))
-    }
+    try {
+      // Aguardar inicialização do Holdstation
+      while (!holdstationService.isInitialized()) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
 
-    this.initialized = true
-    console.log("Enhanced wallet service initialized")
+      this.initialized = true
+      console.log("Enhanced wallet service initialized with REAL Holdstation SDK")
+    } catch (error) {
+      console.error("Error initializing enhanced wallet service:", error)
+      throw error
+    }
   }
 
-  // Obter saldo de TPF usando Holdstation
+  // Obter saldo de TPF usando Holdstation REAL
   async getTPFBalance(walletAddress: string): Promise<number> {
     try {
       if (!this.initialized) await this.initialize()
 
-      const tpfAddress = "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45"
+      const tpfAddress = holdstationService.getKnownTokens().TPF
       const balance = await holdstationService.getSingleTokenBalance(tpfAddress, walletAddress)
 
-      // Converter de wei para unidades normais usando ethers v6
-      const formattedBalance = Number(ethers.formatEther(balance))
-      console.log("TPF balance from Holdstation:", formattedBalance)
+      // Converter de wei para unidades normais
+      const formattedBalance = Number(ethers.utils.formatEther(balance))
+      console.log("REAL TPF balance from Holdstation:", formattedBalance)
 
       return formattedBalance
     } catch (error) {
-      console.error("Error getting TPF balance from Holdstation:", error)
-
-      // Fallback para o saldo definido pelo usuário
-      const userDefinedBalance = localStorage.getItem("userDefinedTPFBalance")
-      return userDefinedBalance ? Number(userDefinedBalance) : 0
+      console.error("Error getting REAL TPF balance from Holdstation:", error)
+      throw error
     }
   }
 
-  // Obter todos os saldos de tokens usando Holdstation
+  // Obter todos os saldos de tokens usando Holdstation REAL
   async getAllTokenBalances(walletAddress: string): Promise<Record<string, number>> {
     try {
       if (!this.initialized) await this.initialize()
@@ -70,37 +72,29 @@ class EnhancedWalletService {
         const tokenInfo = tokenDetails[address]
 
         if (tokenInfo && tokenInfo.decimals) {
-          // Usar ethers v6 formatUnits
-          const formattedBalance = Number(ethers.formatUnits(rawBalance, tokenInfo.decimals))
+          const formattedBalance = Number(ethers.utils.formatUnits(rawBalance, tokenInfo.decimals))
           formattedBalances[symbol] = formattedBalance
         } else {
-          // Fallback para 18 decimais usando ethers v6
-          const formattedBalance = Number(ethers.formatEther(rawBalance))
+          // Fallback para 18 decimais
+          const formattedBalance = Number(ethers.utils.formatEther(rawBalance))
           formattedBalances[symbol] = formattedBalance
         }
       }
 
-      console.log("All token balances from Holdstation:", formattedBalances)
+      console.log("REAL token balances from Holdstation:", formattedBalances)
       return formattedBalances
     } catch (error) {
-      console.error("Error getting all token balances from Holdstation:", error)
-
-      // Fallback para valores padrão
-      return {
-        TPF: 1000,
-        WLD: 42.67,
-        WETH: 0.5,
-        USDCe: 125.45,
-      }
+      console.error("Error getting REAL token balances from Holdstation:", error)
+      throw error
     }
   }
 
-  // Obter histórico de transações usando Holdstation
+  // Obter histórico de transações usando Holdstation REAL
   async getTransactionHistory(walletAddress: string, limit = 50): Promise<any[]> {
     try {
       if (!this.initialized) await this.initialize()
 
-      console.log("Fetching transaction history from Holdstation...")
+      console.log("Fetching REAL transaction history from Holdstation...")
       const transactions = await holdstationService.getTransactionHistory(walletAddress, 0, limit)
 
       // Formatar transações para o formato esperado pela UI
@@ -117,11 +111,11 @@ class EnhancedWalletService {
         token: tx.token || "ETH",
       }))
 
-      console.log("Formatted transaction history:", formattedTransactions)
+      console.log("REAL formatted transaction history:", formattedTransactions)
       return formattedTransactions
     } catch (error) {
-      console.error("Error fetching transaction history from Holdstation:", error)
-      return []
+      console.error("Error fetching REAL transaction history from Holdstation:", error)
+      throw error
     }
   }
 
@@ -130,13 +124,13 @@ class EnhancedWalletService {
     try {
       if (!this.initialized) await this.initialize()
 
-      console.log("Starting real-time transaction monitoring...")
+      console.log("Starting REAL transaction monitoring...")
       const { stop } = await holdstationService.watchTransactionHistory(walletAddress, callback)
 
       return { stop }
     } catch (error) {
-      console.error("Error starting transaction monitoring:", error)
-      return { stop: () => {} }
+      console.error("Error starting REAL transaction monitoring:", error)
+      throw error
     }
   }
 
@@ -155,7 +149,7 @@ class EnhancedWalletService {
 
       return quote
     } catch (error) {
-      console.error("Error getting swap quote:", error)
+      console.error("Error getting REAL swap quote:", error)
       throw error
     }
   }
@@ -179,11 +173,25 @@ class EnhancedWalletService {
           to: params.quote.to,
           value: params.quote.value,
         },
+        feeAmountOut: params.quote.addons?.feeAmountOut,
       })
 
       return result
     } catch (error) {
-      console.error("Error executing swap:", error)
+      console.error("Error executing REAL swap:", error)
+      throw error
+    }
+  }
+
+  // Enviar tokens
+  async sendToken(params: { to: string; amount: number; token?: string }) {
+    try {
+      if (!this.initialized) await this.initialize()
+
+      const result = await holdstationService.sendToken(params)
+      return result
+    } catch (error) {
+      console.error("Error sending REAL token:", error)
       throw error
     }
   }
@@ -195,14 +203,31 @@ class EnhancedWalletService {
 
       return await holdstationService.getTokenDetails(tokenAddresses)
     } catch (error) {
-      console.error("Error getting token details:", error)
-      return {}
+      console.error("Error getting REAL token details:", error)
+      throw error
+    }
+  }
+
+  // Obter tokens da carteira
+  async getWalletTokens(walletAddress: string) {
+    try {
+      if (!this.initialized) await this.initialize()
+
+      return await holdstationService.getWalletTokens(walletAddress)
+    } catch (error) {
+      console.error("Error getting REAL wallet tokens:", error)
+      throw error
     }
   }
 
   // Verificar se está inicializado
   isInitialized() {
     return this.initialized
+  }
+
+  // Obter informações da rede
+  getNetworkInfo() {
+    return holdstationService.getNetworkInfo()
   }
 }
 
