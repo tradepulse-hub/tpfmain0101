@@ -39,7 +39,7 @@ const KNOWN_TOKENS = {
 }
 
 class HoldstationService {
-  private provider: ethers.providers.StaticJsonRpcProvider | null = null
+  private provider: ethers.JsonRpcProvider | null = null
   private initialized = false
 
   constructor() {
@@ -55,8 +55,8 @@ class HoldstationService {
     try {
       console.log("Initializing Holdstation service...")
 
-      // Configurar provider básico
-      this.provider = new ethers.providers.StaticJsonRpcProvider(RPC_URL, {
+      // Configurar provider usando ethers v6
+      this.provider = new ethers.JsonRpcProvider(RPC_URL, {
         chainId: CHAIN_ID,
         name: "worldchain",
       })
@@ -287,10 +287,10 @@ class HoldstationService {
 
   private getSimulatedBalance(symbol: string): string {
     const balances: Record<string, string> = {
-      TPF: ethers.utils.parseEther("1000").toString(),
-      WLD: ethers.utils.parseEther("42.67").toString(),
-      WETH: ethers.utils.parseEther("0.5").toString(),
-      USDCe: ethers.utils.parseUnits("125.45", 6).toString(), // USDC tem 6 decimais
+      TPF: ethers.parseEther("1000").toString(),
+      WLD: ethers.parseEther("42.67").toString(),
+      WETH: ethers.parseEther("0.5").toString(),
+      USDCe: ethers.parseUnits("125.45", 6).toString(), // USDC tem 6 decimais
     }
     return balances[symbol] || "0"
   }
