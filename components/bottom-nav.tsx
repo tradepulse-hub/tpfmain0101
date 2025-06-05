@@ -95,8 +95,8 @@ export function BottomNav({ activeTab = "agenda" }: BottomNavProps) {
                   { name: translations.nav?.news || "News", icon: "megaphone", path: "/news" },
                   { name: translations.nav?.learn || "Aprende", icon: "book", path: "/learn" },
                   { name: translations.nav?.games || "Fi Games", icon: "gamepad", path: "/games" },
-                  { name: translations.nav?.storm || "Storm", icon: "zap", path: "/storm" },
                   { name: translations.nav?.finances || "Finanças", icon: "chart", path: "/finances" },
+                  { name: translations.nav?.storm || "Storm", icon: "zap", path: "/storm" },
                   { name: translations.nav?.about || "Sobre", icon: "info", path: "/about" },
                 ].map((item) => (
                   <Link href={item.path} key={item.name}>
@@ -163,6 +163,11 @@ export function BottomNav({ activeTab = "agenda" }: BottomNavProps) {
                               />
                             </svg>
                           )}
+                          {item.icon === "chart" && (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M18.375 2.25c-1.035 0-1.875.84-1.875 1.875v15.75c0 1.035.84 1.875 1.875 1.875h.75c1.035 0 1.875-.84 1.875-1.875V4.125c0-1.036-.84-1.875-1.875-1.875h-.75zM9.75 8.625c0-1.036.84-1.875 1.875-1.875h.75c1.036 0 1.875.84 1.875 1.875v11.25c0 1.035-.84 1.875-1.875 1.875h-.75a1.875 1.875 0 01-1.875-1.875V8.625zM3 13.125c0-1.036.84-1.875 1.875-1.875h.75c1.036 0 1.875.84 1.875 1.875v6.75c0 1.035-.84 1.875-1.875 1.875h-.75A1.875 1.875 0 013 19.875v-6.75z" />
+                            </svg>
+                          )}
                           {item.icon === "info" && (
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                               <path
@@ -170,11 +175,6 @@ export function BottomNav({ activeTab = "agenda" }: BottomNavProps) {
                                 d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm8.706-1.442c1.146-.573 2.437.463 2.126 1.706l-.709 2.836.042-.02a.75.75 0 01.67 1.34l-.04.022c-1.147.573-2.438-.463-2.127-1.706l.71-2.836-.042.02a.75.75 0 11-.671-1.34l.041-.022zM12 9a.75.75 0 100-1.5.75.75 0 000 1.5z"
                                 clipRule="evenodd"
                               />
-                            </svg>
-                          )}
-                          {item.icon === "chart" && (
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M18.375 2.25c-1.035 0-1.875.84-1.875 1.875v15.75c0 1.035.84 1.875 1.875 1.875h.75c1.035 0 1.875-.84 1.875-1.875V4.125c0-1.036-.84-1.875-1.875-1.875h-.75zM9.75 8.625c0-1.036.84-1.875 1.875-1.875h.75c1.036 0 1.875.84 1.875 1.875v11.25c0 1.035-.84 1.875-1.875 1.875h-.75a1.875 1.875 0 01-1.875-1.875V8.625zM3 13.125c0-1.036.84-1.875 1.875-1.875h.75c1.036 0 1.875.84 1.875 1.875v6.75c0 1.035-.84 1.875-1.875 1.875h-.75A1.875 1.875 0 013 19.875v-6.75z" />
                             </svg>
                           )}
                         </div>

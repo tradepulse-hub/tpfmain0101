@@ -2,14 +2,14 @@
 
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
+import { TrendingUp, TrendingDown, DollarSign, Calendar, BarChart3 } from "lucide-react"
 import { BottomNav } from "@/components/bottom-nav"
-import { LanguageSelector } from "@/components/language-selector"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
-import { TrendingUp, TrendingDown, DollarSign, BarChart3, Calendar } from "lucide-react"
 
 export default function FinancesPage() {
   const [translations, setTranslations] = useState(getTranslations(getCurrentLanguage()))
 
+  // Atualizar traduções quando o idioma mudar
   useEffect(() => {
     const handleLanguageChange = () => {
       setTranslations(getTranslations(getCurrentLanguage()))
@@ -23,7 +23,7 @@ export default function FinancesPage() {
     }
   }, [])
 
-  // Dados financeiros (todos em 0$ conforme solicitado)
+  // Dados financeiros
   const financialData = {
     incentivesReceived: 0,
     transactionFees: 0,
@@ -32,74 +32,82 @@ export default function FinancesPage() {
   }
 
   const totalRevenue = financialData.incentivesReceived + financialData.transactionFees + financialData.tradingRevenue
-  const netBalance = totalRevenue - Math.abs(financialData.projectExpenses)
+  const totalExpenses = Math.abs(financialData.projectExpenses)
+  const netBalance = totalRevenue - totalExpenses
 
-  // Dados para gráficos
-  const revenueData = [
+  const chartData = [
     {
-      name: translations.finances?.incentivesReceived || "Incentives",
+      name: translations.finances?.incentivesReceived || "Incentivos",
       value: financialData.incentivesReceived,
-      color: "#3B82F6",
+      color: "bg-blue-500",
     },
     {
-      name: translations.finances?.transactionFees || "Transaction Fees",
+      name: translations.finances?.transactionFees || "Taxas",
       value: financialData.transactionFees,
-      color: "#10B981",
+      color: "bg-green-500",
     },
     {
-      name: translations.finances?.tradingRevenue || "Trading Revenue",
+      name: translations.finances?.tradingRevenue || "Trading",
       value: financialData.tradingRevenue,
-      color: "#8B5CF6",
+      color: "bg-purple-500",
     },
-  ]
-
-  const expenseData = [
     {
-      name: translations.finances?.projectExpenses || "Project Expenses",
+      name: translations.finances?.projectExpenses || "Gastos",
       value: Math.abs(financialData.projectExpenses),
-      color: "#EF4444",
+      color: "bg-red-500",
     },
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white pb-20">
       {/* Header */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20" />
-        <div className="relative max-w-md mx-auto px-4 py-6">
-          <div className="flex justify-between items-center mb-6">
-            <motion.h1
-              className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              {translations.finances?.title || "Finanças"}
-            </motion.h1>
-            <LanguageSelector />
-          </div>
-
+      <motion.div
+        className="relative overflow-hidden bg-gradient-to-r from-blue-600/20 to-purple-600/20 backdrop-blur-sm border-b border-white/10"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10" />
+        <div className="relative max-w-md mx-auto px-6 py-8">
+          <motion.div
+            className="flex items-center justify-center mb-4"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+          >
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <BarChart3 className="w-6 h-6 text-white" />
+            </div>
+          </motion.div>
+          <motion.h1
+            className="text-3xl font-bold text-center mb-2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.6 }}
+          >
+            {translations.finances?.title || "Finanças"}
+          </motion.h1>
           <motion.p
-            className="text-gray-300 text-sm mb-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
+            className="text-gray-300 text-center text-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
           >
             {translations.finances?.subtitle || "Transparência financeira do projeto"}
           </motion.p>
         </div>
-      </div>
+      </motion.div>
 
       {/* Content */}
-      <div className="max-w-md mx-auto px-4 pb-20">
+      <div className="max-w-md mx-auto px-6 py-6 space-y-6">
         {/* Transparency Message */}
         <motion.div
-          className="bg-gradient-to-r from-blue-800/30 to-purple-800/30 rounded-xl p-4 mb-6 border border-blue-500/20"
+          className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 backdrop-blur-sm rounded-xl p-6 border border-white/10"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+          transition={{ delay: 0.5, duration: 0.6 }}
         >
-          <p className="text-gray-200 text-sm leading-relaxed">
+          <p className="text-gray-200 text-center leading-relaxed">
             {translations.finances?.transparencyMessage ||
               "Como a nossa prioridade é a transparência, procuramos alinhar esse princípio com os nossos usuários e investidores"}
           </p>
@@ -107,177 +115,152 @@ export default function FinancesPage() {
 
         {/* Overview Cards */}
         <motion.div
-          className="grid grid-cols-2 gap-4 mb-6"
+          className="grid grid-cols-2 gap-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
+          transition={{ delay: 0.6, duration: 0.6 }}
         >
-          <div className="bg-gradient-to-br from-green-800/30 to-green-900/30 rounded-xl p-4 border border-green-500/20">
+          {/* Total Revenue */}
+          <div className="bg-gradient-to-br from-green-500/20 to-green-600/20 backdrop-blur-sm rounded-xl p-4 border border-green-500/20">
             <div className="flex items-center justify-between mb-2">
               <TrendingUp className="w-5 h-5 text-green-400" />
-              <span className="text-green-400 text-lg font-bold">${totalRevenue}</span>
+              <span className="text-green-400 text-sm font-medium">
+                {translations.finances?.totalRevenue || "Total Receitas"}
+              </span>
             </div>
-            <p className="text-gray-300 text-xs">{translations.finances?.totalRevenue || "Total de Receitas"}</p>
+            <p className="text-2xl font-bold text-green-300">${totalRevenue}</p>
           </div>
 
-          <div className="bg-gradient-to-br from-red-800/30 to-red-900/30 rounded-xl p-4 border border-red-500/20">
+          {/* Total Expenses */}
+          <div className="bg-gradient-to-br from-red-500/20 to-red-600/20 backdrop-blur-sm rounded-xl p-4 border border-red-500/20">
             <div className="flex items-center justify-between mb-2">
               <TrendingDown className="w-5 h-5 text-red-400" />
-              <span className="text-red-400 text-lg font-bold">-${Math.abs(financialData.projectExpenses)}</span>
+              <span className="text-red-400 text-sm font-medium">
+                {translations.finances?.totalExpenses || "Total Despesas"}
+              </span>
             </div>
-            <p className="text-gray-300 text-xs">{translations.finances?.totalExpenses || "Total de Despesas"}</p>
+            <p className="text-2xl font-bold text-red-300">${totalExpenses}</p>
           </div>
         </motion.div>
 
         {/* Net Balance */}
         <motion.div
-          className="bg-gradient-to-r from-blue-800/30 to-purple-800/30 rounded-xl p-4 mb-6 border border-blue-500/20"
+          className={`bg-gradient-to-br ${
+            netBalance >= 0 ? "from-green-500/20 to-green-600/20" : "from-red-500/20 to-red-600/20"
+          } backdrop-blur-sm rounded-xl p-6 border ${netBalance >= 0 ? "border-green-500/20" : "border-red-500/20"}`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
+          transition={{ delay: 0.7, duration: 0.6 }}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <DollarSign className="w-5 h-5 text-blue-400" />
-              <span className="text-gray-300 text-sm">{translations.finances?.netBalance || "Saldo Líquido"}</span>
-            </div>
-            <span className={`text-lg font-bold ${netBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
-              ${netBalance}
+          <div className="flex items-center justify-center mb-2">
+            <DollarSign className={`w-6 h-6 ${netBalance >= 0 ? "text-green-400" : "text-red-400"} mr-2`} />
+            <span className={`${netBalance >= 0 ? "text-green-400" : "text-red-400"} font-medium`}>
+              {translations.finances?.netBalance || "Saldo Líquido"}
             </span>
+          </div>
+          <p className={`text-3xl font-bold text-center ${netBalance >= 0 ? "text-green-300" : "text-red-300"}`}>
+            ${netBalance}
+          </p>
+        </motion.div>
+
+        {/* Financial Breakdown */}
+        <motion.div
+          className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-white/10"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8, duration: 0.6 }}
+        >
+          <h3 className="text-lg font-semibold mb-4 text-center">
+            {translations.finances?.financialChart || "Gráfico Financeiro"}
+          </h3>
+
+          <div className="space-y-4">
+            {chartData.map((item, index) => (
+              <motion.div
+                key={item.name}
+                className="space-y-2"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.9 + index * 0.1, duration: 0.5 }}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-300">{item.name}</span>
+                  <span className="text-sm font-medium">${item.value}</span>
+                </div>
+                <div className="w-full bg-gray-700/50 rounded-full h-2">
+                  <motion.div
+                    className={`h-2 rounded-full ${item.color}`}
+                    initial={{ width: 0 }}
+                    animate={{ width: item.value > 0 ? "100%" : "0%" }}
+                    transition={{ delay: 1 + index * 0.1, duration: 0.8 }}
+                  />
+                </div>
+              </motion.div>
+            ))}
           </div>
         </motion.div>
 
-        {/* Financial Details */}
+        {/* Detailed Breakdown */}
         <motion.div
-          className="space-y-4 mb-6"
+          className="space-y-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
+          transition={{ delay: 1.2, duration: 0.6 }}
         >
           {/* Incentives */}
-          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/30">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                <span className="text-gray-300 text-sm">
-                  {translations.finances?.incentivesReceived || "Incentivos conseguidos para progressão do projeto"}
-                </span>
-              </div>
+          <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 backdrop-blur-sm rounded-xl p-4 border border-blue-500/20">
+            <div className="flex justify-between items-center">
+              <span className="text-blue-300 text-sm">
+                {translations.finances?.incentivesReceived || "Incentivos conseguidos para progressão do projeto"}
+              </span>
+              <span className="text-blue-300 font-medium">${financialData.incentivesReceived}</span>
             </div>
-            <span className="text-blue-400 text-lg font-bold">${financialData.incentivesReceived}</span>
           </div>
 
           {/* Transaction Fees */}
-          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/30">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-gray-300 text-sm">
-                  {translations.finances?.transactionFees || "Rendimentos obtidos por taxas de transação"}
-                </span>
-              </div>
+          <div className="bg-gradient-to-br from-green-500/10 to-green-600/10 backdrop-blur-sm rounded-xl p-4 border border-green-500/20">
+            <div className="flex justify-between items-center">
+              <span className="text-green-300 text-sm">
+                {translations.finances?.transactionFees || "Rendimentos obtidos por taxas de transação"}
+              </span>
+              <span className="text-green-300 font-medium">${financialData.transactionFees}</span>
             </div>
-            <span className="text-green-400 text-lg font-bold">${financialData.transactionFees}</span>
           </div>
 
           {/* Trading Revenue */}
-          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/30">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                <span className="text-gray-300 text-sm">
-                  {translations.finances?.tradingRevenue || "Rendimentos obtidos pela nossa equipa de Trading"}
-                </span>
-              </div>
+          <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 backdrop-blur-sm rounded-xl p-4 border border-purple-500/20">
+            <div className="flex justify-between items-center">
+              <span className="text-purple-300 text-sm">
+                {translations.finances?.tradingRevenue || "Rendimentos obtidos pela nossa equipa de Trading"}
+              </span>
+              <span className="text-purple-300 font-medium">${financialData.tradingRevenue}</span>
             </div>
-            <span className="text-purple-400 text-lg font-bold">${financialData.tradingRevenue}</span>
           </div>
 
           {/* Project Expenses */}
-          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/30">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <span className="text-gray-300 text-sm">
-                  {translations.finances?.projectExpenses || "Gastos no projeto"}
-                </span>
-              </div>
+          <div className="bg-gradient-to-br from-red-500/10 to-red-600/10 backdrop-blur-sm rounded-xl p-4 border border-red-500/20">
+            <div className="flex justify-between items-center">
+              <span className="text-red-300 text-sm">
+                {translations.finances?.projectExpenses || "Gastos no projeto"}
+              </span>
+              <span className="text-red-300 font-medium">-${Math.abs(financialData.projectExpenses)}</span>
             </div>
-            <span className="text-red-400 text-lg font-bold">-${Math.abs(financialData.projectExpenses)}</span>
-          </div>
-        </motion.div>
-
-        {/* Charts Section */}
-        <motion.div
-          className="bg-gray-800/50 rounded-xl p-4 mb-6 border border-gray-700/30"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
-        >
-          <div className="flex items-center space-x-2 mb-4">
-            <BarChart3 className="w-5 h-5 text-blue-400" />
-            <h3 className="text-white font-semibold">
-              {translations.finances?.financialChart || "Gráfico Financeiro"}
-            </h3>
-          </div>
-
-          {/* Simple Bar Chart */}
-          <div className="space-y-3">
-            {revenueData.map((item, index) => (
-              <div key={index} className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">{item.name}</span>
-                  <span className="text-gray-300">${item.value}</span>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <motion.div
-                    className="h-2 rounded-full"
-                    style={{ backgroundColor: item.color }}
-                    initial={{ width: 0 }}
-                    animate={{ width: item.value > 0 ? "20%" : "0%" }}
-                    transition={{ duration: 1, delay: 0.7 + index * 0.1 }}
-                  />
-                </div>
-              </div>
-            ))}
-
-            {expenseData.map((item, index) => (
-              <div key={index} className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">{item.name}</span>
-                  <span className="text-gray-300">-${item.value}</span>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <motion.div
-                    className="h-2 rounded-full"
-                    style={{ backgroundColor: item.color }}
-                    initial={{ width: 0 }}
-                    animate={{ width: item.value > 0 ? "20%" : "0%" }}
-                    transition={{ duration: 1, delay: 1 + index * 0.1 }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4 text-center">
-            <span className="text-gray-400 text-xs">{translations.finances?.noData || "Sem dados disponíveis"}</span>
           </div>
         </motion.div>
 
         {/* Last Updated */}
         <motion.div
-          className="flex items-center justify-center space-x-2 text-gray-400 text-xs"
+          className="flex items-center justify-center text-gray-400 text-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.8 }}
+          transition={{ delay: 1.4, duration: 0.6 }}
         >
-          <Calendar className="w-4 h-4" />
+          <Calendar className="w-4 h-4 mr-2" />
           <span>{translations.finances?.lastUpdated || "Última atualização"}: 30/05/2025</span>
         </motion.div>
       </div>
 
-      <BottomNav activeTab="finances" />
+      <BottomNav />
     </div>
   )
 }
