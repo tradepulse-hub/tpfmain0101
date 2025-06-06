@@ -15,7 +15,14 @@ interface LevelInfoProps {
 export function LevelInfo({ tpfBalance, isOpen, onClose }: LevelInfoProps) {
   const [currentLanguage, setCurrentLanguage] = useState<Language>("en")
   const [translations, setTranslations] = useState(getTranslations("en"))
-  const [levelInfo, setLevelInfo] = useState(levelService.getUserLevelInfo(tpfBalance))
+  const [levelInfo, setLevelInfo] = useState({
+    level: 1,
+    totalXP: 0,
+    currentLevelXP: 0,
+    nextLevelXP: 100,
+    rewardMultiplier: 1.01,
+    progressPercentage: 0,
+  })
 
   // Carregar idioma e traduções
   useEffect(() => {
@@ -33,15 +40,47 @@ export function LevelInfo({ tpfBalance, isOpen, onClose }: LevelInfoProps) {
     return () => window.removeEventListener("languageChange", handleLanguageChange)
   }, [])
 
-  // Atualizar informações do nível quando o saldo mudar
+  // Calcular informações do nível quando o saldo mudar
   useEffect(() => {
-    setLevelInfo(levelService.getUserLevelInfo(tpfBalance))
+    const checkInXP = levelService.getCheckInXP()
+    const tpfXP = Math.floor(tpfBalance * 0.001)
+    const totalXP = checkInXP + tpfXP
+    const level = levelService.calculateLevel(totalXP)
+    const currentLevelXP = levelService.getCurrentLevelXP(totalXP)
+    const nextLevelXP = levelService.getXPForNextLevel(totalXP)
+    const rewardMultiplier = levelService.getRewardMultiplier(level)
+    const progressPercentage = nextLevelXP > 0 ? (currentLevelXP / nextLevelXP) * 100 : 100
+
+    setLevelInfo({
+      level,
+      totalXP,
+      currentLevelXP,
+      nextLevelXP,
+      rewardMultiplier,
+      progressPercentage,
+    })
   }, [tpfBalance])
 
   // Escutar atualizações de XP
   useEffect(() => {
     const handleXPUpdate = () => {
-      setLevelInfo(levelService.getUserLevelInfo(tpfBalance))
+      const checkInXP = levelService.getCheckInXP()
+      const tpfXP = Math.floor(tpfBalance * 0.001)
+      const totalXP = checkInXP + tpfXP
+      const level = levelService.calculateLevel(totalXP)
+      const currentLevelXP = levelService.getCurrentLevelXP(totalXP)
+      const nextLevelXP = levelService.getXPForNextLevel(totalXP)
+      const rewardMultiplier = levelService.getRewardMultiplier(level)
+      const progressPercentage = nextLevelXP > 0 ? (currentLevelXP / nextLevelXP) * 100 : 100
+
+      setLevelInfo({
+        level,
+        totalXP,
+        currentLevelXP,
+        nextLevelXP,
+        rewardMultiplier,
+        progressPercentage,
+      })
     }
 
     window.addEventListener("xp_updated", handleXPUpdate)
@@ -53,6 +92,8 @@ export function LevelInfo({ tpfBalance, isOpen, onClose }: LevelInfoProps) {
   const { level, totalXP, currentLevelXP, nextLevelXP, rewardMultiplier, progressPercentage } = levelInfo
   const levelColor = levelService.getLevelColor(level)
   const levelIcon = levelService.getLevelIcon(level)
+  const checkInXP = levelService.getCheckInXP()
+  const tpfXP = Math.floor(tpfBalance * 0.001)
 
   return (
     <motion.div
@@ -124,7 +165,7 @@ export function LevelInfo({ tpfBalance, isOpen, onClose }: LevelInfoProps) {
               <span className="text-green-400 font-medium">+10 XP</span>
             </div>
             <div className="text-xs text-gray-500">
-              {translations.level?.checkInXP || "Current"}: {levelService.getCheckInXP()} XP
+              {translations.level?.checkInXP || "Current"}: {checkInXP} XP
             </div>
           </div>
 
@@ -134,7 +175,7 @@ export function LevelInfo({ tpfBalance, isOpen, onClose }: LevelInfoProps) {
               <span className="text-blue-400 font-medium text-xs">0.001 XP/TPF</span>
             </div>
             <div className="text-xs text-gray-500">
-              {tpfBalance.toLocaleString()} TPF = {Math.floor(tpfBalance * 0.001).toLocaleString()} XP
+              {tpfBalance.toLocaleString()} TPF = {tpfXP.toLocaleString()} XP
             </div>
           </div>
         </div>
