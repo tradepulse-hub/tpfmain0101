@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { BackgroundEffect } from "@/components/background-effect"
 import { BottomNav } from "@/components/bottom-nav"
@@ -10,6 +10,7 @@ import { SnakeGame } from "@/components/games/snake-game"
 import { Chess3D } from "@/components/games/chess-3d"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
 import { FlappyBird } from "@/components/games/flappy-bird"
+import ErrorBoundary from "@/components/error-boundary"
 
 export default function GamesPage() {
   const [selectedGame, setSelectedGame] = useState<number | null>(null)
@@ -149,7 +150,13 @@ export default function GamesPage() {
     if (!game || !game.component) return null
 
     const GameComponent = game.component
-    return <GameComponent onBack={handleBackToGames} minimalUI={true} />
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<div>Loading Game...</div>}>
+          <GameComponent onBack={handleBackToGames} minimalUI={true} />
+        </Suspense>
+      </ErrorBoundary>
+    )
   }
 
   return (

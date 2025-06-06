@@ -1,7 +1,6 @@
 import { ethers } from "ethers"
 
 // Endereço do contrato de airdrop na Worldchain
-// Configuração simplificada para evitar problemas de build
 export const AIRDROP_CONTRACT_ADDRESS = "0x1234567890123456789012345678901234567890"
 
 // Endereço do token TPF
@@ -44,3 +43,15 @@ export const getAirdropContract = async () => {
 
   throw new Error("Failed to connect to any RPC endpoint")
 }
+
+// Function to get the provider
+const getProvider = (providerUrl: string): ethers.providers.Provider => {
+  try {
+    return new ethers.providers.JsonRpcProvider(providerUrl)
+  } catch (error) {
+    console.error("Error creating provider:", error)
+    throw new Error("Failed to create provider. Check provider URL.")
+  }
+}
+
+export { getProvider }
