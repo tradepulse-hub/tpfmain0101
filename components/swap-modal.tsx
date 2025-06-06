@@ -1,10 +1,10 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
-import { ChevronDown, X, ArrowUpDown, Loader2, Settings } from "lucide-react"
+import { X, ArrowUpDown, Loader2, Settings } from "lucide-react"
 import { getCurrentLanguage, getTranslations } from "../lib/i18n"
 import { uniswapService } from "../services/uniswap-service"
 import { toast } from "sonner"
@@ -16,8 +16,8 @@ interface SwapModalProps {
 }
 
 export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
-  const [tokenIn, setTokenIn] = useState("WETH")
-  const [tokenOut, setTokenOut] = useState("USDCe")
+  const [tokenIn, setTokenIn] = useState<"WLD" | "TPF">("WLD")
+  const [tokenOut, setTokenOut] = useState<"WLD" | "TPF">("TPF")
   const [amountIn, setAmountIn] = useState("")
   const [amountOut, setAmountOut] = useState("")
   const [slippage, setSlippage] = useState("0.5")
@@ -25,13 +25,9 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   const [isQuoting, setIsQuoting] = useState(false)
   const [language, setLanguage] = useState<"en" | "pt">("en")
   const [translations, setTranslations] = useState(getTranslations("en").swap || {})
-  const [supportedTokens, setSupportedTokens] = useState<any[]>([])
-  const [showTokenInDropdown, setShowTokenInDropdown] = useState(false)
-  const [showTokenOutDropdown, setShowTokenOutDropdown] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
 
-  const tokenInDropdownRef = useRef<HTMLDivElement>(null)
-  const tokenOutDropdownRef = useRef<HTMLDivElement>(null)
+  const tokens = uniswapService.getTokens()
 
   useEffect(() => {
     const updateLanguage = () => {
@@ -43,25 +39,6 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     window.addEventListener("languageChange", updateLanguage)
     return () => window.removeEventListener("languageChange", updateLanguage)
   }, [])
-
-  useEffect(() => {
-    const loadSupportedTokens = async () => {
-      try {
-        const tokens = uniswapService.getSupportedTokens()
-        setSupportedTokens(tokens)
-        console.log("Loaded supported tokens:", tokens)
-      } catch (error) {
-        console.error("Error loading supported tokens:", error)
-      }
-    }
-
-    if (isOpen) {
-      loadSupportedTokens()
-    }
-  }, [isOpen])
-
-  const selectedTokenIn = supportedTokens.find((t) => t.symbol === tokenIn) || supportedTokens[0]
-  const selectedTokenOut = supportedTokens.find((t) => t.symbol === tokenOut) || supportedTokens[1]
 
   // Obter cotação quando o valor de entrada mudar
   useEffect(() => {
@@ -77,7 +54,6 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
           tokenIn,
           tokenOut,
           amountIn,
-          fee: 3000, // 0.3% fee
         })
 
         setAmountOut(Number.parseFloat(quote).toFixed(6))
@@ -109,11 +85,6 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
     if (!amountIn || Number.parseFloat(amountIn) <= 0) {
       toast.error(translations.enterAmount || "Enter amount")
-      return
-    }
-
-    if (tokenIn === tokenOut) {
-      toast.error("Cannot swap same token")
       return
     }
 
@@ -156,29 +127,6 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     }
   }
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        tokenInDropdownRef.current &&
-        !tokenInDropdownRef.current.contains(event.target as Node) &&
-        !event.composedPath().some((el) => (el as HTMLElement).dataset?.dropdown === "tokenIn")
-      ) {
-        setShowTokenInDropdown(false)
-      }
-
-      if (
-        tokenOutDropdownRef.current &&
-        !tokenOutDropdownRef.current.contains(event.target as Node) &&
-        !event.composedPath().some((el) => (el as HTMLElement).dataset?.dropdown === "tokenOut")
-      ) {
-        setShowTokenOutDropdown(false)
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
-
   return (
     <AnimatePresence>
       {isOpen && (
@@ -204,7 +152,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
           >
             <div className="flex justify-between items-center p-3 border-b border-gray-800">
-              <h2 className="text-lg font-bold text-white">{translations.title || "Swap"}</h2>
+              <h2 className="text-lg font-bold text-white">WLD ⇄ TPF Swap</h2>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowSettings(!showSettings)}
@@ -256,62 +204,21 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
             <form onSubmit={handleSwap} className="p-3 space-y-3">
               {/* Token de entrada */}
-              <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700 relative">
+              <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs text-gray-400">{translations.from || "From"}</span>
-                  <button
-                    type="button"
-                    className="flex items-center space-x-1 text-white hover:text-gray-300"
-                    onClick={() => setShowTokenInDropdown(!showTokenInDropdown)}
-                    data-dropdown="tokenIn"
-                  >
-                    <div className="w-4 h-4 rounded-full overflow-hidden">
+                  <span className="text-xs text-gray-400">From</span>
+                  <div className="flex items-center space-x-2 text-white">
+                    <div className="w-5 h-5 rounded-full overflow-hidden">
                       <Image
-                        src={selectedTokenIn?.icon || "/placeholder.svg"}
-                        alt={selectedTokenIn?.name || "Token"}
-                        width={16}
-                        height={16}
+                        src={tokens[tokenIn].icon || "/placeholder.svg"}
+                        alt={tokens[tokenIn].name}
+                        width={20}
+                        height={20}
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <span className="text-sm font-medium">{selectedTokenIn?.symbol || "Select"}</span>
-                    <ChevronDown size={12} />
-                  </button>
-
-                  {showTokenInDropdown && (
-                    <div
-                      ref={tokenInDropdownRef}
-                      className="absolute right-0 top-8 z-50 mt-1 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
-                    >
-                      {supportedTokens
-                        .filter((t) => t.symbol !== tokenOut)
-                        .map((token) => (
-                          <button
-                            key={token.symbol}
-                            type="button"
-                            className="w-full flex items-center px-3 py-2 text-sm hover:bg-gray-700 text-gray-300"
-                            onClick={() => {
-                              setTokenIn(token.symbol)
-                              setShowTokenInDropdown(false)
-                            }}
-                          >
-                            <div className="w-4 h-4 rounded-full overflow-hidden mr-2">
-                              <Image
-                                src={token.icon || "/placeholder.svg"}
-                                alt={token.name}
-                                width={16}
-                                height={16}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="text-left flex-1">
-                              <div className="font-medium">{token.symbol}</div>
-                              <div className="text-xs text-gray-400">{token.name}</div>
-                            </div>
-                          </button>
-                        ))}
-                    </div>
-                  )}
+                    <span className="text-sm font-medium">{tokens[tokenIn].symbol}</span>
+                  </div>
                 </div>
                 <input
                   type="number"
@@ -329,69 +236,28 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                 <button
                   type="button"
                   onClick={handleSwapTokens}
-                  className="p-1 rounded-full bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white transition-colors"
+                  className="p-2 rounded-full bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white transition-colors"
                 >
-                  <ArrowUpDown size={14} />
+                  <ArrowUpDown size={16} />
                 </button>
               </div>
 
               {/* Token de saída */}
-              <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700 relative">
+              <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs text-gray-400">{translations.to || "To"}</span>
-                  <button
-                    type="button"
-                    className="flex items-center space-x-1 text-white hover:text-gray-300"
-                    onClick={() => setShowTokenOutDropdown(!showTokenOutDropdown)}
-                    data-dropdown="tokenOut"
-                  >
-                    <div className="w-4 h-4 rounded-full overflow-hidden">
+                  <span className="text-xs text-gray-400">To</span>
+                  <div className="flex items-center space-x-2 text-white">
+                    <div className="w-5 h-5 rounded-full overflow-hidden">
                       <Image
-                        src={selectedTokenOut?.icon || "/placeholder.svg"}
-                        alt={selectedTokenOut?.name || "Token"}
-                        width={16}
-                        height={16}
+                        src={tokens[tokenOut].icon || "/placeholder.svg"}
+                        alt={tokens[tokenOut].name}
+                        width={20}
+                        height={20}
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <span className="text-sm font-medium">{selectedTokenOut?.symbol || "Select"}</span>
-                    <ChevronDown size={12} />
-                  </button>
-
-                  {showTokenOutDropdown && (
-                    <div
-                      ref={tokenOutDropdownRef}
-                      className="absolute right-0 top-8 z-50 mt-1 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
-                    >
-                      {supportedTokens
-                        .filter((t) => t.symbol !== tokenIn)
-                        .map((token) => (
-                          <button
-                            key={token.symbol}
-                            type="button"
-                            className="w-full flex items-center px-3 py-2 text-sm hover:bg-gray-700 text-gray-300"
-                            onClick={() => {
-                              setTokenOut(token.symbol)
-                              setShowTokenOutDropdown(false)
-                            }}
-                          >
-                            <div className="w-4 h-4 rounded-full overflow-hidden mr-2">
-                              <Image
-                                src={token.icon || "/placeholder.svg"}
-                                alt={token.name}
-                                width={16}
-                                height={16}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="text-left flex-1">
-                              <div className="font-medium">{token.symbol}</div>
-                              <div className="text-xs text-gray-400">{token.name}</div>
-                            </div>
-                          </button>
-                        ))}
-                    </div>
-                  )}
+                    <span className="text-sm font-medium">{tokens[tokenOut].symbol}</span>
+                  </div>
                 </div>
                 <div className="flex items-center">
                   <input
@@ -408,15 +274,15 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
               <button
                 type="submit"
                 disabled={isLoading || !amountIn || !amountOut}
-                className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
-                    <Loader2 size={14} className="animate-spin mr-2" />
-                    {translations.processing || "Swapping..."}
+                    <Loader2 size={16} className="animate-spin mr-2" />
+                    Swapping...
                   </div>
                 ) : (
-                  translations.swapButton || "Swap"
+                  `Swap ${tokenIn} → ${tokenOut}`
                 )}
               </button>
             </form>
