@@ -1,5 +1,4 @@
 import { ethers } from "ethers"
-import { TokenProvider } from "@holdstation/worldchain-sdk"
 
 // Configuração da rede Worldchain
 const WORLDCHAIN_RPC_URL = "https://worldchain-mainnet.g.alchemy.com/public"
@@ -19,31 +18,61 @@ interface TokenBalance {
 }
 
 class HoldstationService {
-  private provider: ethers.JsonRpcProvider
-  private tokenProvider: TokenProvider
+  private provider: ethers.JsonRpcProvider | null = null
+  private tokenProvider: any = null
   private initialized = false
+  private initializationError: string | null = null
 
   constructor() {
     // Inicializar apenas no lado do cliente
     if (typeof window !== "undefined") {
+      this.initializeAsync()
+    }
+  }
+
+  private async initializeAsync() {
+    try {
+      // Importação dinâmica para evitar erros de SSR
+      const { TokenProvider } = await import("@holdstation/worldchain-sdk")
+
       this.provider = new ethers.JsonRpcProvider(WORLDCHAIN_RPC_URL)
       this.tokenProvider = new TokenProvider({ provider: this.provider })
       this.initialized = true
+
+      console.log("HoldstationService initialized successfully")
+    } catch (error) {
+      console.error("Failed to initialize HoldstationService:", error)
+      this.initializationError = error instanceof Error ? error.message : "Unknown initialization error"
     }
   }
 
   // Verificar se o serviço está inicializado
-  private ensureInitialized() {
+  private async ensureInitialized() {
+    if (this.initializationError) {
+      throw new Error(`HoldstationService initialization failed: ${this.initializationError}`)
+    }
+
     if (!this.initialized) {
-      throw new Error("HoldstationService not initialized. Make sure you're on the client side.")
+      // Aguardar um pouco para a inicialização
+      let attempts = 0
+      while (!this.initialized && !this.initializationError && attempts < 50) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        attempts++
+      }
+
+      if (!this.initialized) {
+        throw new Error(
+          "HoldstationService not initialized. Make sure you're on the client side and the SDK is available.",
+        )
+      }
     }
   }
 
   // Obter detalhes de múltiplos tokens
   async getTokenDetails(...tokenAddresses: string[]): Promise<{ [address: string]: TokenDetails }> {
-    this.ensureInitialized()
-
     try {
+      await this.ensureInitialized()
+
       console.log("Fetching token details for:", tokenAddresses)
       const details = await this.tokenProvider.details(...tokenAddresses)
       console.log("Token details received:", details)
@@ -56,9 +85,9 @@ class HoldstationService {
 
   // Obter todos os tokens de uma carteira
   async getWalletTokens(walletAddress: string): Promise<string[]> {
-    this.ensureInitialized()
-
     try {
+      await this.ensureInitialized()
+
       console.log("Fetching tokens for wallet:", walletAddress)
       const tokens = await this.tokenProvider.tokenOf(walletAddress)
       console.log("Wallet tokens received:", tokens)
@@ -71,9 +100,9 @@ class HoldstationService {
 
   // Obter saldos de múltiplos tokens para uma carteira
   async getTokenBalances(walletAddress: string, tokenAddresses: string[]): Promise<TokenBalance> {
-    this.ensureInitialized()
-
     try {
+      await this.ensureInitialized()
+
       console.log("Fetching token balances for wallet:", walletAddress, "tokens:", tokenAddresses)
       const balances = await this.tokenProvider.balanceOf({
         wallet: walletAddress,
@@ -87,29 +116,11 @@ class HoldstationService {
     }
   }
 
-  // Obter saldo de um token específico para múltiplas carteiras
-  async getTokenBalanceForWallets(tokenAddress: string, walletAddresses: string[]): Promise<TokenBalance> {
-    this.ensureInitialized()
-
-    try {
-      console.log("Fetching token balance for token:", tokenAddress, "wallets:", walletAddresses)
-      const balances = await this.tokenProvider.balanceOf({
-        token: tokenAddress,
-        wallets: walletAddresses,
-      })
-      console.log("Token balance for wallets received:", balances)
-      return balances
-    } catch (error) {
-      console.error("Error fetching token balance for wallets:", error)
-      throw error
-    }
-  }
-
   // Obter informações completas de um token (detalhes + saldo)
   async getCompleteTokenInfo(walletAddress: string, tokenAddress: string) {
-    this.ensureInitialized()
-
     try {
+      await this.ensureInitialized()
+
       // Buscar detalhes e saldo em paralelo
       const [details, balances] = await Promise.all([
         this.getTokenDetails(tokenAddress),
@@ -133,42 +144,14 @@ class HoldstationService {
     }
   }
 
-  // Descobrir e obter informações de todos os tokens de uma carteira
-  async discoverWalletTokens(walletAddress: string) {
-    this.ensureInitialized()
+  // Verificar se o serviço está disponível
+  isAvailable(): boolean {
+    return this.initialized && !this.initializationError
+  }
 
-    try {
-      // Primeiro, descobrir todos os tokens da carteira
-      const tokenAddresses = await this.getWalletTokens(walletAddress)
-
-      if (tokenAddresses.length === 0) {
-        return []
-      }
-
-      // Obter detalhes e saldos de todos os tokens
-      const [details, balances] = await Promise.all([
-        this.getTokenDetails(...tokenAddresses),
-        this.getTokenBalances(walletAddress, tokenAddresses),
-      ])
-
-      // Combinar informações
-      return tokenAddresses
-        .map((address) => {
-          const tokenDetails = details[address]
-          const rawBalance = balances[address]
-          const formattedBalance = ethers.formatUnits(rawBalance || "0", tokenDetails.decimals)
-
-          return {
-            ...tokenDetails,
-            balance: formattedBalance,
-            rawBalance: rawBalance || "0",
-          }
-        })
-        .filter((token) => Number.parseFloat(token.balance) > 0) // Filtrar tokens com saldo zero
-    } catch (error) {
-      console.error("Error discovering wallet tokens:", error)
-      throw error
-    }
+  // Obter erro de inicialização se houver
+  getInitializationError(): string | null {
+    return this.initializationError
   }
 }
 

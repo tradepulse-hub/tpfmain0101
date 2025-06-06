@@ -13,9 +13,15 @@ import { SendTokenModal } from "@/components/send-token-modal"
 import { ReceiveTokenModal } from "@/components/receive-token-modal"
 import Image from "next/image"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
+import { toast } from "react-hot-toast"
+// Remover esta linha do topo:
+// import { TokenDetailsModal } from "@/components/token-details-modal"
+
+// Adicionar estado para o modal
 import { TokenDetailsModal } from "@/components/token-details-modal"
 
 export default function WalletPage() {
+  const [TokenDetailsModalComponent, setTokenDetailsModal] = useState<any>(null)
   const [walletAddress, setWalletAddress] = useState<string>("")
   const [balance, setBalance] = useState<number>(0)
   const [tokenBalances, setTokenBalances] = useState<Record<string, number>>({})
@@ -141,9 +147,29 @@ export default function WalletPage() {
       balance: tokenBalances[symbol] || 0,
     }))
 
-  const handleTokenClick = (symbol: string, address: string) => {
-    setSelectedToken({ symbol, address })
-    setIsTokenModalOpen(true)
+  // Adicionar função para carregar o modal dinamicamente
+  const loadTokenModal = async () => {
+    try {
+      const { TokenDetailsModal: Modal } = await import("@/components/token-details-modal")
+      setTokenDetailsModal(() => Modal)
+    } catch (error) {
+      console.error("Failed to load token details modal:", error)
+      toast.error(language === "pt" ? "Erro ao carregar detalhes do token" : "Error loading token details")
+    }
+  }
+
+  // Atualizar a função handleTokenClick
+  const handleTokenClick = async (symbol: string, address: string) => {
+    try {
+      if (!TokenDetailsModalComponent) {
+        await loadTokenModal()
+      }
+      setSelectedToken({ symbol, address })
+      setIsTokenModalOpen(true)
+    } catch (error) {
+      console.error("Error opening token details:", error)
+      toast.error(language === "pt" ? "Erro ao abrir detalhes do token" : "Error opening token details")
+    }
   }
 
   return (
@@ -291,7 +317,7 @@ export default function WalletPage() {
       </div>
 
       {/* Modal de detalhes do token */}
-      {selectedToken && (
+      {selectedToken && TokenDetailsModalComponent && (
         <TokenDetailsModal
           isOpen={isTokenModalOpen}
           onClose={() => setIsTokenModalOpen(false)}

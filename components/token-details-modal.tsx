@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ExternalLink, Copy, RefreshCw, Info, Activity, Wallet } from "lucide-react"
-import { holdstationService } from "@/services/holdstation-service"
 import { walletService } from "@/services/wallet-service"
 import { TransactionHistory } from "@/components/transaction-history"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
@@ -81,14 +80,21 @@ export function TokenDetailsModal({
     try {
       console.log("Fetching token info for:", tokenSymbol, tokenAddress)
 
-      // Tentar obter informações reais do token
-      const info = await holdstationService.getCompleteTokenInfo(walletAddress, tokenAddress)
-      setTokenInfo(info)
+      // Tentar obter informações reais do token usando importação dinâmica
+      try {
+        const { holdstationService } = await import("@/services/holdstation-service")
 
-      console.log("Token info loaded:", info)
-    } catch (error) {
-      console.error("Error fetching token info:", error)
-      setError(language === "pt" ? "Erro ao carregar informações do token" : "Error loading token information")
+        if (holdstationService.isAvailable()) {
+          const info = await holdstationService.getCompleteTokenInfo(walletAddress, tokenAddress)
+          setTokenInfo(info)
+          console.log("Token info loaded from Holdstation:", info)
+          return
+        } else {
+          console.warn("Holdstation service not available:", holdstationService.getInitializationError())
+        }
+      } catch (holdstationError) {
+        console.warn("Failed to use Holdstation service:", holdstationError)
+      }
 
       // Fallback para informações básicas
       const tokensInfo = walletService.getTokensInfo()
@@ -104,7 +110,13 @@ export function TokenDetailsModal({
           balance: initialBalance.toString(),
           rawBalance: (initialBalance * Math.pow(10, basicInfo.decimals)).toString(),
         })
+        console.log("Using fallback token info")
+      } else {
+        throw new Error("Token information not found")
       }
+    } catch (error) {
+      console.error("Error fetching token info:", error)
+      setError(language === "pt" ? "Erro ao carregar informações do token" : "Error loading token information")
     } finally {
       setLoading(false)
     }
