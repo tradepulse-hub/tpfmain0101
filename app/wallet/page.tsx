@@ -13,6 +13,8 @@ import { SendTokenModal } from "@/components/send-token-modal"
 import { ReceiveTokenModal } from "@/components/receive-token-modal"
 import Image from "next/image"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
+import { tokenProviderService } from "@/services/token-provider-service"
+import { TokenDetailsModal } from "@/components/token-details-modal"
 
 export default function WalletPage() {
   const [walletAddress, setWalletAddress] = useState<string>("")
@@ -25,6 +27,10 @@ export default function WalletPage() {
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
   const [language, setLanguage] = useState<"en" | "pt">("en")
   const router = useRouter()
+
+  const [selectedToken, setSelectedToken] = useState<string>("")
+  const [selectedTokenBalance, setSelectedTokenBalance] = useState<string>("0")
+  const [isTokenDetailsOpen, setIsTokenDetailsOpen] = useState(false)
 
   // Obter traduções com base no idioma atual
   const translations = getTranslations(language)
@@ -88,19 +94,35 @@ export default function WalletPage() {
       setLoading(true)
       setError(null)
 
-      // Obter saldo TPF
-      console.log("Fetching wallet data for address:", address)
-      const balance = await walletService.getBalance(address)
-      console.log("Wallet balance fetched:", balance)
-      setBalance(balance)
+      // Obter saldos usando o TokenProvider
+      const realBalances = await tokenProviderService.getTokenBalances(address)
+      console.log("Real token balances:", realBalances)
 
-      // Obter saldos de todos os tokens
-      const allBalances = await walletService.getAllTokenBalances(address)
-      console.log("All token balances:", allBalances)
-      setTokenBalances(allBalances)
+      // Converter para números e atualizar estados
+      const tpfBalance = Number(realBalances.TPF || "0")
+      setBalance(tpfBalance)
+
+      // Converter todos os saldos para números
+      const numericBalances: Record<string, number> = {}
+      for (const [symbol, balance] of Object.entries(realBalances)) {
+        numericBalances[symbol] = Number(balance || "0")
+      }
+      setTokenBalances(numericBalances)
     } catch (error) {
       console.error("Erro ao carregar dados da carteira:", error)
       setError(translations.wallet?.errorMessage || "Não foi possível obter o saldo real. Tente definir manualmente.")
+
+      // Fallback para saldos padrão em caso de erro
+      setBalance(1000)
+      setTokenBalances({
+        TPF: 1000,
+        WLD: 42.67,
+        DNA: 125.45,
+        CASH: 310.89,
+        WDD: 78.32,
+        WETH: 0.5,
+        USDCe: 250.0,
+      })
     } finally {
       setLoading(false)
     }
@@ -137,6 +159,12 @@ export default function WalletPage() {
       logo: info.logo,
       balance: tokenBalances[symbol] || 0,
     }))
+
+  const handleTokenClick = (symbol: string, balance: number) => {
+    setSelectedToken(symbol)
+    setSelectedTokenBalance(balance.toString())
+    setIsTokenDetailsOpen(true)
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center p-4 relative overflow-hidden pb-20">
@@ -236,9 +264,10 @@ export default function WalletPage() {
               ) : (
                 <div className="space-y-3">
                   {otherTokens.map((token) => (
-                    <div
+                    <button
                       key={token.symbol}
-                      className="flex items-center justify-between p-2 rounded-lg bg-gray-800/50 border border-gray-700/30"
+                      onClick={() => handleTokenClick(token.symbol, token.balance)}
+                      className="w-full flex items-center justify-between p-2 rounded-lg bg-gray-800/50 border border-gray-700/30 hover:bg-gray-700/50 transition-colors"
                     >
                       <div className="flex items-center">
                         <div className="w-8 h-8 rounded-full overflow-hidden mr-3">
@@ -255,7 +284,7 @@ export default function WalletPage() {
                         </div>
                         <div className="text-xs text-gray-400">{token.symbol}</div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -280,6 +309,14 @@ export default function WalletPage() {
           )}
         </motion.div>
       </div>
+
+      <TokenDetailsModal
+        isOpen={isTokenDetailsOpen}
+        onClose={() => setIsTokenDetailsOpen(false)}
+        tokenSymbol={selectedToken}
+        tokenBalance={selectedTokenBalance}
+        walletAddress={walletAddress}
+      />
 
       <BottomNav activeTab="wallet" />
     </main>
