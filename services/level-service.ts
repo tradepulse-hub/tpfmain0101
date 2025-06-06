@@ -1,3 +1,5 @@
+import { balanceSyncService } from "./balance-sync-service"
+
 // Serviço para gerenciar sistema de níveis e XP
 class LevelService {
   private static instance: LevelService
@@ -54,7 +56,11 @@ class LevelService {
   // Calcular XP total baseado em check-ins e saldo TPF
   calculateTotalXP(checkInXP: number, tpfBalance: number): number {
     const tpfXP = Math.floor(tpfBalance * 0.001) // 1 TPF = 0.001 XP
-    return checkInXP + tpfXP
+    const totalXP = checkInXP + tpfXP
+    console.log(
+      `XP Calculation: CheckIn=${checkInXP}, TPF=${tpfBalance.toLocaleString()}, TPF_XP=${tpfXP}, Total=${totalXP}`,
+    )
+    return totalXP
   }
 
   // Adicionar XP de check-in
@@ -71,6 +77,7 @@ class LevelService {
       })
       window.dispatchEvent(event)
 
+      console.log(`Check-in XP updated: ${newCheckInXP}`)
       return newCheckInXP
     } catch (error) {
       console.error("Error saving check-in XP:", error)
@@ -82,29 +89,56 @@ class LevelService {
   getCheckInXP(): number {
     try {
       const savedXP = localStorage.getItem("tpf_checkin_xp")
-      return savedXP ? Number.parseInt(savedXP) : 0
+      const xp = savedXP ? Number.parseInt(savedXP) : 0
+      console.log(`Check-in XP: ${xp}`)
+      return xp
     } catch (error) {
       console.error("Error loading check-in XP:", error)
       return 0
     }
   }
 
+  // Obter saldo TPF atual com fallback robusto
+  getCurrentTPFBalance(walletAddress: string): number {
+    const balance = balanceSyncService.getCurrentTPFBalance(walletAddress)
+    console.log(`Current TPF Balance for ${walletAddress}: ${balance.toLocaleString()}`)
+    return balance
+  }
+
   // Obter informações completas do nível do usuário
-  getUserLevelInfo(tpfBalance: number): {
+  getUserLevelInfo(
+    walletAddress: string,
+    manualTPFBalance?: number,
+  ): {
     level: number
     totalXP: number
     currentLevelXP: number
     nextLevelXP: number
     rewardMultiplier: number
     progressPercentage: number
+    checkInXP: number
+    tpfXP: number
+    tpfBalance: number
   } {
     const checkInXP = this.getCheckInXP()
+    const tpfBalance = manualTPFBalance !== undefined ? manualTPFBalance : this.getCurrentTPFBalance(walletAddress)
     const totalXP = this.calculateTotalXP(checkInXP, tpfBalance)
     const level = this.calculateLevel(totalXP)
     const currentLevelXP = this.getCurrentLevelXP(totalXP)
     const nextLevelXP = this.getXPForNextLevel(totalXP)
     const rewardMultiplier = this.getRewardMultiplier(level)
     const progressPercentage = nextLevelXP > 0 ? (currentLevelXP / nextLevelXP) * 100 : 100
+    const tpfXP = Math.floor(tpfBalance * 0.001)
+
+    console.log("=== Level Info Debug ===")
+    console.log(`Wallet: ${walletAddress}`)
+    console.log(`TPF Balance: ${tpfBalance.toLocaleString()}`)
+    console.log(`Check-in XP: ${checkInXP}`)
+    console.log(`TPF XP: ${tpfXP}`)
+    console.log(`Total XP: ${totalXP}`)
+    console.log(`Level: ${level}`)
+    console.log(`Multiplier: ${rewardMultiplier}x`)
+    console.log("=======================")
 
     return {
       level,
@@ -113,7 +147,39 @@ class LevelService {
       nextLevelXP,
       rewardMultiplier,
       progressPercentage,
+      checkInXP,
+      tpfXP,
+      tpfBalance,
     }
+  }
+
+  // Forçar recálculo do nível
+  async forceRecalculateLevel(walletAddress: string): Promise<{
+    level: number
+    totalXP: number
+    currentLevelXP: number
+    nextLevelXP: number
+    rewardMultiplier: number
+    progressPercentage: number
+    checkInXP: number
+    tpfXP: number
+    tpfBalance: number
+  }> {
+    console.log("Forcing level recalculation...")
+
+    // Forçar atualização do saldo
+    const updatedBalance = await balanceSyncService.forceBalanceUpdate(walletAddress)
+
+    // Recalcular com saldo atualizado
+    const levelInfo = this.getUserLevelInfo(walletAddress, updatedBalance)
+
+    // Disparar evento de atualização
+    const event = new CustomEvent("level_updated", {
+      detail: levelInfo,
+    })
+    window.dispatchEvent(event)
+
+    return levelInfo
   }
 
   // Obter cor do nível baseada no nível
@@ -136,6 +202,15 @@ class LevelService {
     if (level <= 75) return "🔥" // Fogo
     if (level <= 100) return "⚡" // Raio
     return "🚀" // Foguete para níveis muito altos
+  }
+
+  // Debug: mostrar todas as informações de XP
+  debugXPInfo(walletAddress: string): void {
+    console.log("=== XP DEBUG INFO ===")
+    balanceSyncService.debugBalanceSources(walletAddress)
+    const levelInfo = this.getUserLevelInfo(walletAddress)
+    console.log("Level Info:", levelInfo)
+    console.log("====================")
   }
 }
 

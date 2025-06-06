@@ -9,7 +9,7 @@ import { EditProfileModal } from "@/components/edit-profile-modal"
 import { useRouter } from "next/navigation"
 import { TransactionHistory } from "@/components/transaction-history"
 // Adicionar import para os ícones do Telegram e Twitter (X)
-import { Settings, Share2, LogOut, Globe, ChevronDown, Check, ExternalLink } from "lucide-react"
+import { Settings, Share2, LogOut, Globe, ChevronDown, Check, ExternalLink, RefreshCw } from "lucide-react"
 
 // Importar as funções de idioma
 import { getCurrentLanguage, setCurrentLanguage, getTranslations, type Language } from "@/lib/i18n"
@@ -32,7 +32,6 @@ export default function ProfilePage() {
 
   // Wallet and balance states
   const [walletAddress, setWalletAddress] = useState<string>("")
-  const [tpfBalance, setTpfBalance] = useState<string>("0")
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,6 +50,17 @@ export default function ProfilePage() {
   const [showLevelInfo, setShowLevelInfo] = useState(false)
   const [userLevel, setUserLevel] = useState(1)
   const [tpfBalanceNumber, setTpfBalanceNumber] = useState(0)
+  const [levelInfo, setLevelInfo] = useState({
+    level: 1,
+    totalXP: 0,
+    currentLevelXP: 0,
+    nextLevelXP: 100,
+    rewardMultiplier: 1.01,
+    progressPercentage: 0,
+    checkInXP: 0,
+    tpfXP: 0,
+    tpfBalance: 0,
+  })
 
   // Handle profile updates
   const handleProfileUpdate = (newData: { nickname?: string; profileImage?: string }) => {
@@ -169,6 +179,35 @@ export default function ProfilePage() {
     }
   }
 
+  // Função para forçar atualização do nível
+  const handleRefreshLevel = async () => {
+    if (isRefreshing || !walletAddress) return
+
+    setIsRefreshing(true)
+    try {
+      console.log("Forcing level refresh...")
+      const updatedLevelInfo = await levelService.forceRecalculateLevel(walletAddress)
+      setLevelInfo(updatedLevelInfo)
+      setUserLevel(updatedLevelInfo.level)
+      setTpfBalanceNumber(updatedLevelInfo.tpfBalance)
+      console.log("Level refreshed successfully:", updatedLevelInfo)
+    } catch (error) {
+      console.error("Error refreshing level:", error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  // Função para atualizar nível
+  const updateLevel = () => {
+    if (!walletAddress) return
+
+    const updatedLevelInfo = levelService.getUserLevelInfo(walletAddress)
+    setLevelInfo(updatedLevelInfo)
+    setUserLevel(updatedLevelInfo.level)
+    setTpfBalanceNumber(updatedLevelInfo.tpfBalance)
+  }
+
   useEffect(() => {
     // Verificar se o usuário está autenticado
     const checkAuth = async () => {
@@ -181,6 +220,11 @@ export default function ProfilePage() {
 
       setWalletAddress(savedAddress)
       setIsLoading(false)
+
+      // Atualizar nível inicial
+      setTimeout(() => {
+        updateLevel()
+      }, 100)
     }
 
     checkAuth()
@@ -244,89 +288,43 @@ export default function ProfilePage() {
     return () => window.removeEventListener("languageChange", handleLanguageChange)
   }, [])
 
-  // Atualizar nível baseado no saldo TPF
+  // Escutar mudanças de saldo e XP
   useEffect(() => {
-    const updateLevel = () => {
-      const balance = Number.parseFloat(tpfBalance) || 0
-      setTpfBalanceNumber(balance)
-      const levelInfo = levelService.getUserLevelInfo(balance)
-      setUserLevel(levelInfo.level)
-    }
+    if (!walletAddress) return
 
-    updateLevel()
-
-    // Escutar mudanças no saldo TPF
     const handleBalanceUpdate = () => {
-      updateLevel()
+      console.log("Balance updated, recalculating level...")
+      setTimeout(updateLevel, 100)
     }
-
-    window.addEventListener("tpf_balance_updated", handleBalanceUpdate)
-    window.addEventListener("xp_updated", handleBalanceUpdate)
-
-    return () => {
-      window.removeEventListener("tpf_balance_updated", handleBalanceUpdate)
-      window.removeEventListener("xp_updated", handleBalanceUpdate)
-    }
-  }, [tpfBalance])
-
-  // Adicionar após os outros useEffects, antes do return
-  useEffect(() => {
-    const fetchTPFBalance = async () => {
-      try {
-        if (walletAddress) {
-          // Simular busca do saldo real - você pode integrar com seu serviço de carteira
-          const savedBalance = localStorage.getItem(`tpf_balance_${walletAddress}`)
-          if (savedBalance) {
-            setTpfBalance(savedBalance)
-            setTpfBalanceNumber(Number.parseFloat(savedBalance))
-          } else {
-            // Fallback: tentar buscar do serviço de carteira
-            const response = await fetch(`/api/wallet/balance?address=${walletAddress}`)
-            if (response.ok) {
-              const data = await response.json()
-              const balance = data.tpfBalance || "0"
-              setTpfBalance(balance)
-              setTpfBalanceNumber(Number.parseFloat(balance))
-              localStorage.setItem(`tpf_balance_${walletAddress}`, balance)
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching TPF balance:", error)
-      }
-    }
-
-    fetchTPFBalance()
-
-    // Escutar eventos de atualização de saldo
-    const handleBalanceUpdate = (event: CustomEvent) => {
-      if (event.detail?.tpfBalance) {
-        setTpfBalance(event.detail.tpfBalance.toString())
-        setTpfBalanceNumber(Number.parseFloat(event.detail.tpfBalance))
-      }
-    }
-
-    window.addEventListener("tpf_balance_updated", handleBalanceUpdate as EventListener)
-    return () => window.removeEventListener("tpf_balance_updated", handleBalanceUpdate as EventListener)
-  }, [walletAddress])
-
-  // Substituir o useEffect de atualização de nível existente
-  useEffect(() => {
-    const updateLevel = () => {
-      const balance = tpfBalanceNumber
-      const levelInfo = levelService.getUserLevelInfo(balance)
-      setUserLevel(levelInfo.level)
-    }
-
-    updateLevel()
 
     const handleXPUpdate = () => {
-      updateLevel()
+      console.log("XP updated, recalculating level...")
+      setTimeout(updateLevel, 100)
     }
 
+    const handleLevelUpdate = (event: CustomEvent) => {
+      console.log("Level updated event received:", event.detail)
+      if (event.detail) {
+        setLevelInfo(event.detail)
+        setUserLevel(event.detail.level)
+        setTpfBalanceNumber(event.detail.tpfBalance)
+      }
+    }
+
+    // Escutar múltiplos eventos
+    window.addEventListener("tpf_balance_updated", handleBalanceUpdate)
+    window.addEventListener("xp_balance_changed", handleBalanceUpdate)
     window.addEventListener("xp_updated", handleXPUpdate)
-    return () => window.removeEventListener("xp_updated", handleXPUpdate)
-  }, [tpfBalanceNumber])
+    window.addEventListener("level_updated", handleLevelUpdate as EventListener)
+
+    // Cleanup
+    return () => {
+      window.removeEventListener("tpf_balance_updated", handleBalanceUpdate)
+      window.removeEventListener("xp_balance_changed", handleBalanceUpdate)
+      window.removeEventListener("xp_updated", handleXPUpdate)
+      window.removeEventListener("level_updated", handleLevelUpdate as EventListener)
+    }
+  }, [walletAddress])
 
   return (
     <main className="relative flex min-h-screen flex-col items-center pt-6 pb-20 overflow-hidden">
@@ -652,15 +650,40 @@ export default function ProfilePage() {
             {walletAddress ? formatAddress(walletAddress) : translations.profile?.notConnected || "Not connected"}
           </div>
 
-          {/* Level Info Button */}
-          <motion.button
-            onClick={() => setShowLevelInfo(true)}
-            className="mt-2 px-3 py-1 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full text-xs text-blue-300 border border-blue-500/30 hover:from-blue-600/30 hover:to-purple-600/30 transition-all"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            {translations.level?.viewDetails || "View level details"}
-          </motion.button>
+          {/* Level Info Button with Refresh */}
+          <div className="flex items-center justify-center gap-2 mt-2">
+            <motion.button
+              onClick={() => setShowLevelInfo(true)}
+              className="px-3 py-1 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full text-xs text-blue-300 border border-blue-500/30 hover:from-blue-600/30 hover:to-purple-600/30 transition-all"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              {translations.level?.viewDetails || "View level details"}
+            </motion.button>
+
+            <motion.button
+              onClick={handleRefreshLevel}
+              disabled={isRefreshing}
+              className="w-6 h-6 rounded-full bg-gray-800/70 border border-gray-700/50 flex items-center justify-center"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <RefreshCw size={12} className={`text-gray-400 ${isRefreshing ? "animate-spin" : ""}`} />
+            </motion.button>
+          </div>
+
+          {/* Debug info (remover em produção) */}
+          {process.env.NODE_ENV === "development" && (
+            <div className="mt-2 text-xs text-gray-500">
+              <div>TPF: {tpfBalanceNumber.toLocaleString()}</div>
+              <div>
+                XP: {levelInfo.totalXP} (Check: {levelInfo.checkInXP} + TPF: {levelInfo.tpfXP})
+              </div>
+              <div>
+                Level: {levelInfo.level} ({levelInfo.rewardMultiplier.toFixed(2)}x)
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* Daily Check-in Component */}
@@ -685,7 +708,7 @@ export default function ProfilePage() {
       </motion.div>
 
       {/* Level Info Modal */}
-      <LevelInfo tpfBalance={tpfBalanceNumber} isOpen={showLevelInfo} onClose={() => setShowLevelInfo(false)} />
+      <LevelInfo levelInfo={levelInfo} isOpen={showLevelInfo} onClose={() => setShowLevelInfo(false)} />
 
       {/* Bottom navigation */}
       <BottomNav activeTab="profile" />
