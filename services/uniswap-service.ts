@@ -4,16 +4,16 @@ import { ethers } from "ethers"
 const WORLDCHAIN_RPC = "https://worldchain-mainnet.g.alchemy.com/public"
 const CHAIN_ID = 480
 
-// Endereços dos contratos Uniswap na WorldChain
+// Endereços CORRETOS dos contratos Uniswap na WorldChain
 const UNISWAP_CONTRACTS = {
   FACTORY_V3: "0x7a5028BDa40e7B173C278C5342087826455ea25a",
-  SWAP_ROUTER_02: "0x091AD9e2e6cc414deE1eB45135672a30bcFEec9de3",
+  SWAP_ROUTER_02: "0x091AD9e2e6e5eD44c1c66dB50e49A601F9f36cF6", // ✅ CORRIGIDO
   QUOTER_V2: "0x10158D43e6cc414deE1eB45135672a30bcFEec9de3",
   WETH: "0x4200000000000000000000000000000000000006",
   TPF_WLD_POOL: "0xEE08Cef6EbCe1e037fFdbDF6ab657E5C19E86FF3",
 }
 
-// Tokens TPF e WLD - vamos verificar estes endereços
+// Tokens TPF e WLD
 const TOKENS = {
   WLD: {
     address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
@@ -31,7 +31,7 @@ const TOKENS = {
   },
 }
 
-// ABIs simplificados
+// ABIs
 const ERC20_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
   "function decimals() view returns (uint8)",
@@ -77,6 +77,7 @@ const QUOTER_V2_ABI = [
   },
 ]
 
+// ABI do SwapRouter02 - baseado no contrato real que você forneceu
 const SWAP_ROUTER_ABI = [
   {
     inputs: [
@@ -86,18 +87,43 @@ const SWAP_ROUTER_ABI = [
           { internalType: "address", name: "tokenOut", type: "address" },
           { internalType: "uint24", name: "fee", type: "uint24" },
           { internalType: "address", name: "recipient", type: "address" },
-          { internalType: "uint256", name: "deadline", type: "uint256" },
           { internalType: "uint256", name: "amountIn", type: "uint256" },
           { internalType: "uint256", name: "amountOutMinimum", type: "uint256" },
           { internalType: "uint160", name: "sqrtPriceLimitX96", type: "uint160" },
         ],
-        internalType: "struct ISwapRouter.ExactInputSingleParams",
+        internalType: "struct IV3SwapRouter.ExactInputSingleParams",
         name: "params",
         type: "tuple",
       },
     ],
     name: "exactInputSingle",
     outputs: [{ internalType: "uint256", name: "amountOut", type: "uint256" }],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        components: [
+          { internalType: "bytes", name: "path", type: "bytes" },
+          { internalType: "address", name: "recipient", type: "address" },
+          { internalType: "uint256", name: "amountIn", type: "uint256" },
+          { internalType: "uint256", name: "amountOutMinimum", type: "uint256" },
+        ],
+        internalType: "struct IV3SwapRouter.ExactInputParams",
+        name: "params",
+        type: "tuple",
+      },
+    ],
+    name: "exactInput",
+    outputs: [{ internalType: "uint256", name: "amountOut", type: "uint256" }],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "bytes[]", name: "data", type: "bytes[]" }],
+    name: "multicall",
+    outputs: [{ internalType: "bytes[]", name: "results", type: "bytes[]" }],
     stateMutability: "payable",
     type: "function",
   },
@@ -154,7 +180,7 @@ class UniswapService {
     if (this.initialized) return
 
     try {
-      console.log("🔄 Initializing Uniswap Service (Simplified)...")
+      console.log("🔄 Initializing Uniswap Service with CORRECT addresses...")
 
       // Criar provider
       this.provider = new ethers.JsonRpcProvider(WORLDCHAIN_RPC, {
@@ -166,15 +192,15 @@ class UniswapService {
       const network = await this.provider.getNetwork()
       console.log(`✅ Connected to WorldChain: ${network.chainId}`)
 
-      // Inicializar contratos
+      // Inicializar contratos com endereços CORRETOS
       this.quoter = new ethers.Contract(UNISWAP_CONTRACTS.QUOTER_V2, QUOTER_V2_ABI, this.provider)
       this.pool = new ethers.Contract(UNISWAP_CONTRACTS.TPF_WLD_POOL, POOL_V3_ABI, this.provider)
       this.swapRouter = new ethers.Contract(UNISWAP_CONTRACTS.SWAP_ROUTER_02, SWAP_ROUTER_ABI, this.provider)
 
-      console.log("📋 Contract addresses:")
+      console.log("📋 CORRECTED Contract addresses:")
       console.log(`├─ QuoterV2: ${UNISWAP_CONTRACTS.QUOTER_V2}`)
       console.log(`├─ Pool: ${UNISWAP_CONTRACTS.TPF_WLD_POOL}`)
-      console.log(`├─ SwapRouter: ${UNISWAP_CONTRACTS.SWAP_ROUTER_02}`)
+      console.log(`├─ SwapRouter: ${UNISWAP_CONTRACTS.SWAP_ROUTER_02} ✅ FIXED`)
       console.log(`├─ WLD Token: ${TOKENS.WLD.address}`)
       console.log(`└─ TPF Token: ${TOKENS.TPF.address}`)
 
@@ -185,7 +211,7 @@ class UniswapService {
       await this.setupPool()
 
       this.initialized = true
-      console.log("✅ Uniswap Service initialized successfully")
+      console.log("✅ Uniswap Service initialized successfully with CORRECT addresses")
     } catch (error) {
       console.error("❌ Failed to initialize Uniswap Service:", error)
     }
@@ -194,12 +220,32 @@ class UniswapService {
   // Verificar se os contratos existem e são válidos
   private async verifyContracts() {
     try {
-      console.log("🔍 Verifying contracts...")
+      console.log("🔍 Verifying contracts with CORRECT addresses...")
+
+      // Verificar SwapRouter primeiro
+      try {
+        const swapRouterCode = await this.provider!.getCode(UNISWAP_CONTRACTS.SWAP_ROUTER_02)
+        if (swapRouterCode === "0x") {
+          console.error(`❌ No contract found at SwapRouter address: ${UNISWAP_CONTRACTS.SWAP_ROUTER_02}`)
+        } else {
+          console.log(`✅ SwapRouter02 contract verified at: ${UNISWAP_CONTRACTS.SWAP_ROUTER_02}`)
+          console.log(`   └─ Code length: ${swapRouterCode.length} bytes`)
+        }
+      } catch (error) {
+        console.error(`❌ Error verifying SwapRouter:`, error)
+      }
 
       // Verificar tokens
       for (const [symbol, token] of Object.entries(TOKENS)) {
         try {
           const contract = new ethers.Contract(token.address, ERC20_ABI, this.provider)
+          const code = await this.provider!.getCode(token.address)
+
+          if (code === "0x") {
+            console.error(`❌ No contract found at ${symbol} address: ${token.address}`)
+            continue
+          }
+
           const [name, symbol_contract, decimals] = await Promise.all([
             contract.name(),
             contract.symbol(),
@@ -207,6 +253,7 @@ class UniswapService {
           ])
 
           console.log(`✅ ${symbol} Token verified:`)
+          console.log(`   ├─ Address: ${token.address}`)
           console.log(`   ├─ Name: ${name}`)
           console.log(`   ├─ Symbol: ${symbol_contract}`)
           console.log(`   └─ Decimals: ${decimals}`)
@@ -217,20 +264,38 @@ class UniswapService {
 
       // Verificar pool
       try {
-        const [fee, token0, token1, liquidity] = await Promise.all([
-          this.pool!.fee(),
-          this.pool!.token0(),
-          this.pool!.token1(),
-          this.pool!.liquidity(),
-        ])
+        const poolCode = await this.provider!.getCode(UNISWAP_CONTRACTS.TPF_WLD_POOL)
+        if (poolCode === "0x") {
+          console.error(`❌ No contract found at Pool address: ${UNISWAP_CONTRACTS.TPF_WLD_POOL}`)
+        } else {
+          const [fee, token0, token1, liquidity] = await Promise.all([
+            this.pool!.fee(),
+            this.pool!.token0(),
+            this.pool!.token1(),
+            this.pool!.liquidity(),
+          ])
 
-        console.log(`✅ Pool verified:`)
-        console.log(`   ├─ Fee: ${fee} (${Number(fee) / 10000}%)`)
-        console.log(`   ├─ Token0: ${token0}`)
-        console.log(`   ├─ Token1: ${token1}`)
-        console.log(`   └─ Liquidity: ${liquidity.toString()}`)
+          console.log(`✅ Pool verified:`)
+          console.log(`   ├─ Address: ${UNISWAP_CONTRACTS.TPF_WLD_POOL}`)
+          console.log(`   ├─ Fee: ${fee} (${Number(fee) / 10000}%)`)
+          console.log(`   ├─ Token0: ${token0}`)
+          console.log(`   ├─ Token1: ${token1}`)
+          console.log(`   └─ Liquidity: ${liquidity.toString()}`)
+        }
       } catch (error) {
         console.error(`❌ Error verifying pool:`, error)
+      }
+
+      // Verificar QuoterV2
+      try {
+        const quoterCode = await this.provider!.getCode(UNISWAP_CONTRACTS.QUOTER_V2)
+        if (quoterCode === "0x") {
+          console.error(`❌ No contract found at QuoterV2 address: ${UNISWAP_CONTRACTS.QUOTER_V2}`)
+        } else {
+          console.log(`✅ QuoterV2 contract verified at: ${UNISWAP_CONTRACTS.QUOTER_V2}`)
+        }
+      } catch (error) {
+        console.error(`❌ Error verifying QuoterV2:`, error)
       }
     } catch (error) {
       console.error("❌ Error in contract verification:", error)
@@ -318,7 +383,7 @@ class UniswapService {
     return isValid
   }
 
-  // Obter saldos reais da carteira - versão simplificada
+  // Obter saldos reais da carteira
   async getTokenBalances(walletAddress: string): Promise<TokenBalance[]> {
     try {
       if (!this.provider) {
@@ -385,7 +450,7 @@ class UniswapService {
     }
   }
 
-  // Obter cotação - versão simplificada
+  // Obter cotação
   async getQuote(params: QuoteParams): Promise<string> {
     try {
       if (!this.initialized) {
@@ -461,7 +526,6 @@ class UniswapService {
 
       const token0Address = this.poolInfo.token0
       const tokenInAddress = tokenIn.address.toLowerCase()
-      const tokenOutAddress = tokenOut.address.toLowerCase()
 
       let finalPrice: number
       let amountOut: number
@@ -488,20 +552,21 @@ class UniswapService {
     }
   }
 
-  // Fallback simples baseado em observação
+  // Fallback baseado em observação real
   private getFallbackQuote(params: QuoteParams): string {
     const amount = Number.parseFloat(params.amountIn)
 
     console.log(`🔄 Using fallback quote for ${params.tokenIn} -> ${params.tokenOut}`)
 
     if (params.tokenIn === "WLD" && params.tokenOut === "TPF") {
-      // 1 WLD ≈ 75000 TPF (baseado na sua observação)
-      const result = (amount * 75000).toString()
+      // Baseado na sua observação: 45855 TPF → 0.615313 WLD
+      // Então: 1 WLD → 74,500 TPF aproximadamente
+      const result = (amount * 74500).toString()
       console.log(`├─ Fallback: ${amount} WLD -> ${result} TPF`)
       return result
     } else if (params.tokenIn === "TPF" && params.tokenOut === "WLD") {
-      // 75000 TPF ≈ 1 WLD
-      const result = (amount / 75000).toString()
+      // 74,500 TPF → 1 WLD
+      const result = (amount / 74500).toString()
       console.log(`├─ Fallback: ${amount} TPF -> ${result} WLD`)
       return result
     }
@@ -520,9 +585,10 @@ class UniswapService {
         throw new Error("Pool not ready for swapping")
       }
 
-      console.log(`🔄 Executing swap:`)
+      console.log(`🔄 Executing swap with CORRECT SwapRouter:`)
       console.log(`├─ ${params.amountIn} ${params.tokenIn} -> ${params.tokenOut}`)
-      console.log(`└─ Minimum out: ${params.amountOutMinimum}`)
+      console.log(`├─ Minimum out: ${params.amountOutMinimum}`)
+      console.log(`└─ SwapRouter: ${UNISWAP_CONTRACTS.SWAP_ROUTER_02}`)
 
       const tokenIn = TOKENS[params.tokenIn]
       const tokenOut = TOKENS[params.tokenOut]
@@ -534,7 +600,7 @@ class UniswapService {
       if (typeof window !== "undefined" && (window as any).MiniKit) {
         const MiniKit = (window as any).MiniKit
 
-        console.log("📱 Executing via MiniKit...")
+        console.log("📱 Executing via MiniKit with CORRECT SwapRouter...")
 
         await this.approveTokenIfNeeded(tokenIn.address, amountIn.toString(), params.recipient)
 
@@ -552,10 +618,15 @@ class UniswapService {
         const swapData = this.swapRouter!.interface.encodeFunctionData("exactInputSingle", [swapParams])
 
         const transaction = {
-          to: UNISWAP_CONTRACTS.SWAP_ROUTER_02,
+          to: UNISWAP_CONTRACTS.SWAP_ROUTER_02, // ✅ ENDEREÇO CORRETO
           value: "0x0",
           data: swapData,
         }
+
+        console.log("📤 Transaction details:")
+        console.log(`├─ To: ${transaction.to}`)
+        console.log(`├─ Value: ${transaction.value}`)
+        console.log(`└─ Data length: ${transaction.data.length}`)
 
         const result = await MiniKit.commandsAsync.sendTransaction(transaction)
 
@@ -581,6 +652,12 @@ class UniswapService {
 
         const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider)
         const currentAllowance = await tokenContract.allowance(userAddress, UNISWAP_CONTRACTS.SWAP_ROUTER_02)
+
+        console.log(`🔍 Token approval check:`)
+        console.log(`├─ Token: ${tokenAddress}`)
+        console.log(`├─ Spender: ${UNISWAP_CONTRACTS.SWAP_ROUTER_02}`)
+        console.log(`├─ Current allowance: ${currentAllowance.toString()}`)
+        console.log(`└─ Required amount: ${amount}`)
 
         if (currentAllowance >= BigInt(amount)) {
           console.log("✅ Sufficient allowance")
