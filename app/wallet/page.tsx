@@ -13,15 +13,8 @@ import { SendTokenModal } from "@/components/send-token-modal"
 import { ReceiveTokenModal } from "@/components/receive-token-modal"
 import Image from "next/image"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
-import { toast } from "react-hot-toast"
-// Remover esta linha do topo:
-// import { TokenDetailsModal } from "@/components/token-details-modal"
-
-// Adicionar estado para o modal
-import { TokenDetailsModal } from "@/components/token-details-modal"
 
 export default function WalletPage() {
-  const [TokenDetailsModalComponent, setTokenDetailsModal] = useState<any>(null)
   const [walletAddress, setWalletAddress] = useState<string>("")
   const [balance, setBalance] = useState<number>(0)
   const [tokenBalances, setTokenBalances] = useState<Record<string, number>>({})
@@ -32,8 +25,6 @@ export default function WalletPage() {
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
   const [language, setLanguage] = useState<"en" | "pt">("en")
   const router = useRouter()
-  const [selectedToken, setSelectedToken] = useState<{ symbol: string; address: string } | null>(null)
-  const [isTokenModalOpen, setIsTokenModalOpen] = useState(false)
 
   // Obter traduções com base no idioma atual
   const translations = getTranslations(language)
@@ -147,31 +138,6 @@ export default function WalletPage() {
       balance: tokenBalances[symbol] || 0,
     }))
 
-  // Adicionar função para carregar o modal dinamicamente
-  const loadTokenModal = async () => {
-    try {
-      const { TokenDetailsModal: Modal } = await import("@/components/token-details-modal")
-      setTokenDetailsModal(() => Modal)
-    } catch (error) {
-      console.error("Failed to load token details modal:", error)
-      toast.error(language === "pt" ? "Erro ao carregar detalhes do token" : "Error loading token details")
-    }
-  }
-
-  // Atualizar a função handleTokenClick
-  const handleTokenClick = async (symbol: string, address: string) => {
-    try {
-      if (!TokenDetailsModalComponent) {
-        await loadTokenModal()
-      }
-      setSelectedToken({ symbol, address })
-      setIsTokenModalOpen(true)
-    } catch (error) {
-      console.error("Error opening token details:", error)
-      toast.error(language === "pt" ? "Erro ao abrir detalhes do token" : "Error opening token details")
-    }
-  }
-
   return (
     <main className="flex min-h-screen flex-col items-center p-4 relative overflow-hidden pb-20">
       <BackgroundEffect />
@@ -272,8 +238,7 @@ export default function WalletPage() {
                   {otherTokens.map((token) => (
                     <div
                       key={token.symbol}
-                      className="flex items-center justify-between p-2 rounded-lg bg-gray-800/50 border border-gray-700/30 cursor-pointer hover:bg-gray-700/50 transition-colors"
-                      onClick={() => handleTokenClick(token.symbol, tokensInfo[token.symbol]?.address || "")}
+                      className="flex items-center justify-between p-2 rounded-lg bg-gray-800/50 border border-gray-700/30"
                     >
                       <div className="flex items-center">
                         <div className="w-8 h-8 rounded-full overflow-hidden mr-3">
@@ -315,18 +280,6 @@ export default function WalletPage() {
           )}
         </motion.div>
       </div>
-
-      {/* Modal de detalhes do token */}
-      {selectedToken && TokenDetailsModalComponent && (
-        <TokenDetailsModal
-          isOpen={isTokenModalOpen}
-          onClose={() => setIsTokenModalOpen(false)}
-          tokenSymbol={selectedToken.symbol}
-          tokenAddress={selectedToken.address}
-          walletAddress={walletAddress}
-          initialBalance={tokenBalances[selectedToken.symbol] || 0}
-        />
-      )}
 
       <BottomNav activeTab="wallet" />
     </main>

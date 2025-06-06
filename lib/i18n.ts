@@ -667,16 +667,17 @@ export function getTranslations(lang: Language): Translations {
           revenueBreakdown: "Detalhamento de Receitas",
           expenseBreakdown: "Detalhamento de Despesas",
           noData: "Sem dados disponíveis",
-          totalRevenue: "Total de Receitas",
-          totalExpenses: "Total de Despesas",
+          totalRevenue: "Receita Total",
+          totalExpenses: "Despesas Totais",
         },
       }
-    // Adicionar traduções em inglês:
-    default: // Inglês (padrão)
+
+    case "en":
+    default:
       return {
         airdrop: {
           title: "Airdrop",
-          subtitle: "Receive your daily TPF tokens",
+          subtitle: "Claim your daily TPF tokens",
           contractBalance: "Contract balance:",
           dailyAirdrop: "Daily airdrop:",
           nextClaimIn: "Next claim in:",
@@ -697,7 +698,7 @@ export function getTranslations(lang: Language): Translations {
           from: "From",
           to: "To",
           block: "Block",
-          txHash: "Transaction Hash",
+          txHash: "Transaction hash",
           today: "Today",
           yesterday: "Yesterday",
         },
@@ -713,7 +714,8 @@ export function getTranslations(lang: Language): Translations {
           storm: "Storm",
           about: "About",
           finances: "Finances",
-          menu: "Close",
+          menu: "Menu",
+          close: "Close",
         },
         games: {
           title: "FiGames",
@@ -745,23 +747,24 @@ export function getTranslations(lang: Language): Translations {
           send: "Send",
           receive: "Receive",
           otherTokens: "Other Trusted Tokens",
-          errorMessage: "Could not get real balance. Try setting it manually.",
+          errorMessage: "Could not get real balance. Try setting manually.",
         },
         winners: {
           title: "Winners",
-          subtitle: "Participants rewarded in our events",
+          subtitle: "Participants awarded in our events",
           noWinners: "No winners yet",
-          noWinnersDesc: "Winners of our events will be displayed here. Stay tuned for upcoming events to participate!",
+          noWinnersDesc:
+            "Winners from our events will be displayed here. Stay tuned for upcoming events to participate!",
         },
         agenda: {
           title: "Agenda",
-          subtitle: "Events and community activities",
+          subtitle: "Community events and activities",
           today: "Today",
           event: "Event",
           noEvents: "No events for this date",
           howToParticipate: "How to participate:",
           incentivePeriod: "Incentive Period",
-          eventsAndActivities: "Events and community activities",
+          eventsAndActivities: "Community events and activities",
           online: "Online",
           participants: "participants",
           days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
@@ -789,18 +792,18 @@ export function getTranslations(lang: Language): Translations {
             topHoldersIncentive: {
               title: "10% Incentive for Top 10 TPF Holders",
               description:
-                "Earn 10% bonus tokens if you are among the top 10 TPF holders during the event period. Example: 10M TPF = 1M bonus tokens",
+                "Earn 10% bonus tokens if you're among the top 10 TPF holders during the event period. Example: 10M TPF = 1M bonus tokens",
               howToParticipate: [
                 "Buy and hold TPF tokens",
                 "Reach a position among the top 10 holders",
-                "Maintain the position until June 9th",
+                "Maintain position until June 9th",
               ],
             },
           },
         },
         furnace: {
           title: "Furnace",
-          subtitle: "Burn TPF tokens and contribute to token stability",
+          subtitle: "Burn TPF tokens and contribute to token sustainability",
           totalBurned: "Total burned",
           amountToBurn: "Amount of TPF to burn",
           startBurn: "Start Burn",
@@ -820,7 +823,7 @@ export function getTranslations(lang: Language): Translations {
           searchInGlossary: "Search in Glossary",
           didYouKnow: "Did you know?",
           bitcoinPizza:
-            "On May 22, 2010, Laszlo Hanyecz made the first Bitcoin purchase: two pizzas for 10,000 BTC. Today, that amount would be worth millions of dollars!",
+            "On May 22, 2010, Laszlo Hanyecz made the first Bitcoin purchase: two pizzas for 10,000 BTC. Today, that value would be worth millions of dollars!",
           tokenomics: "Tokenomics",
           tokenomicsDesc: "Understand token economics and how it affects the value and utility of crypto projects.",
           glossary: "Crypto Glossary",
@@ -829,15 +832,14 @@ export function getTranslations(lang: Language): Translations {
           glossaryTitle: "Crypto Glossary",
           tokenomicsTitle: "Tokenomics",
           tokenomicsIntro:
-            "Tokenomics refers to the economics of cryptocurrency tokens. Understanding a project's tokenomics is essential for evaluating its value and long-term potential.",
+            "Tokenomics refers to the economics of cryptographic tokens. Understanding a project's tokenomics is essential for evaluating its value and long-term potential.",
           supplyDistribution: "Supply and Distribution",
           supplyDistributionDesc:
             "The total, circulating, and maximum supply of tokens, as well as their distribution among team, investors, and community.",
           tokenUtility: "Token Utility",
           tokenUtilityDesc: "How the token is used within the ecosystem and what benefits it offers to holders.",
           valueMechanisms: "Value Mechanisms",
-          valueMechanismsDesc:
-            "Token burning, staking, governance, and other mechanisms that affect the token's value.",
+          valueMechanismsDesc: "Token burning, staking, governance, and other mechanisms that affect token value.",
           tpfTokenomics: "TPF Tokenomics",
           totalSupply: "Total Supply:",
           liquidity: "Liquidity:",
@@ -858,7 +860,7 @@ export function getTranslations(lang: Language): Translations {
           airdrops: "Daily Airdrops",
           community: "Active Community",
           utility: "Utility",
-          longTerm: "Long-Term Vision",
+          longTerm: "Long-term Vision",
           growthStrategy: "Growth Strategy",
           marketing: "Marketing",
           incentives: "Incentives",
@@ -906,7 +908,7 @@ export function getTranslations(lang: Language): Translations {
           tokenNotSupported: "Token not supported",
           warning: "Please verify the recipient address before sending tokens.",
           warningWorldchain:
-            "Do not send to wallets that don't support Worldchain, otherwise you may lose your assets. Do not send to exchanges.",
+            "Do not send to wallets that do not support Worldchain, otherwise you may lose your assets. Do not send to exchanges.",
           hideWarning: "Hide warning",
           transactionPending: "Transaction pending. Please wait...",
         },
@@ -945,7 +947,7 @@ export function getTranslations(lang: Language): Translations {
           totalPoints: "Total points",
           streak: "Streak",
           days: "days",
-          checkInSuccess: "Check-in completed! +1 point",
+          checkInSuccess: "Check-in successful! +1 point",
           history: "History",
           showHistory: "Show history",
           hideHistory: "Hide history",
@@ -985,26 +987,30 @@ export function getTranslations(lang: Language): Translations {
   }
 }
 
-// Hook para usar traduções em componentes
-export function useTranslation() {
-  const [language, setLanguage] = useState<Language>("en")
+// Hook personalizado para usar traduções
+export function useTranslations() {
+  const [language, setLanguage] = useState<Language>(getCurrentLanguage())
+  const [translations, setTranslations] = useState<Translations>(getTranslations(language))
 
   useEffect(() => {
-    setLanguage(getCurrentLanguage())
-
     const handleLanguageChange = () => {
-      setLanguage(getCurrentLanguage())
+      const newLanguage = getCurrentLanguage()
+      setLanguage(newLanguage)
+      setTranslations(getTranslations(newLanguage))
     }
 
+    // Adicionar listener para mudanças de idioma
     window.addEventListener("languageChange", handleLanguageChange)
-    return () => window.removeEventListener("languageChange", handleLanguageChange)
-  }, [])
 
-  const translations = getTranslations(language)
+    // Limpar listener ao desmontar
+    return () => {
+      window.removeEventListener("languageChange", handleLanguageChange)
+    }
+  }, [])
 
   return {
     language,
+    translations,
     setLanguage: setCurrentLanguage,
-    t: translations,
   }
 }
