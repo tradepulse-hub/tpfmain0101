@@ -43,15 +43,3 @@ export const getAirdropContract = async () => {
 
   throw new Error("Failed to connect to any RPC endpoint")
 }
-
-// Function to get the provider
-const getProvider = (providerUrl: string): ethers.providers.Provider => {
-  try {
-    return new ethers.providers.JsonRpcProvider(providerUrl)
-  } catch (error) {
-    console.error("Error creating provider:", error)
-    throw new Error("Failed to create provider. Check provider URL.")
-  }
-}
-
-export { getProvider }
