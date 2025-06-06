@@ -41,7 +41,6 @@
     "@radix-ui/react-tooltip": "1.1.6",
     "@react-three/drei": "latest",
     "@react-three/fiber": "latest",
-    "@tanstack/react-query": "latest",
     "@uniswap/smart-order-router": "latest",
     "@worldcoin/minikit-js": "latest",
     "async-mutex": "latest",
@@ -79,7 +78,6 @@
     "three": "latest",
     "vaul": "^0.9.6",
     "viem": "latest",
-    "wagmi": "latest",
     "zod": "^3.24.1"
   },
   "devDependencies": {
