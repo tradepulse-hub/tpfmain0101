@@ -95,8 +95,8 @@ export function BottomNav({ activeTab = "agenda" }: BottomNavProps) {
                   { name: translations.nav?.news || "News", icon: "megaphone", path: "/news" },
                   { name: translations.nav?.learn || "Aprende", icon: "book", path: "/learn" },
                   { name: translations.nav?.games || "Fi Games", icon: "gamepad", path: "/games" },
-                  { name: translations.nav?.finances || "Finanças", icon: "chart", path: "/finances" },
                   { name: translations.nav?.storm || "Storm", icon: "zap", path: "/storm" },
+                  { name: translations.nav?.finances || "Finanças", icon: "chart", path: "/finances" },
                   { name: translations.nav?.about || "Sobre", icon: "info", path: "/about" },
                 ].map((item) => (
                   <Link href={item.path} key={item.name}>
