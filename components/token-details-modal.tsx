@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import { X, ExternalLink, Copy, Check } from "lucide-react"
 import { getCurrentLanguage, getTranslations } from "../lib/i18n"
-import { tokenProviderService } from "../services/token-provider-service"
+import { enhancedTokenService } from "../services/enhanced-token-service"
 
 interface TokenDetailsModalProps {
   isOpen: boolean
@@ -24,7 +24,7 @@ export function TokenDetailsModal({
 }: TokenDetailsModalProps) {
   const [copied, setCopied] = useState(false)
   const [language, setLanguage] = useState<"en" | "pt">("en")
-  const [tokenDetails, setTokenDetails] = useState<any>(null)
+  const [refreshedBalance, setRefreshedBalance] = useState<string>("")
   const [loading, setLoading] = useState(false)
 
   const translations = getTranslations(language)
@@ -39,23 +39,19 @@ export function TokenDetailsModal({
   }, [])
 
   useEffect(() => {
-    if (isOpen && tokenSymbol) {
-      fetchTokenDetails()
+    if (isOpen && tokenSymbol && walletAddress) {
+      fetchLatestBalance()
     }
-  }, [isOpen, tokenSymbol])
+  }, [isOpen, tokenSymbol, walletAddress])
 
-  const fetchTokenDetails = async () => {
+  const fetchLatestBalance = async () => {
     try {
       setLoading(true)
-      const knownTokens = tokenProviderService.getKnownTokens()
-      const tokenAddress = knownTokens[tokenSymbol as keyof typeof knownTokens]
-
-      if (tokenAddress) {
-        const details = await tokenProviderService.getTokenDetails([tokenAddress])
-        setTokenDetails(details[tokenAddress])
-      }
+      const balance = await enhancedTokenService.getTokenBalance(walletAddress, tokenSymbol)
+      setRefreshedBalance(balance)
     } catch (error) {
-      console.error("Error fetching token details:", error)
+      console.error("Error fetching latest balance:", error)
+      setRefreshedBalance(tokenBalance)
     } finally {
       setLoading(false)
     }
@@ -71,22 +67,12 @@ export function TokenDetailsModal({
     }
   }
 
-  const getTokenInfo = () => {
-    const tokenInfoMap: Record<string, any> = {
-      TPF: { name: "TPulseFi Token", logo: "/logo-tpf.png" },
-      WLD: { name: "Worldcoin", logo: "/worldcoin.jpeg" },
-      DNA: { name: "DNA Token", logo: "/dna-token.png" },
-      CASH: { name: "Cash Token", logo: "/cash-token.png" },
-      WDD: { name: "World Drachma", logo: "/drachma-token.png" },
-      WETH: { name: "Wrapped Ethereum", logo: "/ethereum-abstract.png" },
-      USDCe: { name: "USD Coin", logo: "/usdc-coins.png" },
-    }
-    return tokenInfoMap[tokenSymbol] || { name: tokenSymbol, logo: "/placeholder.svg" }
-  }
+  const tokenInfo = enhancedTokenService.getTokenInfo(tokenSymbol)
+  const displayBalance = refreshedBalance || tokenBalance
 
-  const tokenInfo = getTokenInfo()
-  const knownTokens = tokenProviderService.getKnownTokens()
-  const tokenAddress = knownTokens[tokenSymbol as keyof typeof knownTokens]
+  if (!tokenInfo) {
+    return null
+  }
 
   return (
     <AnimatePresence>
@@ -132,60 +118,57 @@ export function TokenDetailsModal({
 
             <div className="space-y-3">
               <div className="bg-gray-800/50 rounded-lg p-3">
-                <div className="text-gray-400 text-sm mb-1">{translations.wallet?.balance || "Saldo"}</div>
+                <div className="text-gray-400 text-sm mb-1">
+                  {translations.wallet?.balance || "Saldo"}
+                  {loading && <span className="ml-2 text-xs">(atualizando...)</span>}
+                </div>
                 <div className="text-white font-mono text-lg">
-                  {Number(tokenBalance).toLocaleString(language === "pt" ? "pt-BR" : "en-US")} {tokenSymbol}
+                  {Number(displayBalance).toLocaleString(language === "pt" ? "pt-BR" : "en-US")} {tokenSymbol}
                 </div>
               </div>
 
-              {tokenAddress && (
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                  <div className="text-gray-400 text-sm mb-1">
-                    {translations.wallet?.contractAddress || "Endereço do Contrato"}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="text-white font-mono text-sm overflow-hidden overflow-ellipsis">
-                      {`${tokenAddress.substring(0, 10)}...${tokenAddress.substring(tokenAddress.length - 8)}`}
-                    </div>
-                    <button
-                      onClick={() => copyToClipboard(tokenAddress)}
-                      className="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded transition-colors ml-2"
-                    >
-                      {copied ? <Check size={14} /> : <Copy size={14} />}
-                    </button>
-                  </div>
+              <div className="bg-gray-800/50 rounded-lg p-3">
+                <div className="text-gray-400 text-sm mb-1">
+                  {translations.wallet?.contractAddress || "Endereço do Contrato"}
                 </div>
-              )}
-
-              {tokenDetails && !loading && (
-                <div className="bg-gray-800/50 rounded-lg p-3">
-                  <div className="text-gray-400 text-sm mb-2">
-                    {translations.wallet?.tokenInfo || "Informações do Token"}
+                <div className="flex items-center justify-between">
+                  <div className="text-white font-mono text-sm overflow-hidden overflow-ellipsis">
+                    {`${tokenInfo.address.substring(0, 10)}...${tokenInfo.address.substring(tokenInfo.address.length - 8)}`}
                   </div>
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Decimals:</span>
-                      <span className="text-white">{tokenDetails.decimals}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Chain ID:</span>
-                      <span className="text-white">{tokenDetails.chainId}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {tokenAddress && (
-                <div className="flex space-x-2">
                   <button
-                    onClick={() => window.open(`https://worldscan.org/token/${tokenAddress}`, "_blank")}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded text-sm flex items-center justify-center"
+                    onClick={() => copyToClipboard(tokenInfo.address)}
+                    className="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded transition-colors ml-2"
                   >
-                    <ExternalLink size={14} className="mr-1" />
-                    {translations.wallet?.viewOnExplorer || "Ver no Explorer"}
+                    {copied ? <Check size={14} /> : <Copy size={14} />}
                   </button>
                 </div>
-              )}
+              </div>
+
+              <div className="bg-gray-800/50 rounded-lg p-3">
+                <div className="text-gray-400 text-sm mb-2">
+                  {translations.wallet?.tokenInfo || "Informações do Token"}
+                </div>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Decimals:</span>
+                    <span className="text-white">{tokenInfo.decimals}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Network:</span>
+                    <span className="text-white">Worldchain</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => window.open(`https://worldscan.org/token/${tokenInfo.address}`, "_blank")}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded text-sm flex items-center justify-center"
+                >
+                  <ExternalLink size={14} className="mr-1" />
+                  {translations.wallet?.viewOnExplorer || "Ver no Explorer"}
+                </button>
+              </div>
             </div>
           </motion.div>
         </motion.div>

@@ -13,7 +13,7 @@ import { SendTokenModal } from "@/components/send-token-modal"
 import { ReceiveTokenModal } from "@/components/receive-token-modal"
 import Image from "next/image"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
-import { tokenProviderService } from "@/services/token-provider-service"
+import { enhancedTokenService } from "@/services/enhanced-token-service"
 import { TokenDetailsModal } from "@/components/token-details-modal"
 
 export default function WalletPage() {
@@ -24,7 +24,7 @@ export default function WalletPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSendModalOpen, setIsSendModalOpen] = useState(false)
-  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
+  const [isReceiveModalOpen, setIsReceiveTokenModalOpen] = useState(false)
   const [language, setLanguage] = useState<"en" | "pt">("en")
   const router = useRouter()
 
@@ -94,8 +94,8 @@ export default function WalletPage() {
       setLoading(true)
       setError(null)
 
-      // Obter saldos usando o TokenProvider
-      const realBalances = await tokenProviderService.getTokenBalances(address)
+      // Obter saldos usando o Enhanced Token Service
+      const realBalances = await enhancedTokenService.getAllTokenBalances(address)
       console.log("Real token balances:", realBalances)
 
       // Converter para números e atualizar estados
@@ -179,7 +179,7 @@ export default function WalletPage() {
 
       <ReceiveTokenModal
         isOpen={isReceiveModalOpen}
-        onClose={() => setIsReceiveModalOpen(false)}
+        onClose={() => setIsReceiveTokenModalOpen(false)}
         walletAddress={walletAddress}
       />
 
@@ -240,7 +240,7 @@ export default function WalletPage() {
                 <Button
                   variant="outline"
                   className="flex-1 bg-gray-800 border-gray-700 hover:bg-gray-700 text-white"
-                  onClick={() => setIsReceiveModalOpen(true)}
+                  onClick={() => setIsReceiveTokenModalOpen(true)}
                 >
                   <ArrowDownLeft className="w-4 h-4 mr-2" />
                   {translations.wallet?.receive || "Receber"}
