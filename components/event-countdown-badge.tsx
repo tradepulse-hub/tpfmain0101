@@ -5,7 +5,7 @@ import type React from "react"
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
 import { Trophy, Clock, Gamepad2, Copy, Check } from "lucide-react"
-import { useTranslation } from "@/lib/i18n"
+import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
 
 interface TimeRemaining {
   days: number
@@ -26,37 +26,42 @@ interface EventInfo {
 }
 
 export function EventCountdownBadge() {
-  const { t } = useTranslation()
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining>({ days: 0, hours: 0, minutes: 0, seconds: 0 })
   const [currentEvent, setCurrentEvent] = useState<EventInfo | null>(null)
   const [showTooltip, setShowTooltip] = useState(false)
   const [addressCopied, setAddressCopied] = useState(false)
+  const [translations, setTranslations] = useState(getTranslations("en"))
 
   // Endereço para inscrição no torneio
   const registrationAddress = "0xf04a78df4cc3017c0c23f37528d7b6cbbeea6677"
+
+  useEffect(() => {
+    const lang = getCurrentLanguage()
+    setTranslations(getTranslations(lang))
+  }, [])
 
   // Definir eventos com suas datas
   const events: EventInfo[] = [
     {
       type: "topHolders",
-      title: t.events?.topHoldersEvent?.title || "Top 10 Event",
-      description: t.events?.topHoldersEvent?.description || "10% Bonus for Top Holders",
+      title: "Top 10 Event",
+      description: "10% Bonus for Top Holders",
       endDate: new Date("2025-06-09T23:59:59Z"),
       icon: <Trophy className="w-4 h-4 text-white" />,
       color: "from-yellow-500 to-orange-600",
     },
     {
       type: "snakeRegistration",
-      title: t.events?.snakeTournament?.registrationTitle || "Tournament Registration",
-      description: t.events?.snakeTournament?.registrationDescription || "Send 200,000 TPF to register",
+      title: "Tournament Registration",
+      description: "Send 200,000 TPF to register",
       endDate: new Date("2025-01-15T23:59:59Z"),
       icon: <Gamepad2 className="w-4 h-4 text-white" />,
       color: "from-green-500 to-emerald-600",
     },
     {
       type: "snakeTournament",
-      title: t.events?.snakeTournament?.tournamentTitle || "Snake Game Tournament",
-      description: t.events?.snakeTournament?.tournamentDescription || "Get highest score to win",
+      title: "Snake Game Tournament",
+      description: "Get highest score to win",
       endDate: new Date("2025-07-09T23:59:59Z"),
       icon: <Gamepad2 className="w-4 h-4 text-white" />,
       color: "from-purple-500 to-pink-600",
@@ -103,7 +108,7 @@ export function EventCountdownBadge() {
     const interval = setInterval(updateCountdown, 1000)
 
     return () => clearInterval(interval)
-  }, [t])
+  }, [])
 
   const formatTime = (time: TimeRemaining): string => {
     const { days, hours, minutes, seconds } = time
@@ -143,7 +148,7 @@ export function EventCountdownBadge() {
               <Clock className="w-3 h-3" />
               <span className="font-mono font-bold">{formatTime(timeRemaining)}</span>
             </div>
-            <div className="text-gray-400 text-xs mt-1">{t.events?.topHoldersEvent?.remaining || "remaining"}</div>
+            <div className="text-gray-400 text-xs mt-1">remaining</div>
           </div>
         )
 
@@ -157,9 +162,7 @@ export function EventCountdownBadge() {
             <div className="text-gray-300 mb-2 text-xs">{currentEvent.description}</div>
 
             <div className="mb-2">
-              <div className="text-gray-400 text-xs mb-1">
-                {t.events?.snakeTournament?.registrationAddress || "Registration address:"}
-              </div>
+              <div className="text-gray-400 text-xs mb-1">Registration address:</div>
               <div className="flex items-center gap-1 bg-gray-800 rounded px-2 py-1">
                 <span className="text-xs font-mono text-gray-300 truncate">
                   {registrationAddress.slice(0, 10)}...{registrationAddress.slice(-6)}
@@ -172,18 +175,14 @@ export function EventCountdownBadge() {
                   )}
                 </button>
               </div>
-              {addressCopied && (
-                <div className="text-green-400 text-xs mt-1">
-                  {t.events?.snakeTournament?.addressCopied || "Address copied!"}
-                </div>
-              )}
+              {addressCopied && <div className="text-green-400 text-xs mt-1">Address copied!</div>}
             </div>
 
             <div className="flex items-center gap-1 text-green-400">
               <Clock className="w-3 h-3" />
               <span className="font-mono font-bold">{formatTime(timeRemaining)}</span>
             </div>
-            <div className="text-gray-400 text-xs mt-1">{t.events?.snakeTournament?.remaining || "remaining"}</div>
+            <div className="text-gray-400 text-xs mt-1">remaining</div>
           </div>
         )
 
@@ -197,18 +196,17 @@ export function EventCountdownBadge() {
             <div className="text-gray-300 mb-2 text-xs">{currentEvent.description}</div>
 
             <div className="mb-2">
-              <div className="text-gray-400 text-xs mb-1">
-                {t.events?.snakeTournament?.instructions || "Instructions:"}
-              </div>
+              <div className="text-gray-400 text-xs mb-1">Instructions:</div>
               <div className="text-gray-300 text-xs space-y-1">
-                <div>• {t.events?.snakeTournament?.rules?.rule1 || "Get highest score in snake game"}</div>
-                <div>• {t.events?.snakeTournament?.rules?.rule2 || "Send screenshot to support email"}</div>
-                <div>• {t.events?.snakeTournament?.rules?.rule5 || "Only one submission allowed"}</div>
+                <div>• Get highest score in snake game</div>
+                <div>• Send screenshot to support email</div>
+                <div>• Only one submission allowed</div>
+                <div>• Prize shared if tied</div>
               </div>
             </div>
 
             <div className="mb-2">
-              <div className="text-gray-400 text-xs mb-1">{t.events?.snakeTournament?.email || "Email:"}</div>
+              <div className="text-gray-400 text-xs mb-1">Email:</div>
               <div className="text-xs font-mono text-blue-300">support@tradepulsetoken.com</div>
             </div>
 
@@ -216,7 +214,7 @@ export function EventCountdownBadge() {
               <Clock className="w-3 h-3" />
               <span className="font-mono font-bold">{formatTime(timeRemaining)}</span>
             </div>
-            <div className="text-gray-400 text-xs mt-1">{t.events?.snakeTournament?.remaining || "remaining"}</div>
+            <div className="text-gray-400 text-xs mt-1">remaining</div>
           </div>
         )
 
