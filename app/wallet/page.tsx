@@ -232,29 +232,33 @@ export default function WalletPage() {
               )}
             </CardHeader>
             <CardContent className="pb-4">
-              <div className="flex space-x-2">
+              {/* Botões compactos */}
+              <div className="grid grid-cols-3 gap-2">
                 <Button
                   variant="outline"
-                  className="flex-1 bg-gray-800 border-gray-700 hover:bg-gray-700 text-white"
+                  size="sm"
+                  className="bg-gray-800 border-gray-700 hover:bg-gray-700 text-white text-xs py-2"
                   onClick={() => setIsSendModalOpen(true)}
                 >
-                  <ArrowUpRight className="w-4 h-4 mr-2" />
+                  <ArrowUpRight className="w-3 h-3 mr-1" />
                   {translations.wallet?.send || "Enviar"}
                 </Button>
                 <Button
                   variant="outline"
-                  className="flex-1 bg-gray-800 border-gray-700 hover:bg-gray-700 text-white"
+                  size="sm"
+                  className="bg-gray-800 border-gray-700 hover:bg-gray-700 text-white text-xs py-2"
                   onClick={() => setIsReceiveTokenModalOpen(true)}
                 >
-                  <ArrowDownLeft className="w-4 h-4 mr-2" />
+                  <ArrowDownLeft className="w-3 h-3 mr-1" />
                   {translations.wallet?.receive || "Receber"}
                 </Button>
                 <Button
                   variant="outline"
-                  className="flex-1 bg-gray-800 border-gray-700 hover:bg-gray-700 text-white"
+                  size="sm"
+                  className="bg-gray-800 border-gray-700 hover:bg-gray-700 text-white text-xs py-2"
                   onClick={() => setIsSwapModalOpen(true)}
                 >
-                  <ArrowUpDown className="w-4 h-4 mr-2" />
+                  <ArrowUpDown className="w-3 h-3 mr-1" />
                   {translations.wallet?.swap || "Swap"}
                 </Button>
               </div>

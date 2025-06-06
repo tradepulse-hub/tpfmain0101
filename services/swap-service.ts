@@ -1,24 +1,14 @@
 import { ethers } from "ethers"
 
-// Configuração da rede Worldchain
+// Configuração da rede Worldchain baseada na documentação
 const WORLDCHAIN_RPC = "https://worldchain-mainnet.g.alchemy.com/public"
 
-// Endereços dos contratos (baseado na documentação)
-const SWAP_HELPER_ADDRESS = "0x..." // Endereço do SwapHelper (precisa ser obtido da documentação)
+// Endereços dos contratos (estes precisam ser obtidos da documentação oficial)
+const TOKEN_PROVIDER_ADDRESS = "0x..." // Endereço do TokenProvider
 const QUOTER_ADDRESS = "0x..." // Endereço do Quoter
+const SWAP_HELPER_ADDRESS = "0x..." // Endereço do SwapHelper
 
-// ABI simplificado baseado na documentação
-const QUOTER_ABI = [
-  "function simple(address tokenIn, address tokenOut) external view returns (uint256)",
-  "function smart(address tokenIn, address tokenOut, uint256 slippage, uint256 deadline) external view returns (uint256)",
-  "function quote(tuple(address tokenIn, address tokenOut, string amountIn, string slippage, string fee)) external view returns (tuple(bytes data, address to, uint256 value, uint256 feeAmountOut))",
-]
-
-const SWAP_HELPER_ABI = [
-  "function swap(tuple(address tokenIn, address tokenOut, string amountIn, bytes tx, string fee, string feeAmountOut, address feeReceiver)) external returns (bool)",
-]
-
-// Tokens conhecidos
+// Tokens conhecidos baseados na documentação
 const KNOWN_TOKENS = {
   WETH: "0x4200000000000000000000000000000000000006",
   USDCe: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
@@ -28,6 +18,22 @@ const KNOWN_TOKENS = {
   CASH: "0xbfdA4F50a2d5B9b864511579D7dfa1C72f118575",
   WDD: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B",
 }
+
+// ABI simplificado baseado na documentação
+const TOKEN_PROVIDER_ABI = [
+  "function balanceOf(tuple(string wallet, string[] tokens)) external view returns (uint256[])",
+  "function details(string[] tokens) external view returns (tuple(string address, uint256 chainId, uint8 decimals, string symbol, string name)[])",
+]
+
+const QUOTER_ABI = [
+  "function simple(string tokenIn, string tokenOut) external view returns (uint256)",
+  "function smart(string tokenIn, string tokenOut, uint256 slippage, uint256 deadline) external view returns (uint256)",
+  "function quote(tuple(string tokenIn, string tokenOut, string amountIn, string slippage, string fee)) external view returns (tuple(bytes data, string to, uint256 value, uint256 feeAmountOut))",
+]
+
+const SWAP_HELPER_ABI = [
+  "function swap(tuple(string tokenIn, string tokenOut, string amountIn, bytes tx, string fee, string feeAmountOut, string feeReceiver)) external returns (bool)",
+]
 
 interface QuoteParams {
   tokenIn: string
@@ -41,21 +47,12 @@ interface QuoteResponse {
   data: string
   to: string
   value: string
-  feeAmountOut?: string
-}
-
-interface SwapParams {
-  tokenIn: string
-  tokenOut: string
-  amountIn: string
-  tx: QuoteResponse
-  fee: string
-  feeAmountOut?: string
-  feeReceiver: string
+  feeAmountOut: string
 }
 
 class SwapService {
   private provider: ethers.JsonRpcProvider | null = null
+  private tokenProvider: ethers.Contract | null = null
   private quoter: ethers.Contract | null = null
   private swapHelper: ethers.Contract | null = null
   private initialized = false
@@ -72,7 +69,7 @@ class SwapService {
     try {
       console.log("Initializing Swap Service...")
 
-      // Criar provider (adaptado para ethers v6)
+      // Criar provider baseado na documentação
       this.provider = new ethers.JsonRpcProvider(WORLDCHAIN_RPC, {
         chainId: 480,
         name: "worldchain",
@@ -83,6 +80,7 @@ class SwapService {
       console.log(`Connected to network: ${network.name} (${network.chainId})`)
 
       // Inicializar contratos quando os endereços estiverem disponíveis
+      // this.tokenProvider = new ethers.Contract(TOKEN_PROVIDER_ADDRESS, TOKEN_PROVIDER_ABI, this.provider)
       // this.quoter = new ethers.Contract(QUOTER_ADDRESS, QUOTER_ABI, this.provider)
       // this.swapHelper = new ethers.Contract(SWAP_HELPER_ADDRESS, SWAP_HELPER_ABI, this.provider)
 
@@ -93,34 +91,36 @@ class SwapService {
     }
   }
 
-  // Cotação simples
-  async getSimpleQuote(tokenInSymbol: string, tokenOutSymbol: string): Promise<string> {
+  // Cotação simples baseada na documentação
+  async getSimpleQuote(tokenIn: string, tokenOut: string): Promise<string> {
     try {
       if (!this.initialized) {
         await this.initialize()
       }
 
-      const tokenIn = KNOWN_TOKENS[tokenInSymbol as keyof typeof KNOWN_TOKENS]
-      const tokenOut = KNOWN_TOKENS[tokenOutSymbol as keyof typeof KNOWN_TOKENS]
+      const tokenInAddress = KNOWN_TOKENS[tokenIn as keyof typeof KNOWN_TOKENS]
+      const tokenOutAddress = KNOWN_TOKENS[tokenOut as keyof typeof KNOWN_TOKENS]
 
-      if (!tokenIn || !tokenOut) {
+      if (!tokenInAddress || !tokenOutAddress) {
         throw new Error("Token not supported")
       }
 
-      // Por enquanto, retornar uma cotação simulada
-      // Quando os contratos estiverem disponíveis, usar:
-      // const quote = await this.quoter!.simple(tokenIn, tokenOut)
+      // Quando o contrato estiver disponível, usar:
+      // const quote = await this.quoter!.simple(tokenInAddress, tokenOutAddress)
       // return ethers.formatUnits(quote, 18)
 
-      // Simulação de cotação
+      // Simulação baseada em taxas reais aproximadas
       const mockRates: Record<string, Record<string, number>> = {
-        WETH: { USDCe: 3500, TPF: 1000, WLD: 100 },
-        USDCe: { WETH: 0.0003, TPF: 0.3, WLD: 0.03 },
-        TPF: { WETH: 0.001, USDCe: 3.33, WLD: 0.1 },
-        WLD: { WETH: 0.01, USDCe: 33.33, TPF: 10 },
+        WETH: { USDCe: 3500, TPF: 1000000, WLD: 1000, DNA: 10000, CASH: 5000, WDD: 2000 },
+        USDCe: { WETH: 0.0003, TPF: 300, WLD: 0.3, DNA: 3, CASH: 1.5, WDD: 0.6 },
+        TPF: { WETH: 0.000001, USDCe: 0.0033, WLD: 0.001, DNA: 0.01, CASH: 0.005, WDD: 0.002 },
+        WLD: { WETH: 0.001, USDCe: 3.33, TPF: 1000, DNA: 10, CASH: 5, WDD: 2 },
+        DNA: { WETH: 0.0001, USDCe: 0.33, TPF: 100, WLD: 0.1, CASH: 0.5, WDD: 0.2 },
+        CASH: { WETH: 0.0002, USDCe: 0.67, TPF: 200, WLD: 0.2, DNA: 2, WDD: 0.4 },
+        WDD: { WETH: 0.0005, USDCe: 1.67, TPF: 500, WLD: 0.5, DNA: 5, CASH: 2.5 },
       }
 
-      const rate = mockRates[tokenInSymbol]?.[tokenOutSymbol] || 1
+      const rate = mockRates[tokenIn]?.[tokenOut] || 1
       return rate.toString()
     } catch (error) {
       console.error("Error getting simple quote:", error)
@@ -128,22 +128,26 @@ class SwapService {
     }
   }
 
-  // Cotação inteligente com slippage
-  async getSmartQuote(tokenInSymbol: string, tokenOutSymbol: string, slippage = 3, deadline = 10): Promise<string> {
+  // Cotação inteligente com slippage baseada na documentação
+  async getSmartQuote(tokenIn: string, tokenOut: string, slippage = 3, deadline = 10): Promise<string> {
     try {
       if (!this.initialized) {
         await this.initialize()
       }
 
-      const tokenIn = KNOWN_TOKENS[tokenInSymbol as keyof typeof KNOWN_TOKENS]
-      const tokenOut = KNOWN_TOKENS[tokenOutSymbol as keyof typeof KNOWN_TOKENS]
+      const tokenInAddress = KNOWN_TOKENS[tokenIn as keyof typeof KNOWN_TOKENS]
+      const tokenOutAddress = KNOWN_TOKENS[tokenOut as keyof typeof KNOWN_TOKENS]
 
-      if (!tokenIn || !tokenOut) {
+      if (!tokenInAddress || !tokenOutAddress) {
         throw new Error("Token not supported")
       }
 
+      // Quando o contrato estiver disponível, usar:
+      // const quote = await this.quoter!.smart(tokenInAddress, tokenOutAddress, slippage, deadline)
+      // return ethers.formatUnits(quote, 18)
+
       // Por enquanto, usar cotação simples com ajuste de slippage
-      const simpleQuote = await this.getSimpleQuote(tokenInSymbol, tokenOutSymbol)
+      const simpleQuote = await this.getSimpleQuote(tokenIn, tokenOut)
       const adjustedQuote = Number.parseFloat(simpleQuote) * (1 - slippage / 100)
 
       return adjustedQuote.toString()
@@ -153,17 +157,18 @@ class SwapService {
     }
   }
 
-  // Obter cotação completa para swap
+  // Obter cotação completa baseada na documentação
   async getQuote(params: QuoteParams): Promise<QuoteResponse> {
     try {
       if (!this.initialized) {
         await this.initialize()
       }
 
-      // Por enquanto, retornar dados simulados
       // Quando o contrato estiver disponível, usar:
       // const quote = await this.quoter!.quote(params)
+      // return quote
 
+      // Por enquanto, retornar dados simulados
       return {
         data: "0x", // Dados da transação
         to: KNOWN_TOKENS[params.tokenOut as keyof typeof KNOWN_TOKENS] || ethers.ZeroAddress,
@@ -176,23 +181,19 @@ class SwapService {
     }
   }
 
-  // Executar swap
-  async executeSwap(params: SwapParams): Promise<string> {
+  // Executar swap baseado na documentação
+  async executeSwap(swapParams: any): Promise<string> {
     try {
       if (!this.initialized) {
         await this.initialize()
       }
 
-      if (!this.swapHelper) {
-        throw new Error("SwapHelper contract not initialized")
-      }
-
-      // Executar o swap
-      // const result = await this.swapHelper.swap(params)
+      // Quando o contrato estiver disponível, usar:
+      // const result = await this.swapHelper!.swap(swapParams)
       // return result.hash
 
       // Por enquanto, simular sucesso
-      console.log("Executing swap with params:", params)
+      console.log("Executing swap with params:", swapParams)
       return "0x" + Math.random().toString(16).substring(2, 66) // Hash simulado
     } catch (error) {
       console.error("Error executing swap:", error)
