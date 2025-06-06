@@ -59,23 +59,22 @@ export function LevelBadge({ level, size = "small", showTooltip = false, classNa
         />
       </motion.div>
 
-      {/* Tooltip */}
       {showTooltip && showTooltipState && (
         <motion.div
           initial={{ opacity: 0, y: -10, scale: 0.8 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -10, scale: 0.8 }}
-          className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50"
+          className="absolute bottom-full right-0 transform mb-2 z-50"
         >
-          <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl border border-gray-700 min-w-max">
+          <div className="bg-gray-900 text-white text-xs rounded-lg px-2 py-1 shadow-xl border border-gray-700 min-w-max">
             <div className="text-center">
-              <div className="font-bold text-sm mb-1">
+              <div className="font-bold text-xs mb-1">
                 {levelIcon} Level {level}
               </div>
-              <div className="text-gray-300">Reward Multiplier: {rewardMultiplier.toFixed(2)}x</div>
+              <div className="text-gray-300 text-xs">Multiplier: {rewardMultiplier.toFixed(2)}x</div>
             </div>
-            {/* Seta do tooltip */}
-            <div className="absolute top-full left-1/2 transform -translate-x-1/2">
+            {/* Seta do tooltip ajustada */}
+            <div className="absolute top-full right-2">
               <div className="border-4 border-transparent border-t-gray-900"></div>
             </div>
           </div>

@@ -66,39 +66,39 @@ export function LevelInfo({ tpfBalance, isOpen, onClose }: LevelInfoProps) {
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.8, opacity: 0 }}
-        className="bg-gray-800 rounded-xl p-6 max-w-md w-full border border-gray-700 shadow-2xl"
+        className="bg-gray-800 rounded-xl p-4 max-w-sm w-full border border-gray-700 shadow-2xl max-h-[80vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <LevelBadge level={level} size="large" />
+        {/* Header compacto */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <LevelBadge level={level} size="medium" />
             <div>
-              <h2 className="text-xl font-bold text-white">
+              <h2 className="text-lg font-bold text-white">
                 {translations.level?.title || "Level"} {level}
               </h2>
-              <p className="text-gray-400 text-sm">
-                {levelIcon} {translations.level?.multiplier || "Multiplier"}: {rewardMultiplier.toFixed(2)}x
+              <p className="text-gray-400 text-xs">
+                {levelIcon} {rewardMultiplier.toFixed(2)}x
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+            className="w-6 h-6 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center text-gray-400 hover:text-white transition-colors text-sm"
           >
             ✕
           </button>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mb-6">
-          <div className="flex justify-between text-sm text-gray-400 mb-2">
+        {/* Progress Bar compacta */}
+        <div className="mb-4">
+          <div className="flex justify-between text-xs text-gray-400 mb-1">
             <span>{translations.level?.progress || "Progress"}</span>
             <span>
               {currentLevelXP} / {nextLevelXP} XP
             </span>
           </div>
-          <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+          <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
             <motion.div
               className="h-full rounded-full"
               style={{
@@ -114,48 +114,46 @@ export function LevelInfo({ tpfBalance, isOpen, onClose }: LevelInfoProps) {
           </div>
         </div>
 
-        {/* XP Sources */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-white mb-3">{translations.level?.xpSources || "XP Sources"}</h3>
+        {/* XP Sources compactas */}
+        <div className="space-y-2 mb-4">
+          <h3 className="text-sm font-semibold text-white">{translations.level?.xpSources || "XP Sources"}</h3>
 
-          <div className="bg-gray-700/50 rounded-lg p-4">
-            <div className="flex justify-between items-center mb-2">
+          <div className="bg-gray-700/50 rounded-lg p-2">
+            <div className="flex justify-between items-center text-sm">
               <span className="text-gray-300">{translations.level?.dailyCheckIn || "Daily Check-in"}</span>
               <span className="text-green-400 font-medium">+10 XP</span>
             </div>
             <div className="text-xs text-gray-500">
-              {translations.level?.checkInXP || "Current check-in XP"}: {levelService.getCheckInXP()} XP
+              {translations.level?.checkInXP || "Current"}: {levelService.getCheckInXP()} XP
             </div>
           </div>
 
-          <div className="bg-gray-700/50 rounded-lg p-4">
-            <div className="flex justify-between items-center mb-2">
+          <div className="bg-gray-700/50 rounded-lg p-2">
+            <div className="flex justify-between items-center text-sm">
               <span className="text-gray-300">{translations.level?.tpfHolding || "TPF Holding"}</span>
-              <span className="text-blue-400 font-medium">1 TPF = 0.001 XP</span>
+              <span className="text-blue-400 font-medium text-xs">0.001 XP/TPF</span>
             </div>
             <div className="text-xs text-gray-500">
-              {translations.level?.currentBalance || "Current balance"}: {tpfBalance.toLocaleString()} TPF ={" "}
-              {Math.floor(tpfBalance * 0.001)} XP
+              {tpfBalance.toLocaleString()} TPF = {Math.floor(tpfBalance * 0.001).toLocaleString()} XP
             </div>
           </div>
         </div>
 
-        {/* Total XP */}
-        <div className="mt-6 pt-4 border-t border-gray-700">
+        {/* Total XP compacto */}
+        <div className="mb-3 pt-2 border-t border-gray-700">
           <div className="flex justify-between items-center">
-            <span className="text-lg font-semibold text-white">{translations.level?.totalXP || "Total XP"}</span>
-            <span className="text-xl font-bold" style={{ color: levelColor }}>
-              {totalXP.toLocaleString()} XP
+            <span className="text-sm font-semibold text-white">{translations.level?.totalXP || "Total XP"}</span>
+            <span className="text-lg font-bold" style={{ color: levelColor }}>
+              {totalXP.toLocaleString()}
             </span>
           </div>
         </div>
 
-        {/* Level Benefits */}
-        <div className="mt-4 p-3 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-lg border border-blue-500/30">
-          <div className="text-sm text-center text-gray-300">
-            <span className="font-medium text-white">{translations.level?.levelBenefits || "Level Benefits"}:</span>
-            <br />
-            {rewardMultiplier.toFixed(2)}x {translations.level?.eventRewards || "event rewards multiplier"}
+        {/* Level Benefits compacto */}
+        <div className="p-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-lg border border-blue-500/30">
+          <div className="text-xs text-center text-gray-300">
+            <span className="font-medium text-white">{translations.level?.levelBenefits || "Benefits"}:</span>{" "}
+            {rewardMultiplier.toFixed(2)}x {translations.level?.eventRewards || "event rewards"}
           </div>
         </div>
       </motion.div>

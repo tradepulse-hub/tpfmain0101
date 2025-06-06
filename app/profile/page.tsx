@@ -269,6 +269,65 @@ export default function ProfilePage() {
     }
   }, [tpfBalance])
 
+  // Adicionar após os outros useEffects, antes do return
+  useEffect(() => {
+    const fetchTPFBalance = async () => {
+      try {
+        if (walletAddress) {
+          // Simular busca do saldo real - você pode integrar com seu serviço de carteira
+          const savedBalance = localStorage.getItem(`tpf_balance_${walletAddress}`)
+          if (savedBalance) {
+            setTpfBalance(savedBalance)
+            setTpfBalanceNumber(Number.parseFloat(savedBalance))
+          } else {
+            // Fallback: tentar buscar do serviço de carteira
+            const response = await fetch(`/api/wallet/balance?address=${walletAddress}`)
+            if (response.ok) {
+              const data = await response.json()
+              const balance = data.tpfBalance || "0"
+              setTpfBalance(balance)
+              setTpfBalanceNumber(Number.parseFloat(balance))
+              localStorage.setItem(`tpf_balance_${walletAddress}`, balance)
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching TPF balance:", error)
+      }
+    }
+
+    fetchTPFBalance()
+
+    // Escutar eventos de atualização de saldo
+    const handleBalanceUpdate = (event: CustomEvent) => {
+      if (event.detail?.tpfBalance) {
+        setTpfBalance(event.detail.tpfBalance.toString())
+        setTpfBalanceNumber(Number.parseFloat(event.detail.tpfBalance))
+      }
+    }
+
+    window.addEventListener("tpf_balance_updated", handleBalanceUpdate as EventListener)
+    return () => window.removeEventListener("tpf_balance_updated", handleBalanceUpdate as EventListener)
+  }, [walletAddress])
+
+  // Substituir o useEffect de atualização de nível existente
+  useEffect(() => {
+    const updateLevel = () => {
+      const balance = tpfBalanceNumber
+      const levelInfo = levelService.getUserLevelInfo(balance)
+      setUserLevel(levelInfo.level)
+    }
+
+    updateLevel()
+
+    const handleXPUpdate = () => {
+      updateLevel()
+    }
+
+    window.addEventListener("xp_updated", handleXPUpdate)
+    return () => window.removeEventListener("xp_updated", handleXPUpdate)
+  }, [tpfBalanceNumber])
+
   return (
     <main className="relative flex min-h-screen flex-col items-center pt-6 pb-20 overflow-hidden">
       {/* Background effects */}
