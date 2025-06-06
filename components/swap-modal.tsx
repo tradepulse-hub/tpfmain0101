@@ -33,6 +33,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     TPF: "0.000000",
   })
   const [poolInfo, setPoolInfo] = useState<any>(null)
+  const [poolDetails, setPoolDetails] = useState<any>(null)
 
   const tokens = uniswapService.getTokens()
 
@@ -50,6 +51,17 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     }
   }, [])
 
+  // Carregar detalhes do pool
+  const loadPoolDetails = async () => {
+    try {
+      const details = await uniswapService.getPoolInfo()
+      setPoolDetails(details)
+      console.log("Pool details loaded:", details)
+    } catch (error) {
+      console.error("Error loading pool details:", error)
+    }
+  }
+
   useEffect(() => {
     const updateLanguage = () => {
       const currentLang = getCurrentLanguage()
@@ -66,6 +78,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     if (!isOpen) return
 
     loadPoolInfo()
+    loadPoolDetails()
 
     if (walletAddress) {
       loadBalances()
@@ -294,18 +307,22 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                         ))}
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500 flex items-center">
-                      <span className="mr-1">Pool:</span>
-                      <a
-                        href={`https://worldchain-mainnet.explorer.alchemy.com/address/${uniswapService.getContractAddresses().TPF_WLD_POOL}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:underline"
-                      >
-                        {uniswapService.getContractAddresses().TPF_WLD_POOL.slice(0, 6)}...
+                    <div className="text-xs text-gray-500">
+                      <div>
+                        Pool: {uniswapService.getContractAddresses().TPF_WLD_POOL.slice(0, 6)}...
                         {uniswapService.getContractAddresses().TPF_WLD_POOL.slice(-4)}
-                      </a>
-                      {poolFee && <span className="ml-1">({poolFee / 10000}% fee)</span>}
+                      </div>
+                      {poolDetails && (
+                        <>
+                          <div>
+                            Fee: {poolDetails.fee / 10000}% | Tick: {poolDetails.tick}
+                          </div>
+                          <div>Liquidity: {Number(poolDetails.liquidity).toExponential(2)}</div>
+                          <div className={poolDetails.isValid ? "text-green-400" : "text-red-400"}>
+                            {poolDetails.isValid ? "✅ Pool Verified" : "⚠️ Pool Invalid"}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </motion.div>
