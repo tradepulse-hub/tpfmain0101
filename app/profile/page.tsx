@@ -14,6 +14,9 @@ import { Settings, Share2, LogOut, Globe, ChevronDown, Check, ExternalLink } fro
 // Importar as funções de idioma
 import { getCurrentLanguage, setCurrentLanguage, getTranslations, type Language } from "@/lib/i18n"
 import { DailyCheckIn } from "@/components/daily-check-in"
+import { LevelBadge } from "@/components/level-badge"
+import { LevelInfo } from "@/components/level-info"
+import { levelService } from "@/services/level-service"
 
 export default function ProfilePage() {
   // User state with profile data
@@ -44,6 +47,10 @@ export default function ProfilePage() {
 
   // Dentro da função ProfilePage, adicionar estado para as traduções
   const [translations, setTranslations] = useState(getTranslations("en"))
+
+  const [showLevelInfo, setShowLevelInfo] = useState(false)
+  const [userLevel, setUserLevel] = useState(1)
+  const [tpfBalanceNumber, setTpfBalanceNumber] = useState(0)
 
   // Handle profile updates
   const handleProfileUpdate = (newData: { nickname?: string; profileImage?: string }) => {
@@ -236,6 +243,31 @@ export default function ProfilePage() {
     window.addEventListener("languageChange", handleLanguageChange)
     return () => window.removeEventListener("languageChange", handleLanguageChange)
   }, [])
+
+  // Atualizar nível baseado no saldo TPF
+  useEffect(() => {
+    const updateLevel = () => {
+      const balance = Number.parseFloat(tpfBalance) || 0
+      setTpfBalanceNumber(balance)
+      const levelInfo = levelService.getUserLevelInfo(balance)
+      setUserLevel(levelInfo.level)
+    }
+
+    updateLevel()
+
+    // Escutar mudanças no saldo TPF
+    const handleBalanceUpdate = () => {
+      updateLevel()
+    }
+
+    window.addEventListener("tpf_balance_updated", handleBalanceUpdate)
+    window.addEventListener("xp_updated", handleBalanceUpdate)
+
+    return () => {
+      window.removeEventListener("tpf_balance_updated", handleBalanceUpdate)
+      window.removeEventListener("xp_updated", handleBalanceUpdate)
+    }
+  }, [tpfBalance])
 
   return (
     <main className="relative flex min-h-screen flex-col items-center pt-6 pb-20 overflow-hidden">
@@ -452,7 +484,7 @@ export default function ProfilePage() {
           <p className="text-gray-400 text-sm mt-1">Global Crypto Bridge</p>
         </motion.div>
 
-        {/* Profile picture circle with edit button */}
+        {/* Profile picture circle with edit button and level badge */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -474,6 +506,11 @@ export default function ProfilePage() {
               animate={{ opacity: [0.2, 0.4, 0.2] }}
               transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
             />
+          </div>
+
+          {/* Level Badge - posicionado no canto superior direito */}
+          <div className="absolute -top-1 -right-1">
+            <LevelBadge level={userLevel} size="small" showTooltip={true} className="cursor-pointer" />
           </div>
 
           {/* Animated rings around profile picture */}
@@ -527,7 +564,7 @@ export default function ProfilePage() {
           />
         </motion.div>
 
-        {/* Username with edit button */}
+        {/* Username with edit button and level info */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -555,6 +592,16 @@ export default function ProfilePage() {
           <div className="mt-1 px-3 py-1 bg-gray-800/50 rounded-full text-xs text-gray-400 border border-gray-700/50">
             {walletAddress ? formatAddress(walletAddress) : translations.profile?.notConnected || "Not connected"}
           </div>
+
+          {/* Level Info Button */}
+          <motion.button
+            onClick={() => setShowLevelInfo(true)}
+            className="mt-2 px-3 py-1 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full text-xs text-blue-300 border border-blue-500/30 hover:from-blue-600/30 hover:to-purple-600/30 transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            {translations.level?.viewDetails || "View level details"}
+          </motion.button>
         </motion.div>
 
         {/* Daily Check-in Component */}
@@ -577,6 +624,9 @@ export default function ProfilePage() {
           <TransactionHistory walletAddress={walletAddress} daysToShow={5} />
         </motion.div>
       </motion.div>
+
+      {/* Level Info Modal */}
+      <LevelInfo tpfBalance={tpfBalanceNumber} isOpen={showLevelInfo} onClose={() => setShowLevelInfo(false)} />
 
       {/* Bottom navigation */}
       <BottomNav activeTab="profile" />

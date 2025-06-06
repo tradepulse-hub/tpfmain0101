@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useState, useEffect } from "react"
 import { Calendar, Flame, ChevronDown, ChevronUp, Clock } from "lucide-react"
 import { getCurrentLanguage, getTranslations, type Language } from "@/lib/i18n"
+import { levelService } from "@/services/level-service"
 
 interface CheckInData {
   date: string
@@ -151,6 +152,9 @@ export function DailyCheckIn() {
 
     const updatedHistory = [...checkInHistory, newCheckIn]
     const newStreak = calculateStreak(updatedHistory)
+
+    // Adicionar XP do check-in
+    const newCheckInXP = levelService.addCheckInXP()
 
     // Atualizar estados
     setTotalPoints(newPoints)

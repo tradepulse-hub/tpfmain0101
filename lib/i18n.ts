@@ -46,6 +46,7 @@ export interface NavTranslations {
   storm?: string
   about?: string
   finances?: string
+  partnerships?: string
   menu?: string
   close?: string
 }
@@ -329,6 +330,37 @@ export interface FinancesTranslations {
   totalExpenses?: string
 }
 
+export interface PartnershipsTranslations {
+  title?: string
+  subtitle?: string
+  ourPartners?: string
+  holdstationTitle?: string
+  holdstationDescription?: string
+  visitApp?: string
+  poweredBy?: string
+  swapIntegration?: string
+  swapDescription?: string
+  morePartnerships?: string
+  comingSoon?: string
+}
+
+export interface LevelTranslations {
+  title?: string
+  multiplier?: string
+  progress?: string
+  toNextLevel?: string
+  xpSources?: string
+  dailyCheckIn?: string
+  checkInXP?: string
+  tpfHolding?: string
+  currentBalance?: string
+  totalXP?: string
+  levelBenefits?: string
+  eventRewards?: string
+  level?: string
+  viewDetails?: string
+}
+
 export interface Translations {
   airdrop?: AirdropTranslations
   history?: HistoryTranslations
@@ -347,6 +379,8 @@ export interface Translations {
   profile?: ProfileTranslations
   dailyCheckIn?: DailyCheckInTranslations
   finances?: FinancesTranslations
+  partnerships?: PartnershipsTranslations
+  level?: LevelTranslations
 }
 
 // Função para obter o idioma atual do navegador ou o padrão (inglês)
@@ -418,6 +452,7 @@ export function getTranslations(lang: Language): Translations {
           storm: "Storm",
           about: "Sobre",
           finances: "Finanças",
+          partnerships: "Parcerias",
           menu: "Menu",
           close: "Fechar",
         },
@@ -711,6 +746,35 @@ export function getTranslations(lang: Language): Translations {
           totalRevenue: "Total de Receitas",
           totalExpenses: "Total de Despesas",
         },
+        partnerships: {
+          title: "Parcerias",
+          subtitle: "Nossos parceiros estratégicos",
+          ourPartners: "Nossos Parceiros",
+          holdstationTitle: "HoldStation",
+          holdstationDescription: "Plataforma avançada de trading e swap para WorldChain",
+          visitApp: "Visitar App",
+          poweredBy: "Powered by",
+          swapIntegration: "Integração de Swap",
+          swapDescription: "Funcionalidade de swap integrada através da API da HoldStation",
+          morePartnerships: "Mais parcerias",
+          comingSoon: "Em breve...",
+        },
+        level: {
+          title: "Nível",
+          multiplier: "Multiplicador",
+          progress: "Progresso",
+          toNextLevel: "para o próximo nível",
+          xpSources: "Fontes de XP",
+          dailyCheckIn: "Check-in Diário",
+          checkInXP: "XP de check-in atual",
+          tpfHolding: "Holding de TPF",
+          currentBalance: "Saldo atual",
+          totalXP: "XP Total",
+          levelBenefits: "Benefícios do Nível",
+          eventRewards: "multiplicador de recompensas de eventos",
+          level: "Nível",
+          viewDetails: "Ver detalhes",
+        },
       }
 
     case "en":
@@ -755,6 +819,7 @@ export function getTranslations(lang: Language): Translations {
           storm: "Storm",
           about: "About",
           finances: "Finances",
+          partnerships: "Partnerships",
           menu: "Menu",
           close: "Close",
         },
@@ -1047,6 +1112,35 @@ export function getTranslations(lang: Language): Translations {
           noData: "No data available",
           totalRevenue: "Total Revenue",
           totalExpenses: "Total Expenses",
+        },
+        partnerships: {
+          title: "Partnerships",
+          subtitle: "Our strategic partners",
+          ourPartners: "Our Partners",
+          holdstationTitle: "HoldStation",
+          holdstationDescription: "Advanced trading and swap platform for WorldChain",
+          visitApp: "Visit App",
+          poweredBy: "Powered by",
+          swapIntegration: "Swap Integration",
+          swapDescription: "Swap functionality integrated through HoldStation API",
+          morePartnerships: "More partnerships",
+          comingSoon: "Coming soon...",
+        },
+        level: {
+          title: "Level",
+          multiplier: "Multiplier",
+          progress: "Progress",
+          toNextLevel: "to next level",
+          xpSources: "XP Sources",
+          dailyCheckIn: "Daily Check-in",
+          checkInXP: "Current check-in XP",
+          tpfHolding: "TPF Holding",
+          currentBalance: "Current balance",
+          totalXP: "Total XP",
+          levelBenefits: "Level Benefits",
+          eventRewards: "event rewards multiplier",
+          level: "Level",
+          viewDetails: "View details",
         },
       }
   }
