@@ -1,3 +1,5 @@
+import { ethers } from "ethers"
+
 // Endereço do contrato de airdrop na Worldchain
 export const AIRDROP_CONTRACT_ADDRESS = "0x1234567890123456789012345678901234567890"
 
@@ -18,79 +20,38 @@ export const airdropContractABI = [
   "function claimAirdrop() external",
 ]
 
-// Função para criar provider usando fetch API
-export const createProvider = (rpcUrl: string) => {
-  return {
-    async call(method: string, params: any[] = []) {
-      try {
-        const response = await fetch(rpcUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            method,
-            params,
-            id: 1,
-          }),
-        })
-
-        const data = await response.json()
-        return data.result
-      } catch (error) {
-        console.error(`RPC call failed for ${rpcUrl}:`, error)
-        throw error
-      }
-    },
-  }
-}
-
-// Verificar se contrato existe
+// Criar uma instância do contrato
 export const getAirdropContract = async () => {
   for (const rpcUrl of RPC_ENDPOINTS) {
     try {
-      const provider = createProvider(rpcUrl)
+      const provider = new ethers.providers.JsonRpcProvider(rpcUrl)
 
       // Verificar se o contrato existe
-      const code = await provider.call("eth_getCode", [AIRDROP_CONTRACT_ADDRESS, "latest"])
-
-      if (code === "0x" || code === "0x0") {
+      const code = await provider.getCode(AIRDROP_CONTRACT_ADDRESS)
+      if (code === "0x") {
         console.log(`Contract not found at ${AIRDROP_CONTRACT_ADDRESS} using RPC ${rpcUrl}`)
-        continue
+        continue // Tentar próximo RPC
       }
 
       console.log(`Contract found at ${AIRDROP_CONTRACT_ADDRESS} using RPC ${rpcUrl}`)
-      return { provider, address: AIRDROP_CONTRACT_ADDRESS }
+      return new ethers.Contract(AIRDROP_CONTRACT_ADDRESS, airdropContractABI, provider)
     } catch (error) {
       console.error(`Error with RPC ${rpcUrl}:`, error)
-      continue
+      // Continuar para o próximo RPC
     }
   }
 
   throw new Error("Failed to connect to any RPC endpoint")
 }
 
-// Função utilitária para converter wei para ether
-export const formatEther = (wei: string): string => {
+// Function to get the provider
+const getProvider = (providerUrl: string): ethers.providers.Provider => {
   try {
-    const weiNum = BigInt(wei)
-    const etherNum = Number(weiNum) / Math.pow(10, 18)
-    return etherNum.toString()
+    return new ethers.providers.JsonRpcProvider(providerUrl)
   } catch (error) {
-    console.error("Error formatting ether:", error)
-    return "0"
+    console.error("Error creating provider:", error)
+    throw new Error("Failed to create provider. Check provider URL.")
   }
 }
 
-// Função utilitária para converter ether para wei
-export const parseEther = (ether: string): string => {
-  try {
-    const etherNum = Number.parseFloat(ether)
-    const weiNum = BigInt(Math.floor(etherNum * Math.pow(10, 18)))
-    return weiNum.toString()
-  } catch (error) {
-    console.error("Error parsing ether:", error)
-    return "0"
-  }
-}
+export { getProvider }
