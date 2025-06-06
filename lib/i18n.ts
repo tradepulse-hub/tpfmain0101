@@ -361,6 +361,36 @@ export interface LevelTranslations {
   viewDetails?: string
 }
 
+export interface EventsTranslations {
+  topHoldersEvent?: {
+    title?: string
+    description?: string
+    remaining?: string
+  }
+  snakeTournament?: {
+    registrationTitle?: string
+    registrationDescription?: string
+    tournamentTitle?: string
+    tournamentDescription?: string
+    instructions?: string
+    rules?: {
+      rule1?: string
+      rule2?: string
+      rule3?: string
+      rule4?: string
+      rule5?: string
+    }
+    registrationAddress?: string
+    copyAddress?: string
+    addressCopied?: string
+    email?: string
+    remaining?: string
+    phase?: string
+    registration?: string
+    tournament?: string
+  }
+}
+
 export interface Translations {
   airdrop?: AirdropTranslations
   history?: HistoryTranslations
@@ -381,6 +411,7 @@ export interface Translations {
   finances?: FinancesTranslations
   partnerships?: PartnershipsTranslations
   level?: LevelTranslations
+  events?: EventsTranslations
 }
 
 // Função para obter o idioma atual do navegador ou o padrão (inglês)
@@ -775,6 +806,37 @@ export function getTranslations(lang: Language): Translations {
           level: "Nível",
           viewDetails: "Ver detalhes",
         },
+        events: {
+          topHoldersEvent: {
+            title: "Top 10 Event",
+            description: "10% Bônus para Top Holders",
+            remaining: "restante",
+          },
+          snakeTournament: {
+            registrationTitle: "Inscrição para o Torneio",
+            registrationDescription: "Envie 200.000 TPF para se inscrever no torneio",
+            tournamentTitle: "Torneio Jogo da Cobra",
+            tournamentDescription: "Consiga mais pontos no jogo da cobra para ganhar o grande prêmio",
+            instructions: "Instruções:",
+            rules: {
+              rule1: "O jogador que conseguir mais pontos no jogo da cobra ganha o grande prêmio",
+              rule2:
+                "O print do seu score deverá ser enviado para support@tradepulsetoken.com até ao último dia de torneio",
+              rule3: "Em caso de empate com qualquer outro jogador o prêmio será dividido",
+              rule4: "O prêmio será anunciado na última semana de evento",
+              rule5:
+                "Só poderá enviar um print para o email, mais que um será desconsiderado, portanto envie com cuidado",
+            },
+            registrationAddress: "Endereço para inscrição:",
+            copyAddress: "Copiar endereço",
+            addressCopied: "Endereço copiado!",
+            email: "Email para envio do score:",
+            remaining: "restante",
+            phase: "Fase",
+            registration: "Inscrição",
+            tournament: "Torneio",
+          },
+        },
       }
 
     case "en":
@@ -1141,6 +1203,37 @@ export function getTranslations(lang: Language): Translations {
           eventRewards: "event rewards multiplier",
           level: "Level",
           viewDetails: "View details",
+        },
+        events: {
+          topHoldersEvent: {
+            title: "Top 10 Event",
+            description: "10% Bonus for Top Holders",
+            remaining: "remaining",
+          },
+          snakeTournament: {
+            registrationTitle: "Tournament Registration",
+            registrationDescription: "Send 200,000 TPF to register for the tournament",
+            tournamentTitle: "Snake Game Tournament",
+            tournamentDescription: "Get the highest score in the snake game to win the grand prize",
+            instructions: "Instructions:",
+            rules: {
+              rule1: "The player who achieves the highest score in the snake game wins the grand prize",
+              rule2:
+                "Screenshot of your score must be sent to support@tradepulsetoken.com by the last day of the tournament",
+              rule3: "In case of a tie with any other player, the prize will be divided",
+              rule4: "The prize will be announced in the last week of the event",
+              rule5:
+                "You can only send one screenshot to the email, more than one will be disregarded, so send carefully",
+            },
+            registrationAddress: "Registration address:",
+            copyAddress: "Copy address",
+            addressCopied: "Address copied!",
+            email: "Email for score submission:",
+            remaining: "remaining",
+            phase: "Phase",
+            registration: "Registration",
+            tournament: "Tournament",
+          },
         },
       }
   }

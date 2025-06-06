@@ -1,8 +1,10 @@
 "use client"
 
+import type React from "react"
+
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
-import { Trophy, Clock } from "lucide-react"
+import { Trophy, Clock, Gamepad2, Copy, Check } from "lucide-react"
 import { useTranslation } from "@/lib/i18n"
 
 interface TimeRemaining {
@@ -12,22 +14,79 @@ interface TimeRemaining {
   seconds: number
 }
 
+type EventType = "topHolders" | "snakeRegistration" | "snakeTournament" | "none"
+
+interface EventInfo {
+  type: EventType
+  title: string
+  description: string
+  endDate: Date
+  icon: React.ReactNode
+  color: string
+}
+
 export function EventCountdownBadge() {
   const { t } = useTranslation()
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining>({ days: 0, hours: 0, minutes: 0, seconds: 0 })
-  const [isEventActive, setIsEventActive] = useState(true)
+  const [currentEvent, setCurrentEvent] = useState<EventInfo | null>(null)
   const [showTooltip, setShowTooltip] = useState(false)
+  const [addressCopied, setAddressCopied] = useState(false)
 
-  // Data do fim do evento - 9 de junho de 2025
-  const eventEndDate = new Date("2025-06-09T23:59:59Z")
+  // Endereço para inscrição no torneio
+  const registrationAddress = "0xf04a78df4cc3017c0c23f37528d7b6cbbeea6677"
+
+  // Definir eventos com suas datas
+  const events: EventInfo[] = [
+    {
+      type: "topHolders",
+      title: t.events?.topHoldersEvent?.title || "Top 10 Event",
+      description: t.events?.topHoldersEvent?.description || "10% Bonus for Top Holders",
+      endDate: new Date("2025-06-09T23:59:59Z"),
+      icon: <Trophy className="w-4 h-4 text-white" />,
+      color: "from-yellow-500 to-orange-600",
+    },
+    {
+      type: "snakeRegistration",
+      title: t.events?.snakeTournament?.registrationTitle || "Tournament Registration",
+      description: t.events?.snakeTournament?.registrationDescription || "Send 200,000 TPF to register",
+      endDate: new Date("2025-01-15T23:59:59Z"),
+      icon: <Gamepad2 className="w-4 h-4 text-white" />,
+      color: "from-green-500 to-emerald-600",
+    },
+    {
+      type: "snakeTournament",
+      title: t.events?.snakeTournament?.tournamentTitle || "Snake Game Tournament",
+      description: t.events?.snakeTournament?.tournamentDescription || "Get highest score to win",
+      endDate: new Date("2025-07-09T23:59:59Z"),
+      icon: <Gamepad2 className="w-4 h-4 text-white" />,
+      color: "from-purple-500 to-pink-600",
+    },
+  ]
 
   useEffect(() => {
     const updateCountdown = () => {
       const now = new Date()
-      const timeDiff = eventEndDate.getTime() - now.getTime()
+
+      // Encontrar o evento ativo atual
+      let activeEvent: EventInfo | null = null
+
+      for (const event of events) {
+        if (now < event.endDate) {
+          activeEvent = event
+          break
+        }
+      }
+
+      if (!activeEvent) {
+        setCurrentEvent(null)
+        return
+      }
+
+      setCurrentEvent(activeEvent)
+
+      const timeDiff = activeEvent.endDate.getTime() - now.getTime()
 
       if (timeDiff <= 0) {
-        setIsEventActive(false)
         setTimeRemaining({ days: 0, hours: 0, minutes: 0, seconds: 0 })
         return
       }
@@ -44,7 +103,7 @@ export function EventCountdownBadge() {
     const interval = setInterval(updateCountdown, 1000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [t])
 
   const formatTime = (time: TimeRemaining): string => {
     const { days, hours, minutes, seconds } = time
@@ -58,14 +117,122 @@ export function EventCountdownBadge() {
     }
   }
 
-  if (!isEventActive) {
+  const copyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(registrationAddress)
+      setAddressCopied(true)
+      setTimeout(() => setAddressCopied(false), 2000)
+    } catch (err) {
+      console.error("Failed to copy address:", err)
+    }
+  }
+
+  const renderTooltipContent = () => {
+    if (!currentEvent) return null
+
+    switch (currentEvent.type) {
+      case "topHolders":
+        return (
+          <div className="text-left">
+            <div className="flex items-center gap-1 mb-1">
+              <Trophy className="w-3 h-3 text-yellow-400" />
+              <span className="font-bold text-yellow-400">{currentEvent.title}</span>
+            </div>
+            <div className="text-gray-300 mb-1">{currentEvent.description}</div>
+            <div className="flex items-center gap-1 text-orange-400">
+              <Clock className="w-3 h-3" />
+              <span className="font-mono font-bold">{formatTime(timeRemaining)}</span>
+            </div>
+            <div className="text-gray-400 text-xs mt-1">{t.events?.topHoldersEvent?.remaining || "remaining"}</div>
+          </div>
+        )
+
+      case "snakeRegistration":
+        return (
+          <div className="text-left max-w-xs">
+            <div className="flex items-center gap-1 mb-2">
+              <Gamepad2 className="w-3 h-3 text-green-400" />
+              <span className="font-bold text-green-400">{currentEvent.title}</span>
+            </div>
+            <div className="text-gray-300 mb-2 text-xs">{currentEvent.description}</div>
+
+            <div className="mb-2">
+              <div className="text-gray-400 text-xs mb-1">
+                {t.events?.snakeTournament?.registrationAddress || "Registration address:"}
+              </div>
+              <div className="flex items-center gap-1 bg-gray-800 rounded px-2 py-1">
+                <span className="text-xs font-mono text-gray-300 truncate">
+                  {registrationAddress.slice(0, 10)}...{registrationAddress.slice(-6)}
+                </span>
+                <button onClick={copyAddress} className="flex-shrink-0 p-1 hover:bg-gray-700 rounded">
+                  {addressCopied ? (
+                    <Check className="w-3 h-3 text-green-400" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-gray-400" />
+                  )}
+                </button>
+              </div>
+              {addressCopied && (
+                <div className="text-green-400 text-xs mt-1">
+                  {t.events?.snakeTournament?.addressCopied || "Address copied!"}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1 text-green-400">
+              <Clock className="w-3 h-3" />
+              <span className="font-mono font-bold">{formatTime(timeRemaining)}</span>
+            </div>
+            <div className="text-gray-400 text-xs mt-1">{t.events?.snakeTournament?.remaining || "remaining"}</div>
+          </div>
+        )
+
+      case "snakeTournament":
+        return (
+          <div className="text-left max-w-xs">
+            <div className="flex items-center gap-1 mb-2">
+              <Gamepad2 className="w-3 h-3 text-purple-400" />
+              <span className="font-bold text-purple-400">{currentEvent.title}</span>
+            </div>
+            <div className="text-gray-300 mb-2 text-xs">{currentEvent.description}</div>
+
+            <div className="mb-2">
+              <div className="text-gray-400 text-xs mb-1">
+                {t.events?.snakeTournament?.instructions || "Instructions:"}
+              </div>
+              <div className="text-gray-300 text-xs space-y-1">
+                <div>• {t.events?.snakeTournament?.rules?.rule1 || "Get highest score in snake game"}</div>
+                <div>• {t.events?.snakeTournament?.rules?.rule2 || "Send screenshot to support email"}</div>
+                <div>• {t.events?.snakeTournament?.rules?.rule5 || "Only one submission allowed"}</div>
+              </div>
+            </div>
+
+            <div className="mb-2">
+              <div className="text-gray-400 text-xs mb-1">{t.events?.snakeTournament?.email || "Email:"}</div>
+              <div className="text-xs font-mono text-blue-300">support@tradepulsetoken.com</div>
+            </div>
+
+            <div className="flex items-center gap-1 text-purple-400">
+              <Clock className="w-3 h-3" />
+              <span className="font-mono font-bold">{formatTime(timeRemaining)}</span>
+            </div>
+            <div className="text-gray-400 text-xs mt-1">{t.events?.snakeTournament?.remaining || "remaining"}</div>
+          </div>
+        )
+
+      default:
+        return null
+    }
+  }
+
+  if (!currentEvent) {
     return null
   }
 
   return (
     <div className="relative">
       <motion.div
-        className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-600 border-2 border-yellow-400/50 flex items-center justify-center cursor-pointer shadow-lg"
+        className={`w-8 h-8 rounded-lg bg-gradient-to-br ${currentEvent.color} border-2 border-white/20 flex items-center justify-center cursor-pointer shadow-lg`}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
         onMouseEnter={() => setShowTooltip(true)}
@@ -73,9 +240,9 @@ export function EventCountdownBadge() {
         onClick={() => setShowTooltip(!showTooltip)}
         animate={{
           boxShadow: [
-            "0 0 0 0 rgba(251, 191, 36, 0.7)",
-            "0 0 0 8px rgba(251, 191, 36, 0)",
-            "0 0 0 0 rgba(251, 191, 36, 0)",
+            "0 0 0 0 rgba(255, 255, 255, 0.4)",
+            "0 0 0 8px rgba(255, 255, 255, 0)",
+            "0 0 0 0 rgba(255, 255, 255, 0)",
           ],
         }}
         transition={{
@@ -84,7 +251,7 @@ export function EventCountdownBadge() {
           ease: "easeInOut",
         }}
       >
-        <Trophy className="w-4 h-4 text-white" />
+        {currentEvent.icon}
 
         {/* Efeito de brilho */}
         <motion.div
@@ -106,23 +273,12 @@ export function EventCountdownBadge() {
           initial={{ opacity: 0, y: 10, scale: 0.8 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 10, scale: 0.8 }}
-          className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 z-50"
+          className="absolute top-full right-0 mt-2 z-50"
         >
           <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl border border-gray-700 min-w-max">
-            <div className="text-center">
-              <div className="flex items-center gap-1 mb-1">
-                <Trophy className="w-3 h-3 text-yellow-400" />
-                <span className="font-bold text-yellow-400">Top 10 Event</span>
-              </div>
-              <div className="text-gray-300 mb-1">10% Bonus for Top Holders</div>
-              <div className="flex items-center gap-1 text-orange-400">
-                <Clock className="w-3 h-3" />
-                <span className="font-mono font-bold">{formatTime(timeRemaining)}</span>
-              </div>
-              <div className="text-gray-400 text-xs mt-1">remaining</div>
-            </div>
-            {/* Seta do tooltip */}
-            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2">
+            {renderTooltipContent()}
+            {/* Seta do tooltip - no canto direito */}
+            <div className="absolute bottom-full right-3">
               <div className="border-4 border-transparent border-b-gray-900"></div>
             </div>
           </div>

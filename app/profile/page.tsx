@@ -640,7 +640,7 @@ export default function ProfilePage() {
           transition={{ duration: 0.5, delay: 0.5 }}
           className="text-center relative"
         >
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center gap-2 relative">
             <h2 className="text-xl font-medium text-white">{user.nickname}</h2>
             <motion.button
               className="w-6 h-6 rounded-md bg-gray-800/70 border border-gray-700/50 flex items-center justify-center"
@@ -658,8 +658,10 @@ export default function ProfilePage() {
               </svg>
             </motion.button>
 
-            {/* Event Countdown Badge */}
-            <EventCountdownBadge />
+            {/* Event Countdown Badge - posicionado mais na lateral */}
+            <div className="absolute -right-8 top-1/2 transform -translate-y-1/2">
+              <EventCountdownBadge />
+            </div>
           </div>
           <div className="mt-1 px-3 py-1 bg-gray-800/50 rounded-full text-xs text-gray-400 border border-gray-700/50">
             {walletAddress ? formatAddress(walletAddress) : translations.profile?.notConnected || "Not connected"}
