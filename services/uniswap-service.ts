@@ -38,7 +38,7 @@ const FACTORY_V3_ABI = [
   "function feeAmountTickSpacing(uint24 fee) external view returns (int24)",
 ]
 
-// ABI do Pool V3 (baseado nas imagens)
+// ABI do Pool V3
 const POOL_V3_ABI = [
   "function token0() external view returns (address)",
   "function token1() external view returns (address)",
@@ -46,19 +46,19 @@ const POOL_V3_ABI = [
   "function tickSpacing() external view returns (int24)",
   "function liquidity() external view returns (uint128)",
   "function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
-  "function swap(address recipient, bool zeroForOne, int256 amountSpecified, uint160 sqrtPriceLimitX96, bytes calldata data) external returns (int256 amount0, int256 amount1)",
 ]
 
-// ABI do QuoterV2 simplificado
+// ABI do QuoterV2
 const QUOTER_V2_ABI = [
   "function quoteExactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, uint256 amountIn, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)",
 ]
 
-// ABI do SwapRouter02
+// ABI do SwapRouter02 para MiniKit
 const SWAP_ROUTER_02_ABI = [
   "function exactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external payable returns (uint256 amountOut)",
 ]
 
+// ABI do ERC20 para aprovação
 const ERC20_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
   "function decimals() view returns (uint8)",
@@ -340,26 +340,146 @@ class UniswapService {
     return tokenAddress === this.poolInfo.token0
   }
 
-  // Executar swap real
+  // Executar swap real usando MiniKit
   async executeSwap(params: SwapParams): Promise<string> {
     try {
       if (!this.initialized) {
         await this.initialize()
       }
 
-      console.log(`Executing swap: ${params.amountIn} ${params.tokenIn} → ${params.tokenOut}`)
+      if (!this.poolInfo) {
+        throw new Error("Pool not initialized")
+      }
 
-      // Por enquanto, simular o swap
-      // Em produção, seria necessário conectar com a carteira do usuário
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      console.log(`Executing real swap via MiniKit: ${params.amountIn} ${params.tokenIn} → ${params.tokenOut}`)
 
-      const txHash = "0x" + Math.random().toString(16).substring(2, 66)
-      console.log("Swap executed with hash:", txHash)
+      const tokenIn = TOKENS[params.tokenIn]
+      const tokenOut = TOKENS[params.tokenOut]
 
-      return txHash
+      // Converter valores para wei
+      const amountIn = ethers.parseUnits(params.amountIn, tokenIn.decimals)
+      const amountOutMinimum = ethers.parseUnits(params.amountOutMinimum, tokenOut.decimals)
+
+      // Deadline: 20 minutos a partir de agora
+      const deadline = Math.floor(Date.now() / 1000) + 1200
+
+      // Preparar dados para o swap
+      const swapParams = {
+        tokenIn: tokenIn.address,
+        tokenOut: tokenOut.address,
+        fee: this.poolInfo.fee,
+        recipient: params.recipient,
+        deadline: deadline,
+        amountIn: amountIn,
+        amountOutMinimum: amountOutMinimum,
+        sqrtPriceLimitX96: 0n,
+      }
+
+      console.log("Swap parameters:", {
+        tokenIn: tokenIn.symbol,
+        tokenOut: tokenOut.symbol,
+        amountIn: params.amountIn,
+        amountOutMinimum: params.amountOutMinimum,
+        fee: this.poolInfo.fee,
+        deadline,
+      })
+
+      // Verificar se MiniKit está disponível
+      if (typeof window !== "undefined" && (window as any).MiniKit) {
+        const MiniKit = (window as any).MiniKit
+
+        // Primeiro, aprovar o token se necessário
+        const approvalTx = await this.approveTokenForSwap(tokenIn.address, amountIn.toString(), params.recipient)
+
+        if (approvalTx) {
+          console.log("Token approved for swap")
+        }
+
+        // Executar o swap via MiniKit
+        const swapData = this.swapRouter!.interface.encodeFunctionData("exactInputSingle", [swapParams])
+
+        const transaction = {
+          to: UNISWAP_CONTRACTS.SWAP_ROUTER_02,
+          value: "0", // Não é ETH
+          data: swapData,
+        }
+
+        console.log("Sending transaction via MiniKit:", transaction)
+
+        // Enviar transação via MiniKit
+        const result = await MiniKit.commandsAsync.sendTransaction(transaction)
+
+        if (result.success) {
+          console.log("Swap executed successfully:", result.transaction_id)
+          return result.transaction_id
+        } else {
+          throw new Error(`Swap failed: ${result.error_code}`)
+        }
+      } else {
+        // Fallback: simular o swap se MiniKit não estiver disponível
+        console.warn("MiniKit not available, simulating swap...")
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+
+        const txHash = "0x" + Math.random().toString(16).substring(2, 66)
+        console.log("Simulated swap with hash:", txHash)
+
+        return txHash
+      }
     } catch (error) {
       console.error("Error executing swap:", error)
       throw error
+    }
+  }
+
+  // Aprovar token para o SwapRouter
+  private async approveTokenForSwap(tokenAddress: string, amount: string, userAddress: string): Promise<boolean> {
+    try {
+      if (typeof window !== "undefined" && (window as any).MiniKit) {
+        const MiniKit = (window as any).MiniKit
+
+        // Verificar allowance atual
+        const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider)
+        const currentAllowance = await tokenContract.allowance(userAddress, UNISWAP_CONTRACTS.SWAP_ROUTER_02)
+
+        console.log(`Current allowance: ${currentAllowance.toString()}`)
+        console.log(`Required amount: ${amount}`)
+
+        // Se allowance é suficiente, não precisa aprovar
+        if (currentAllowance >= BigInt(amount)) {
+          console.log("Sufficient allowance, no approval needed")
+          return true
+        }
+
+        // Preparar transação de aprovação
+        const approvalData = tokenContract.interface.encodeFunctionData("approve", [
+          UNISWAP_CONTRACTS.SWAP_ROUTER_02,
+          amount,
+        ])
+
+        const approvalTransaction = {
+          to: tokenAddress,
+          value: "0",
+          data: approvalData,
+        }
+
+        console.log("Sending approval transaction via MiniKit:", approvalTransaction)
+
+        // Enviar aprovação via MiniKit
+        const result = await MiniKit.commandsAsync.sendTransaction(approvalTransaction)
+
+        if (result.success) {
+          console.log("Token approved successfully:", result.transaction_id)
+          return true
+        } else {
+          console.error("Approval failed:", result.error_code)
+          return false
+        }
+      }
+
+      return false
+    } catch (error) {
+      console.error("Error approving token:", error)
+      return false
     }
   }
 

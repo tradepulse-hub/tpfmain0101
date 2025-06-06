@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
-import { X, ArrowUpDown, Loader2, Settings, RefreshCw, Info } from "lucide-react"
+import { X, ArrowUpDown, Loader2, Settings, RefreshCw, Info, ArrowUp, ArrowDown } from "lucide-react"
 import { getCurrentLanguage, getTranslations } from "../lib/i18n"
 import { uniswapService } from "../services/uniswap-service"
 import { toast } from "sonner"
@@ -27,6 +27,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   const [language, setLanguage] = useState<"en" | "pt">("en")
   const [translations, setTranslations] = useState(getTranslations("en").swap || {})
   const [showSettings, setShowSettings] = useState(false)
+  const [showConfirmation, setShowConfirmation] = useState(false)
   const [poolFee, setPoolFee] = useState<number | null>(null)
   const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({
     WLD: "0.000000",
@@ -161,7 +162,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     await loadBalances()
   }
 
-  const handleSwap = async (e: React.FormEvent) => {
+  const handleSwapClick = (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!amountIn || Number.parseFloat(amountIn) <= 0) {
@@ -183,6 +184,11 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
       return
     }
 
+    // Mostrar tela de confirmação (como na HoldStation)
+    setShowConfirmation(true)
+  }
+
+  const handleConfirmSwap = async () => {
     setIsLoading(true)
     try {
       // Calcular minimum amount out com slippage
@@ -202,7 +208,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
         tokenOut,
         amountIn,
         amountOutMinimum,
-        recipient: walletAddress,
+        recipient: walletAddress!,
       })
 
       toast.success("Swap realizado com sucesso!", {
@@ -216,6 +222,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
       // Limpar campos e fechar modal
       setAmountIn("")
       setAmountOut("")
+      setShowConfirmation(false)
       onClose()
 
       // Atualizar saldos após o swap
@@ -228,6 +235,113 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Tela de confirmação (como na HoldStation)
+  if (showConfirmation) {
+    return (
+      <AnimatePresence>
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowConfirmation(false)}
+          />
+
+          <motion.div
+            className="relative bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          >
+            <div className="flex justify-between items-center p-4 border-b">
+              <h2 className="text-lg font-bold text-gray-900">Permitir transação</h2>
+              <button
+                onClick={() => setShowConfirmation(false)}
+                className="text-gray-400 hover:text-gray-600"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              <div className="text-center">
+                <div className="text-sm text-gray-600 mb-2">para TPulseFi Swap</div>
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <ArrowUpDown className="text-blue-600" size={24} />
+                </div>
+              </div>
+
+              {/* Enviar */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                    <ArrowUp size={16} className="text-gray-600" />
+                  </div>
+                  <span className="text-gray-700 font-medium">Enviar</span>
+                </div>
+                <div className="text-right">
+                  <div className="font-semibold text-gray-900">
+                    {amountIn} {tokenIn}
+                  </div>
+                </div>
+              </div>
+
+              {/* Receber */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                    <ArrowDown size={16} className="text-gray-600" />
+                  </div>
+                  <span className="text-gray-700 font-medium">Receber</span>
+                </div>
+                <div className="text-right">
+                  <div className="font-semibold text-gray-900">
+                    {amountOut} {tokenOut}
+                  </div>
+                </div>
+              </div>
+
+              {/* Informações adicionais */}
+              <div className="text-xs text-gray-500 space-y-1">
+                <div className="flex justify-between">
+                  <span>Taxa do pool:</span>
+                  <span>{poolFee ? poolFee / 10000 : "0.3"}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Slippage:</span>
+                  <span>{slippage}%</span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleConfirmSwap}
+                disabled={isLoading}
+                className="w-full py-3 px-4 bg-black text-white font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <Loader2 size={16} className="animate-spin mr-2" />
+                    Executando...
+                  </div>
+                ) : (
+                  "Permitir"
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
+    )
   }
 
   return (
@@ -329,7 +443,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
               )}
             </AnimatePresence>
 
-            <form onSubmit={handleSwap} className="p-3 space-y-3">
+            <form onSubmit={handleSwapClick} className="p-3 space-y-3">
               {/* Token de entrada */}
               <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                 <div className="flex justify-between items-center mb-2">
@@ -438,17 +552,10 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
               <button
                 type="submit"
-                disabled={isLoading || !amountIn || !amountOut || isLoadingBalances || isQuoting}
+                disabled={!amountIn || !amountOut || isLoadingBalances || isQuoting}
                 className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? (
-                  <div className="flex items-center justify-center">
-                    <Loader2 size={16} className="animate-spin mr-2" />
-                    Swapping...
-                  </div>
-                ) : (
-                  `Swap ${tokenIn} → ${tokenOut}`
-                )}
+                Swap {tokenIn} → {tokenOut}
               </button>
             </form>
           </motion.div>
