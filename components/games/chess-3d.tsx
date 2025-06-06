@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useCallback } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls } from "@react-three/drei"
 import { motion } from "framer-motion"
@@ -276,7 +276,7 @@ const createBoard = (): (ChessPiece | null)[][] => {
   return board
 }
 
-function Chess3D({ onBack }: { onBack: () => void }) {
+export function Chess3D({ onBack }: { onBack: () => void }) {
   const [gameState, setGameState] = useState<GameState>({
     board: createBoard(),
     selectedSquare: null,
@@ -374,10 +374,10 @@ function Chess3D({ onBack }: { onBack: () => void }) {
             const nc = col + dc * i
             if (!isValid(nr, nc)) break
             if (isEmpty(nr, nc)) moves.push([nr, nc])
-            else {
-              if (isEnemy(nr, nc)) moves.push([nr, nc])
+            else if (isEnemy(nr, nc)) {
+              moves.push([nr, nc])
               break
-            }
+            } else break
           }
         }
         break
@@ -386,7 +386,7 @@ function Chess3D({ onBack }: { onBack: () => void }) {
         for (const [dr, dc] of directions.king) {
           const nr = row + dr
           const nc = col + dc
-          if (isEmpty(nr, nc) || isEnemy(nr, nc)) if (isEmpty(nr, nc) || isEnemy(nr, nc)) moves.push([nr, nc])
+          if (isEmpty(nr, nc) || isEnemy(nr, nc)) moves.push([nr, nc])
         }
         break
     }
@@ -394,130 +394,52 @@ function Chess3D({ onBack }: { onBack: () => void }) {
     return moves
   }, [])
 
-  // Check for game over
-  const checkGameOver = useCallback(
-    (board: (ChessPiece | null)[][], currentPlayer: PieceColor) => {
-      const pieces = board.flat().filter((p) => p && p.color === currentPlayer)
-      const king = pieces.find((p) => p!.type === "king")
-
-      if (!king) {
-        return currentPlayer === "white" ? "black" : "white"
-      }
-
-      // Check if player has any valid moves
-      for (const piece of pieces) {
-        if (piece && getValidMoves(piece, board).length > 0) {
-          return null
-        }
-      }
-
-      return currentPlayer === "white" ? "black" : "white"
-    },
-    [getValidMoves],
-  )
-
-  // Computer AI
-  const makeComputerMove = useCallback(() => {
-    const pieces = gameState.board.flat().filter((p) => p && p.color === "black")
-    let bestMove: { piece: ChessPiece; to: [number, number] } | null = null
-    let bestScore = -999
-
-    for (const piece of pieces) {
-      if (!piece) continue
-      const moves = getValidMoves(piece, gameState.board)
-      for (const move of moves) {
-        let score = Math.random() * 5
-        const target = gameState.board[move[0]][move[1]]
-        if (target) {
-          const values = { pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9, king: 100 }
-          score += values[target.type] * 10
-        }
-        if (score > bestScore) {
-          bestScore = score
-          bestMove = { piece, to: move }
-        }
-      }
-    }
-
-    if (bestMove) {
-      setTimeout(() => handleMove(bestMove.piece, bestMove.to), 600)
-    }
-  }, [gameState, getValidMoves])
-
-  // Handle move with explosion effect
-  const handleMove = useCallback(
-    (piece: ChessPiece, to: [number, number]) => {
-      setGameState((prev) => {
-        const newBoard = prev.board.map((row) => [...row])
-        const [fromRow, fromCol] = piece.position
-        const [toRow, toCol] = to
-
-        const capturedPiece = newBoard[toRow][toCol]
-
-        // Add explosion effect if piece captured
-        if (capturedPiece) {
-          const explosionPos: [number, number, number] = [(toCol - 3.5) * 0.5, 0.1, (toRow - 3.5) * 0.5]
-          setExplosions((prev) => [...prev, { position: explosionPos, active: true }])
-          setTimeout(() => {
-            setExplosions((prev) => prev.map((exp, i) => (i === prev.length - 1 ? { ...exp, active: false } : exp)))
-          }, 1000)
-        }
-
-        newBoard[fromRow][fromCol] = null
-        newBoard[toRow][toCol] = { ...piece, position: [toRow, toCol] }
-
-        const nextPlayer = prev.currentPlayer === "white" ? "black" : "white"
-        const winner = checkGameOver(newBoard, nextPlayer)
-        const newCapturedPieces = capturedPiece ? [...prev.capturedPieces, capturedPiece] : prev.capturedPieces
-
-        return {
-          ...prev,
-          board: newBoard,
-          currentPlayer: nextPlayer,
-          selectedSquare: null,
-          validMoves: [],
-          capturedPieces: newCapturedPieces,
-          moveHistory: [...prev.moveHistory, `${piece.type} to ${String.fromCharCode(97 + toCol)}${8 - toRow}`],
-          winner,
-          gameMode: winner ? "gameover" : "playing",
-        }
-      })
-    },
-    [checkGameOver],
-  )
-
-  // Handle click
+  // Handle square click
   const handleSquareClick = useCallback(
     (row: number, col: number) => {
       if (gameState.gameMode !== "playing") return
-      if (gameState.vsComputer && gameState.currentPlayer === "black") return
 
       const piece = gameState.board[row][col]
 
       if (gameState.selectedSquare) {
-        const [sr, sc] = gameState.selectedSquare
-        const selectedPiece = gameState.board[sr][sc]
-        const isValidMove = gameState.validMoves.some(([r, c]) => r === row && c === col)
+        const [selectedRow, selectedCol] = gameState.selectedSquare
+        const selectedPiece = gameState.board[selectedRow][selectedCol]
 
-        if (isValidMove && selectedPiece) {
-          handleMove(selectedPiece, [row, col])
+        if (selectedPiece && gameState.validMoves.some(([r, c]) => r === row && c === col)) {
+          // Make move
+          const newBoard = gameState.board.map((r) => [...r])
+          const capturedPiece = newBoard[row][col]
+
+          // Add explosion effect if capturing
+          if (capturedPiece) {
+            const explosionPos: [number, number, number] = [(col - 3.5) * 0.5, 0.1, (row - 3.5) * 0.5]
+            setExplosions((prev) => [...prev, { position: explosionPos, active: true }])
+            setTimeout(() => {
+              setExplosions((prev) => prev.map((exp, i) => (i === prev.length - 1 ? { ...exp, active: false } : exp)))
+            }, 1000)
+          }
+
+          newBoard[row][col] = { ...selectedPiece, position: [row, col] }
+          newBoard[selectedRow][selectedCol] = null
+
+          setGameState((prev) => ({
+            ...prev,
+            board: newBoard,
+            selectedSquare: null,
+            validMoves: [],
+            currentPlayer: prev.currentPlayer === "white" ? "black" : "white",
+            capturedPieces: capturedPiece ? [...prev.capturedPieces, capturedPiece] : prev.capturedPieces,
+          }))
         } else {
           setGameState((prev) => ({ ...prev, selectedSquare: null, validMoves: [] }))
         }
       } else if (piece && piece.color === gameState.currentPlayer) {
-        const moves = getValidMoves(piece, gameState.board)
-        setGameState((prev) => ({ ...prev, selectedSquare: [row, col], validMoves: moves }))
+        const validMoves = getValidMoves(piece, gameState.board)
+        setGameState((prev) => ({ ...prev, selectedSquare: [row, col], validMoves }))
       }
     },
-    [gameState, getValidMoves, handleMove],
+    [gameState, getValidMoves],
   )
-
-  // Computer move effect
-  useEffect(() => {
-    if (gameState.vsComputer && gameState.currentPlayer === "black" && gameState.gameMode === "playing") {
-      makeComputerMove()
-    }
-  }, [gameState.currentPlayer, gameState.vsComputer, gameState.gameMode, makeComputerMove])
 
   const startGame = (vsComputer: boolean) => {
     setGameState({
@@ -531,136 +453,118 @@ function Chess3D({ onBack }: { onBack: () => void }) {
       winner: null,
       capturedPieces: [],
     })
+  }
+
+  const resetGame = () => {
+    setGameState((prev) => ({ ...prev, gameMode: "menu" }))
     setExplosions([])
   }
 
-  const playAgain = () => {
-    startGame(gameState.vsComputer)
-  }
-
   return (
-    <div className="w-full h-screen bg-gradient-to-br from-amber-900 via-amber-800 to-amber-900 relative">
-      {/* Menu */}
+    <div className="w-full h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 relative">
+      {/* Close button */}
+      <button
+        onClick={onBack}
+        className="absolute top-4 right-4 p-2 z-50 text-white hover:text-gray-300 transition-colors bg-black/50 rounded-full"
+        aria-label="Close game"
+      >
+        <X size={20} />
+      </button>
+
+      {/* Game UI */}
+      <div className="absolute top-4 left-4 z-10 text-white">
+        <div className="bg-black/50 p-3 rounded-lg">
+          <div className="text-sm">Current Player</div>
+          <div className={`text-lg font-bold ${gameState.currentPlayer === "white" ? "text-white" : "text-gray-400"}`}>
+            {gameState.currentPlayer === "white" ? "⚪ White" : "⚫ Black"}
+          </div>
+          <div className="text-xs mt-1">Captured: {gameState.capturedPieces.length}</div>
+        </div>
+      </div>
+
+      {/* 3D Scene */}
+      <Canvas camera={{ position: [5, 8, 5], fov: 50 }}>
+        <ambientLight intensity={0.4} />
+        <directionalLight position={[10, 10, 5]} intensity={1} castShadow />
+        <pointLight position={[-10, 10, -5]} intensity={0.5} />
+
+        {gameState.gameMode === "playing" && (
+          <ChessBoard3D
+            board={gameState.board}
+            selectedSquare={gameState.selectedSquare}
+            validMoves={gameState.validMoves}
+            onSquareClick={handleSquareClick}
+            explosions={explosions}
+          />
+        )}
+
+        <OrbitControls enablePan={false} maxPolarAngle={Math.PI / 2} minDistance={3} maxDistance={12} />
+      </Canvas>
+
+      {/* Game Menu */}
       {gameState.gameMode === "menu" && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white p-6 rounded-xl text-center max-w-sm mx-4">
-            <h1 className="text-3xl font-bold text-amber-800 mb-4">♟️ Chess 3D</h1>
-            <div className="space-y-3">
+        <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900/90 p-8 rounded-lg border border-gray-700 text-center"
+          >
+            <h1 className="text-3xl font-bold text-white mb-6">♟️ 3D Chess</h1>
+            <div className="space-y-4">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => startGame(false)}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                className="w-full px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-500 transition-colors"
               >
-                👥 Player vs Player
+                👥 Two Players
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => startGame(true)}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                className="w-full px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-500 transition-colors"
               >
                 🤖 vs Computer
               </motion.button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 
-      {/* Game Over Modal */}
+      {/* Game Over */}
       {gameState.gameMode === "gameover" && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black bg-opacity-70">
-          <div className="bg-white p-8 rounded-xl text-center max-w-sm mx-4">
-            <h1 className="text-4xl font-bold mb-4">
-              {gameState.winner === "white" ? "🎉" : gameState.winner === "black" ? "😔" : "🤝"}
-            </h1>
-            <h2 className="text-2xl font-bold mb-2">
-              {gameState.winner === "white" && !gameState.vsComputer && "White Wins!"}
-              {gameState.winner === "black" && !gameState.vsComputer && "Black Wins!"}
-              {gameState.winner === "white" && gameState.vsComputer && "You Win!"}
-              {gameState.winner === "black" && gameState.vsComputer && "Computer Wins!"}
-            </h2>
-            <p className="text-gray-600 mb-6">
-              Captured {gameState.capturedPieces.length} pieces in {gameState.moveHistory.length} moves
-            </p>
+        <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-gray-900/90 p-8 rounded-lg border border-gray-700 text-center"
+          >
+            <h2 className="text-3xl font-bold text-white mb-4">🏆 Game Over!</h2>
+            <p className="text-xl text-yellow-400 mb-6">{gameState.winner} Wins!</p>
             <div className="space-y-3">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={playAgain}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                onClick={() => startGame(gameState.vsComputer)}
+                className="w-full px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-500 transition-colors"
               >
                 🔄 Play Again
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setGameState((prev) => ({ ...prev, gameMode: "menu" }))}
-                className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
+                onClick={resetGame}
+                className="w-full px-6 py-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-500 transition-colors"
               >
                 📋 Main Menu
               </motion.button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
-
-      {/* Game UI */}
-      {gameState.gameMode === "playing" && (
-        <>
-          <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-center">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onBack}
-              className="px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded text-white text-sm"
-            >
-              ← Back
-            </motion.button>
-
-            <div className="text-center text-white">
-              <h1 className="text-lg font-bold">Chess 3D</h1>
-              <p className="text-xs">{gameState.vsComputer ? "vs Computer" : "vs Player"}</p>
-            </div>
-
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setGameState((prev) => ({ ...prev, gameMode: "menu" }))}
-              className="px-3 py-2 bg-red-600 hover:bg-red-700 rounded text-white text-sm"
-            >
-              Menu
-            </motion.button>
-          </div>
-          {/* Botão de fechar (X) no canto superior direito - sempre visível */}
-          <button
-            onClick={onBack}
-            className="absolute top-4 right-4 p-2 z-50 text-white hover:text-gray-300 transition-colors bg-black/50 rounded-full"
-            aria-label="Close game"
-          >
-            <X size={20} />
-          </button>
-        </>
-      )}
-
-      {/* Compact 3D Scene */}
-      <Canvas camera={{ position: [0, 5, 3], fov: 65 }} className="w-full h-full">
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[5, 5, 3]} intensity={1} castShadow />
-
-        <ChessBoard3D
-          board={gameState.board}
-          selectedSquare={gameState.selectedSquare}
-          validMoves={gameState.validMoves}
-          onSquareClick={handleSquareClick}
-          explosions={explosions}
-        />
-
-        <OrbitControls enablePan={false} maxPolarAngle={Math.PI / 2.8} minDistance={3} maxDistance={8} />
-      </Canvas>
     </div>
   )
 }
 
-export { Chess3D }
 export default Chess3D

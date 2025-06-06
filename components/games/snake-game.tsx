@@ -29,7 +29,7 @@ const INITIAL_SNAKE = [
   { x: 10, y: 11 },
 ]
 
-const SnakeGame = ({ onBack, minimalUI = false }: SnakeGameProps) => {
+export const SnakeGame = ({ onBack, minimalUI = false }: SnakeGameProps) => {
   const [snake, setSnake] = useState<Position[]>(INITIAL_SNAKE)
   const [food, setFood] = useState<Position>({ x: 5, y: 5 })
   const [direction, setDirection] = useState<Direction>("UP")
@@ -274,7 +274,7 @@ const SnakeGame = ({ onBack, minimalUI = false }: SnakeGameProps) => {
         head.x -= 1
         break
       case "RIGHT":
-        head.x += 1
+        head.x -= 1
         break
     }
 
@@ -302,12 +302,14 @@ const SnakeGame = ({ onBack, minimalUI = false }: SnakeGameProps) => {
       // Generate new food position
       const newFood = generateFood()
       setFood(newFood)
-      foodRef.current = newFood
-
       // Increase score
       const newScore = scoreRef.current + 10
       setScore(newScore)
       scoreRef.current = newScore
+
+      const anotherNewFood = generateFood()
+      setFood(anotherNewFood)
+      foodRef.current = anotherNewFood
     } else {
       // Remove tail if no food eaten
       newSnake.pop()
@@ -437,5 +439,4 @@ const SnakeGame = ({ onBack, minimalUI = false }: SnakeGameProps) => {
   )
 }
 
-export { SnakeGame }
 export default SnakeGame

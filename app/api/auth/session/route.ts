@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 
-// Marcar como rota dinâmica
-export const dynamic = "force-dynamic"
-
 export async function GET() {
   try {
     // Obter o cookie de sessão
-    const cookieStore = cookies()
-    const sessionCookie = cookieStore.get("tpulsefi_session")
+    const sessionCookie = cookies().get("tpulsefi_session")
 
     if (!sessionCookie) {
       return NextResponse.json({ authenticated: false }, { status: 401 })

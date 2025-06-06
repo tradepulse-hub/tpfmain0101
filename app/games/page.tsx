@@ -1,16 +1,15 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { BackgroundEffect } from "@/components/background-effect"
 import { BottomNav } from "@/components/bottom-nav"
 import { DuckHuntGame } from "@/components/games/duck-hunt-game"
-import HangmanGame from "@/components/games/hangman-game"
-import SnakeGame from "@/components/games/snake-game"
-import Chess3D from "@/components/games/chess-3d"
+import { HangmanGame } from "@/components/games/hangman-game"
+import { SnakeGame } from "@/components/games/snake-game"
+import { Chess3D } from "@/components/games/chess-3d"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
-import FlappyBird from "@/components/games/flappy-bird"
-import ErrorBoundary from "@/components/error-boundary"
+import { FlappyBird } from "@/components/games/flappy-bird"
 
 export default function GamesPage() {
   const [selectedGame, setSelectedGame] = useState<number | null>(null)
@@ -150,13 +149,7 @@ export default function GamesPage() {
     if (!game || !game.component) return null
 
     const GameComponent = game.component
-    return (
-      <ErrorBoundary>
-        <Suspense fallback={<div>Loading Game...</div>}>
-          <GameComponent onBack={handleBackToGames} minimalUI={true} />
-        </Suspense>
-      </ErrorBoundary>
-    )
+    return <GameComponent onBack={handleBackToGames} minimalUI={true} />
   }
 
   return (

@@ -397,4 +397,5 @@ class WalletService {
   }
 }
 
+// Exportar instância única
 export const walletService = new WalletService()

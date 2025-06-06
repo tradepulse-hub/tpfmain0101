@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { X } from "lucide-react"
-import GameLoadingScreen from "./game-loading-screen"
+import { GameLoadingScreen } from "./game-loading-screen"
 import { getCurrentLanguage } from "@/lib/i18n"
 
 interface HangmanGameProps {
@@ -37,7 +37,7 @@ const CRYPTO_WORDS = [
 
 const MAX_GUESSES = 6
 
-const HangmanGame = (props: HangmanGameProps) => {
+export const HangmanGame = (props: HangmanGameProps) => {
   const { onBack } = props
   const [word, setWord] = useState("")
   const [category, setCategory] = useState("")
@@ -254,5 +254,4 @@ const HangmanGame = (props: HangmanGameProps) => {
   )
 }
 
-export { HangmanGame }
 export default HangmanGame

@@ -1,7 +1,5 @@
 "use client"
 
-import React from "react"
-
 import { useState, useEffect, Suspense, useRef } from "react"
 import { motion } from "framer-motion"
 import { Canvas, useFrame } from "@react-three/fiber"
@@ -69,38 +67,6 @@ function Scene() {
       <RotatingCoin />
     </>
   )
-}
-
-function ErrorBoundary({ children, fallback }: { children: React.ReactNode; fallback: React.ReactNode }) {
-  const [hasError, setHasError] = useState(false)
-  const handleErrorRef = useRef<(error: any) => void>(null)
-
-  useEffect(() => {
-    handleErrorRef.current = (error: any) => {
-      console.error("Caught an error in the component tree:", error)
-      setHasError(true)
-    }
-  }, [])
-
-  useEffect(() => {
-    const originalConsoleError = console.error
-    console.error = (...args: any[]) => {
-      originalConsoleError(...args)
-      if (handleErrorRef.current) {
-        handleErrorRef.current(args)
-      }
-    }
-
-    return () => {
-      console.error = originalConsoleError // Restore the original console.error
-    }
-  }, [])
-
-  if (hasError) {
-    return fallback
-  }
-
-  return <React.Fragment>{children}</React.Fragment>
 }
 
 export default function AirdropPage() {
@@ -288,30 +254,25 @@ export default function AirdropPage() {
       setTxId(null)
 
       // Chamar a função claimAirdrop
-      try {
-        const result = await claimAirdrop(userAddress)
-        console.log("Claim result:", result)
+      const result = await claimAirdrop(userAddress)
+      console.log("Claim result:", result)
 
-        if (result.success) {
-          setClaimSuccess(true)
-          setTxId(result.txId)
+      if (result.success) {
+        setClaimSuccess(true)
+        setTxId(result.txId)
 
-          // Atualizar o status e o saldo após um claim bem-sucedido
-          setTimeout(async () => {
-            await checkClaimStatus()
-            await fetchContractBalance()
-          }, 2000)
+        // Atualizar o status e o saldo após um claim bem-sucedido
+        setTimeout(async () => {
+          await checkClaimStatus()
+          await fetchContractBalance()
+        }, 2000)
 
-          // Limpa a mensagem de sucesso após 5 segundos
-          setTimeout(() => {
-            setClaimSuccess(false)
-          }, 5000)
-        } else {
-          setClaimError(result.error || "Failed to claim tokens. Please try again.")
-        }
-      } catch (claimError: any) {
-        console.error("Error claiming airdrop:", claimError)
-        setClaimError(claimError?.message || "An error occurred during the claim. Please try again.")
+        // Limpa a mensagem de sucesso após 5 segundos
+        setTimeout(() => {
+          setClaimSuccess(false)
+        }, 5000)
+      } else {
+        setClaimError(result.error || "Failed to claim tokens. Please try again.")
       }
     } catch (error) {
       console.error("Error claiming airdrop:", error)
@@ -382,26 +343,18 @@ export default function AirdropPage() {
         transition={{ duration: 0.5, delay: 0.2 }}
         className="w-full h-[300px] relative z-10 border border-gray-800/30 rounded-lg overflow-hidden"
       >
-        <ErrorBoundary
-          fallback={
-            <Html center>
-              <p className="text-white">Error loading 3D scene.</p>
-            </Html>
-          }
-        >
-          <Canvas camera={{ position: [0, 0, 2.5], fov: 35 }} gl={{ alpha: true }}>
-            <Suspense fallback={<LoadingIndicator />}>
-              <Scene />
-              <Preload all />
-            </Suspense>
-            <OrbitControls
-              enableZoom={false}
-              enablePan={false}
-              minPolarAngle={Math.PI / 2 - 0.5}
-              maxPolarAngle={Math.PI / 2 + 0.5}
-            />
-          </Canvas>
-        </ErrorBoundary>
+        <Canvas camera={{ position: [0, 0, 2.5], fov: 35 }} gl={{ alpha: true }}>
+          <Suspense fallback={<LoadingIndicator />}>
+            <Scene />
+            <Preload all />
+          </Suspense>
+          <OrbitControls
+            enableZoom={false}
+            enablePan={false}
+            minPolarAngle={Math.PI / 2 - 0.5}
+            maxPolarAngle={Math.PI / 2 + 0.5}
+          />
+        </Canvas>
       </motion.div>
 
       {animationComplete && (

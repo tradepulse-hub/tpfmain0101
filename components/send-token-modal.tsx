@@ -88,7 +88,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
       }
 
       // Converter o valor para wei (18 casas decimais)
-      const amountInWei = ethers.utils.parseUnits(amount, 18).toString()
+      const amountInWei = ethers.parseUnits(amount, 18).toString()
 
       // Obter o endereço do contrato do token selecionado
       const tokenAddress = TOKEN_ADDRESSES[token as keyof typeof TOKEN_ADDRESSES]
