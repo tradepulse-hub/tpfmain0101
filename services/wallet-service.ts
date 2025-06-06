@@ -1,5 +1,6 @@
 import { MiniKit } from "@worldcoin/minikit-js"
 import { ethers } from "ethers"
+import { holdstationService } from "./holdstation-service"
 
 // Endereço do contrato TPF na Worldchain
 const TPF_CONTRACT_ADDRESS = "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45"
@@ -229,10 +230,7 @@ class WalletService {
     }
   }
 
-  // Obter saldos de todos os tokens suportados
   async getAllTokenBalances(walletAddress: string): Promise<Record<string, number>> {
-    const balances: Record<string, number> = {}
-
     try {
       if (!this.initialized) {
         await this.initialize()
@@ -242,23 +240,45 @@ class WalletService {
         throw new Error("Wallet address is required")
       }
 
-      // Obter saldos para cada token
-      for (const symbol of Object.keys(TOKENS_INFO)) {
-        balances[symbol] = await this.getTokenBalance(walletAddress, symbol)
-      }
+      // Usar a API da Holdstation para obter saldos reais
+      const tokenBalances = await holdstationService.getTokenBalances(walletAddress)
 
+      const balances: Record<string, number> = {}
+      tokenBalances.forEach((token) => {
+        balances[token.symbol] = Number.parseFloat(token.balance)
+      })
+
+      console.log("Real token balances from Holdstation:", balances)
       return balances
     } catch (error) {
-      console.error("Error getting all token balances:", error)
+      console.error("Error getting token balances from Holdstation:", error)
 
-      // Valores de fallback para demonstração
+      // Fallback para valores simulados
       return {
         TPF: 1000,
         WLD: 42.67,
         DNA: 125.45,
         CASH: 310.89,
         WDD: 78.32,
+        WETH: 0.5,
+        USDCe: 1500,
       }
+    }
+  }
+
+  async getTokenBalances(walletAddress: string): Promise<any[]> {
+    try {
+      if (!walletAddress) {
+        throw new Error("Wallet address is required")
+      }
+
+      // Usar a API da Holdstation para obter tokens reais da carteira
+      const tokens = await holdstationService.getTokenBalances(walletAddress)
+      console.log("Real wallet tokens from Holdstation:", tokens)
+      return tokens
+    } catch (error) {
+      console.error("Error getting wallet tokens from Holdstation:", error)
+      return []
     }
   }
 

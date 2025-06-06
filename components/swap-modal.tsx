@@ -6,9 +6,9 @@ import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import { ChevronDown, X, ArrowUpDown, Loader2 } from "lucide-react"
 import { getCurrentLanguage, getTranslations } from "../lib/i18n"
-import { swapService } from "../services/swap-service"
+import { holdstationService } from "../services/holdstation-service"
 import { toast } from "sonner"
-import { walletService } from "../services/wallet-service"
+import { ethers } from "ethers"
 
 interface SwapModalProps {
   isOpen: boolean
@@ -45,17 +45,12 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     const loadWalletTokens = async () => {
       if (walletAddress) {
         try {
-          const tokens = await walletService.getTokenBalances(walletAddress)
-          const tokensWithBalance = tokens.filter((token) => Number.parseFloat(token.balance) > 0)
-          setWalletTokens(tokensWithBalance)
+          const tokens = await holdstationService.getTokenBalances(walletAddress)
+          setWalletTokens(tokens)
+          console.log("Loaded real wallet tokens:", tokens)
         } catch (error) {
           console.error("Error loading wallet tokens:", error)
-          // Fallback para tokens padrão se houver erro
-          setWalletTokens([
-            { symbol: "WETH", name: "Wrapped Ethereum", icon: "/ethereum-abstract.png", balance: "0" },
-            { symbol: "USDCe", name: "USD Coin", icon: "/usdc-coins.png", balance: "0" },
-            { symbol: "TPF", name: "TPulseFi", icon: "/logo-tpf.png", balance: "0" },
-          ])
+          setWalletTokens([])
         }
       }
     }
@@ -75,7 +70,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
       setIsQuoting(true)
       try {
-        const quote = await swapService.getSmartQuote(tokenIn, tokenOut, Number.parseFloat(slippage))
+        const quote = await holdstationService.getSmartQuote(tokenIn, tokenOut, Number.parseFloat(slippage))
         const outputAmount = Number.parseFloat(amountIn) * Number.parseFloat(quote)
         setAmountOut(outputAmount.toFixed(6))
       } catch (error) {
@@ -115,17 +110,57 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
     setIsLoading(true)
     try {
-      // Simular swap bem-sucedido
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Obter cotação final usando a API da Holdstation
+      const quoteParams = {
+        tokenIn: holdstationService.getTokenAddress(tokenIn),
+        tokenOut: holdstationService.getTokenAddress(tokenOut),
+        amountIn,
+        slippage,
+        fee: "0.2",
+      }
+
+      const quote = await holdstationService.getQuote(quoteParams)
+
+      // Executar swap real usando a API da Holdstation
+      const swapParams = {
+        tokenIn: quoteParams.tokenIn,
+        tokenOut: quoteParams.tokenOut,
+        amountIn,
+        tx: quote,
+        fee: "0.2",
+        feeAmountOut: quote.feeAmountOut,
+        feeReceiver: walletAddress || ethers.ZeroAddress,
+      }
+
+      const txHash = await holdstationService.executeSwap(swapParams)
 
       toast.success(translations.success || "Swap completed successfully!", {
         description: `${amountIn} ${tokenIn} → ${amountOut} ${tokenOut}`,
+        action: {
+          label: "View TX",
+          onClick: () => window.open(`https://worldscan.org/tx/${txHash}`, "_blank"),
+        },
       })
 
       // Limpar campos e fechar modal
       setAmountIn("")
       setAmountOut("")
       onClose()
+
+      // Recarregar saldos da carteira
+      const loadWalletTokens = async () => {
+        if (walletAddress) {
+          try {
+            const tokens = await holdstationService.getTokenBalances(walletAddress)
+            setWalletTokens(tokens)
+            console.log("Loaded real wallet tokens:", tokens)
+          } catch (error) {
+            console.error("Error loading wallet tokens:", error)
+            setWalletTokens([])
+          }
+        }
+      }
+      loadWalletTokens()
     } catch (error) {
       console.error("Error executing swap:", error)
       toast.error(translations.error || "Swap failed. Please try again.")
