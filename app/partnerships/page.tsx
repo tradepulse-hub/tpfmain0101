@@ -112,20 +112,6 @@ export default function PartnershipsPage() {
                     "Advanced trading and swap platform for WorldChain"}
                 </p>
 
-                {/* Partnership Features */}
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-400">
-                      {translations.partnerships?.swapIntegration || "Swap Integration"}
-                    </span>
-                    <span className="text-green-400">✓</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-400">{translations.partnerships?.poweredBy || "Powered by"}</span>
-                    <span className="text-blue-400">HoldStation API</span>
-                  </div>
-                </div>
-
                 {/* Visit Button */}
                 <motion.button
                   className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 group-hover:from-purple-500 group-hover:to-blue-500 transition-all duration-300"
@@ -140,51 +126,11 @@ export default function PartnershipsPage() {
           </motion.div>
         </motion.div>
 
-        {/* Partnership with TPF Section */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="w-full"
-        >
-          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-6">
-            {/* Background pattern */}
-            <div className="absolute inset-0 opacity-5">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-500" />
-            </div>
-
-            <div className="relative z-10">
-              {/* TPF + HoldStation Logos */}
-              <div className="flex items-center justify-center gap-4 mb-4">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center border border-gray-600/20">
-                  <Image src="/logo-tpf.png" alt="TPulseFi" width={32} height={32} />
-                </div>
-                <div className="text-gray-400">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                </div>
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-white font-bold text-xs">
-                  HOLD
-                </div>
-              </div>
-
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-white mb-2">TPulseFi × HoldStation</h3>
-                <p className="text-gray-300 text-sm">
-                  {translations.partnerships?.swapDescription ||
-                    "Swap functionality integrated through HoldStation API"}
-                </p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
         {/* More Partnerships Coming Soon */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
           className="w-full"
         >
           <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/20 border-dashed p-6 text-center">
