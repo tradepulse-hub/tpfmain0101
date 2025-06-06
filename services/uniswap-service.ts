@@ -1,4 +1,5 @@
 import { ethers } from "ethers"
+import { MulticallService, type MulticallCall } from "./multicall-service"
 
 // Configuração da WorldChain
 const WORLDCHAIN_RPC = "https://worldchain-mainnet.g.alchemy.com/public"
@@ -31,7 +32,7 @@ const TOKENS = {
   },
 }
 
-// ABI do QuoterV2 - baseado no contrato real
+// ABIs
 const QUOTER_V2_ABI = [
   {
     inputs: [
@@ -60,7 +61,6 @@ const QUOTER_V2_ABI = [
   },
 ]
 
-// ABI do Pool V3
 const POOL_V3_ABI = [
   "function fee() external view returns (uint24)",
   "function token0() external view returns (address)",
@@ -69,7 +69,6 @@ const POOL_V3_ABI = [
   "function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
 ]
 
-// ABI do ERC20
 const ERC20_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
   "function decimals() view returns (uint8)",
@@ -77,7 +76,6 @@ const ERC20_ABI = [
   "function allowance(address owner, address spender) view returns (uint256)",
 ]
 
-// ABI do SwapRouter02
 const SWAP_ROUTER_ABI = [
   {
     inputs: [
@@ -137,8 +135,16 @@ interface PoolInfo {
   isActive: boolean
 }
 
+interface BatchQuoteResult {
+  quotes: { [key: string]: string }
+  poolInfo: PoolInfo
+  balances: TokenBalance[]
+  timestamp: number
+}
+
 class UniswapService {
   private provider: ethers.JsonRpcProvider | null = null
+  private multicall: MulticallService | null = null
   private quoter: ethers.Contract | null = null
   private pool: ethers.Contract | null = null
   private swapRouter: ethers.Contract | null = null
@@ -155,13 +161,16 @@ class UniswapService {
     if (this.initialized) return
 
     try {
-      console.log("🔄 Initializing Uniswap Service...")
+      console.log("🔄 Initializing Enhanced Uniswap Service with Multicall3...")
 
       // Criar provider
       this.provider = new ethers.JsonRpcProvider(WORLDCHAIN_RPC, {
         chainId: CHAIN_ID,
         name: "worldchain",
       })
+
+      // Inicializar Multicall3
+      this.multicall = new MulticallService(this.provider)
 
       // Testar conexão
       const network = await this.provider.getNetwork()
@@ -172,29 +181,61 @@ class UniswapService {
       this.pool = new ethers.Contract(UNISWAP_CONTRACTS.TPF_WLD_POOL, POOL_V3_ABI, this.provider)
       this.swapRouter = new ethers.Contract(UNISWAP_CONTRACTS.SWAP_ROUTER_02, SWAP_ROUTER_ABI, this.provider)
 
-      // Verificar pool
-      await this.setupPool()
+      // Verificar pool usando Multicall3
+      await this.setupPoolWithMulticall()
 
       this.initialized = true
-      console.log("✅ Uniswap Service initialized successfully")
+      console.log("✅ Enhanced Uniswap Service initialized successfully")
     } catch (error) {
-      console.error("❌ Failed to initialize Uniswap Service:", error)
+      console.error("❌ Failed to initialize Enhanced Uniswap Service:", error)
     }
   }
 
-  private async setupPool() {
-    if (!this.pool) return
+  // Configurar pool usando Multicall3 para otimizar
+  private async setupPoolWithMulticall() {
+    if (!this.pool || !this.multicall) return
 
     try {
-      console.log("🔍 Verifying TPF/WLD pool...")
+      console.log("🔍 Verifying TPF/WLD pool with Multicall3...")
 
-      const [fee, token0, token1, liquidity, slot0] = await Promise.all([
-        this.pool.fee(),
-        this.pool.token0(),
-        this.pool.token1(),
-        this.pool.liquidity(),
-        this.pool.slot0(),
-      ])
+      // Preparar calls para obter todas as informações do pool em uma única chamada
+      const calls: MulticallCall[] = [
+        {
+          target: UNISWAP_CONTRACTS.TPF_WLD_POOL,
+          gasLimit: 100000,
+          callData: this.multicall.createCallData(this.pool, "fee", []),
+        },
+        {
+          target: UNISWAP_CONTRACTS.TPF_WLD_POOL,
+          gasLimit: 100000,
+          callData: this.multicall.createCallData(this.pool, "token0", []),
+        },
+        {
+          target: UNISWAP_CONTRACTS.TPF_WLD_POOL,
+          gasLimit: 100000,
+          callData: this.multicall.createCallData(this.pool, "token1", []),
+        },
+        {
+          target: UNISWAP_CONTRACTS.TPF_WLD_POOL,
+          gasLimit: 100000,
+          callData: this.multicall.createCallData(this.pool, "liquidity", []),
+        },
+        {
+          target: UNISWAP_CONTRACTS.TPF_WLD_POOL,
+          gasLimit: 100000,
+          callData: this.multicall.createCallData(this.pool, "slot0", []),
+        },
+      ]
+
+      // Executar todas as calls em uma única transação
+      const result = await this.multicall.multicall(calls)
+
+      // Decodificar resultados
+      const fee = this.multicall.decodeResult(this.pool, "fee", result.results[0].returnData)[0]
+      const token0 = this.multicall.decodeResult(this.pool, "token0", result.results[1].returnData)[0]
+      const token1 = this.multicall.decodeResult(this.pool, "token1", result.results[2].returnData)[0]
+      const liquidity = this.multicall.decodeResult(this.pool, "liquidity", result.results[3].returnData)[0]
+      const slot0 = this.multicall.decodeResult(this.pool, "slot0", result.results[4].returnData)
 
       const isValidPool = this.validatePoolTokens(token0, token1)
       const hasLiquidity = liquidity > 0n
@@ -212,7 +253,8 @@ class UniswapService {
         isActive: hasLiquidity,
       }
 
-      console.log("📊 Pool Information:")
+      console.log("📊 Pool Information (via Multicall3):")
+      console.log(`├─ Block: ${result.blockNumber}`)
       console.log(`├─ Address: ${this.poolInfo.address}`)
       console.log(`├─ Fee: ${this.poolInfo.fee} (${this.poolInfo.feePercent}%)`)
       console.log(`├─ Token0: ${this.poolInfo.token0}`)
@@ -224,10 +266,10 @@ class UniswapService {
       console.log(`└─ Active: ${this.poolInfo.isActive ? "✅" : "❌"}`)
 
       if (this.poolInfo.isValid && this.poolInfo.isActive) {
-        console.log("✅ Pool TPF/WLD verified and ready for quotes")
+        console.log("✅ Pool TPF/WLD verified and ready (via Multicall3)")
       }
     } catch (error) {
-      console.error("❌ Error setting up pool:", error)
+      console.error("❌ Error setting up pool with Multicall3:", error)
     }
   }
 
@@ -241,21 +283,41 @@ class UniswapService {
     )
   }
 
-  // Obter saldos reais da carteira
+  // Obter saldos usando Multicall3 para otimizar
   async getTokenBalances(walletAddress: string): Promise<TokenBalance[]> {
     try {
-      if (!this.provider) {
+      if (!this.provider || !this.multicall) {
         await this.initialize()
       }
 
-      console.log(`💰 Getting token balances for: ${walletAddress}`)
+      console.log(`💰 Getting token balances via Multicall3 for: ${walletAddress}`)
+
+      // Preparar calls para obter saldos de ambos os tokens
+      const calls: MulticallCall[] = []
+
+      for (const [symbol, token] of Object.entries(TOKENS)) {
+        const tokenContract = new ethers.Contract(token.address, ERC20_ABI, this.provider)
+        calls.push({
+          target: token.address,
+          gasLimit: 100000,
+          callData: this.multicall!.createCallData(tokenContract, "balanceOf", [walletAddress]),
+        })
+      }
+
+      // Executar todas as calls
+      const result = await this.multicall!.multicall(calls)
 
       const balances: TokenBalance[] = []
+      let callIndex = 0
 
       for (const [symbol, token] of Object.entries(TOKENS)) {
         try {
-          const contract = new ethers.Contract(token.address, ERC20_ABI, this.provider)
-          const balance = await contract.balanceOf(walletAddress)
+          const tokenContract = new ethers.Contract(token.address, ERC20_ABI, this.provider)
+          const balance = this.multicall!.decodeResult(
+            tokenContract,
+            "balanceOf",
+            result.results[callIndex].returnData,
+          )[0]
           const formattedBalance = ethers.formatUnits(balance, token.decimals)
 
           balances.push({
@@ -265,8 +327,9 @@ class UniswapService {
           })
 
           console.log(`├─ ${symbol}: ${formattedBalance}`)
+          callIndex++
         } catch (error) {
-          console.error(`❌ Error getting ${symbol} balance:`, error)
+          console.error(`❌ Error processing ${symbol} balance:`, error)
           balances.push({
             symbol: symbol as "WLD" | "TPF",
             balance: "0",
@@ -275,9 +338,10 @@ class UniswapService {
         }
       }
 
+      console.log(`✅ Balances retrieved via Multicall3 at block ${result.blockNumber}`)
       return balances
     } catch (error) {
-      console.error("❌ Error getting token balances:", error)
+      console.error("❌ Error getting token balances via Multicall3:", error)
       return [
         { symbol: "WLD", balance: "0", formattedBalance: "0.000000" },
         { symbol: "TPF", balance: "0", formattedBalance: "0.000000" },
@@ -285,7 +349,7 @@ class UniswapService {
     }
   }
 
-  // Obter cotação real usando QuoterV2 - implementação correta baseada no contrato
+  // Obter cotação otimizada com Multicall3
   async getQuote(params: QuoteParams): Promise<string> {
     try {
       if (!this.initialized) {
@@ -296,8 +360,8 @@ class UniswapService {
         return params.amountIn
       }
 
-      if (!this.quoter || !this.poolInfo) {
-        throw new Error("Quoter or pool not initialized")
+      if (!this.quoter || !this.poolInfo || !this.multicall) {
+        throw new Error("Service not properly initialized")
       }
 
       if (!this.poolInfo.isValid || !this.poolInfo.isActive) {
@@ -306,87 +370,149 @@ class UniswapService {
 
       const tokenIn = TOKENS[params.tokenIn]
       const tokenOut = TOKENS[params.tokenOut]
-
-      // Converter amount para wei
       const amountIn = ethers.parseUnits(params.amountIn, tokenIn.decimals)
 
-      console.log(`💱 Getting REAL quote from Uniswap QuoterV2:`)
-      console.log(`├─ Input: ${params.amountIn} ${params.tokenIn} (${tokenIn.address})`)
-      console.log(`├─ Output Token: ${params.tokenOut} (${tokenOut.address})`)
-      console.log(`├─ Pool Fee: ${this.poolInfo.fee} (${this.poolInfo.feePercent}%)`)
-      console.log(`├─ Amount In (wei): ${amountIn.toString()}`)
-      console.log(`└─ Pool Address: ${this.poolInfo.address}`)
+      console.log(`💱 Getting optimized quote via Multicall3:`)
+      console.log(`├─ Input: ${params.amountIn} ${params.tokenIn}`)
+      console.log(`├─ Output Token: ${params.tokenOut}`)
+      console.log(`└─ Pool Fee: ${this.poolInfo.feePercent}%`)
 
-      // Parâmetros para o QuoterV2 (estrutura exata do contrato)
+      // Preparar parâmetros para o QuoterV2
       const quoteParams = {
         tokenIn: tokenIn.address,
         tokenOut: tokenOut.address,
         fee: this.poolInfo.fee,
         amountIn: amountIn,
-        sqrtPriceLimitX96: 0n, // Sem limite de preço
+        sqrtPriceLimitX96: 0n,
       }
 
       try {
-        console.log("🔄 Calling QuoterV2.quoteExactInputSingle...")
-        console.log("📋 Quote params:", {
-          tokenIn: quoteParams.tokenIn,
-          tokenOut: quoteParams.tokenOut,
-          fee: quoteParams.fee,
-          amountIn: quoteParams.amountIn.toString(),
-          sqrtPriceLimitX96: quoteParams.sqrtPriceLimitX96.toString(),
-        })
-
-        // O QuoterV2 é uma função não-view que simula o swap e reverte com os dados
-        // Precisamos usar call() em vez de staticCall() porque é nonpayable
+        // Tentar QuoterV2 primeiro (método direto)
         const result = await this.quoter.quoteExactInputSingle.staticCall(quoteParams)
-
         const amountOut = result[0]
-        const sqrtPriceX96After = result[1]
-        const initializedTicksCrossed = result[2]
-        const gasEstimate = result[3]
-
-        // Converter de volta para formato legível
         const formattedAmount = ethers.formatUnits(amountOut, tokenOut.decimals)
 
-        console.log(`✅ QuoterV2 Result:`)
-        console.log(`├─ Amount Out: ${formattedAmount} ${params.tokenOut}`)
-        console.log(`├─ Amount Out (wei): ${amountOut.toString()}`)
-        console.log(`├─ Price After: ${sqrtPriceX96After.toString()}`)
-        console.log(`├─ Ticks Crossed: ${initializedTicksCrossed}`)
-        console.log(`├─ Gas Estimate: ${gasEstimate.toString()}`)
-        console.log(
-          `└─ Exchange Rate: 1 ${params.tokenIn} = ${(Number.parseFloat(formattedAmount) / Number.parseFloat(params.amountIn)).toFixed(6)} ${params.tokenOut}`,
-        )
-
+        console.log(`✅ QuoterV2 Result: ${formattedAmount} ${params.tokenOut}`)
         return formattedAmount
-      } catch (quoterError: any) {
-        console.error("❌ QuoterV2 call failed:", quoterError)
-
-        // Log detalhado do erro para debugging
-        if (quoterError.reason) {
-          console.error(`├─ Reason: ${quoterError.reason}`)
-        }
-        if (quoterError.code) {
-          console.error(`├─ Code: ${quoterError.code}`)
-        }
-        if (quoterError.data) {
-          console.error(`├─ Data: ${quoterError.data}`)
-        }
-        if (quoterError.message) {
-          console.error(`└─ Message: ${quoterError.message}`)
-        }
-
-        // Tentar abordagem alternativa: calcular preço baseado no sqrtPriceX96 do pool
-        console.log("🔄 Trying alternative price calculation from pool...")
+      } catch (quoterError) {
+        console.warn("⚠️ QuoterV2 failed, using pool price calculation...")
         return await this.calculatePriceFromPool(params)
       }
     } catch (error) {
-      console.error("❌ Error getting quote:", error)
+      console.error("❌ Error getting optimized quote:", error)
       throw error
     }
   }
 
-  // Método alternativo: calcular preço baseado no sqrtPriceX96 do pool
+  // Método para obter múltiplas cotações e informações em uma única call
+  async getBatchQuoteData(walletAddress: string, quoteParams: QuoteParams[]): Promise<BatchQuoteResult> {
+    try {
+      if (!this.initialized || !this.multicall) {
+        await this.initialize()
+      }
+
+      console.log(`🚀 Getting batch data via Multicall3...`)
+
+      const calls: MulticallCall[] = []
+
+      // 1. Adicionar calls para saldos dos tokens
+      for (const [symbol, token] of Object.entries(TOKENS)) {
+        const tokenContract = new ethers.Contract(token.address, ERC20_ABI, this.provider)
+        calls.push({
+          target: token.address,
+          gasLimit: 100000,
+          callData: this.multicall.createCallData(tokenContract, "balanceOf", [walletAddress]),
+        })
+      }
+
+      // 2. Adicionar calls para informações do pool
+      calls.push(
+        {
+          target: UNISWAP_CONTRACTS.TPF_WLD_POOL,
+          gasLimit: 100000,
+          callData: this.multicall.createCallData(this.pool!, "slot0", []),
+        },
+        {
+          target: UNISWAP_CONTRACTS.TPF_WLD_POOL,
+          gasLimit: 100000,
+          callData: this.multicall.createCallData(this.pool!, "liquidity", []),
+        },
+      )
+
+      // 3. Adicionar timestamp
+      calls.push({
+        target: "0x0a22c04215c97E3F532F4eF30e0aD9458792dAB9", // Multicall3 address
+        gasLimit: 50000,
+        callData: "0x0f28c97d", // getCurrentBlockTimestamp()
+      })
+
+      // Executar todas as calls
+      const result = await this.multicall.multicall(calls)
+
+      // Processar resultados
+      const balances: TokenBalance[] = []
+      let callIndex = 0
+
+      // Processar saldos
+      for (const [symbol, token] of Object.entries(TOKENS)) {
+        const tokenContract = new ethers.Contract(token.address, ERC20_ABI, this.provider)
+        const balance = this.multicall.decodeResult(tokenContract, "balanceOf", result.results[callIndex].returnData)[0]
+        const formattedBalance = ethers.formatUnits(balance, token.decimals)
+
+        balances.push({
+          symbol: symbol as "WLD" | "TPF",
+          balance: balance.toString(),
+          formattedBalance: Number.parseFloat(formattedBalance).toFixed(6),
+        })
+        callIndex++
+      }
+
+      // Processar informações do pool
+      const slot0 = this.multicall.decodeResult(this.pool!, "slot0", result.results[callIndex].returnData)
+      const liquidity = this.multicall.decodeResult(
+        this.pool!,
+        "liquidity",
+        result.results[callIndex + 1].returnData,
+      )[0]
+
+      // Atualizar pool info
+      if (this.poolInfo) {
+        this.poolInfo.sqrtPriceX96 = slot0[0].toString()
+        this.poolInfo.tick = Number(slot0[1])
+        this.poolInfo.liquidity = liquidity.toString()
+      }
+
+      // Processar timestamp
+      const timestampData = result.results[callIndex + 2].returnData
+      const timestamp = Number(ethers.AbiCoder.defaultAbiCoder().decode(["uint256"], timestampData)[0])
+
+      // Calcular cotações para todos os parâmetros solicitados
+      const quotes: { [key: string]: string } = {}
+      for (const params of quoteParams) {
+        try {
+          const quote = await this.getQuote(params)
+          quotes[`${params.tokenIn}_${params.tokenOut}_${params.amountIn}`] = quote
+        } catch (error) {
+          console.error(`Error getting quote for ${params.tokenIn}->${params.tokenOut}:`, error)
+          quotes[`${params.tokenIn}_${params.tokenOut}_${params.amountIn}`] = "0"
+        }
+      }
+
+      console.log(`✅ Batch data retrieved at block ${result.blockNumber}`)
+
+      return {
+        quotes,
+        poolInfo: this.poolInfo!,
+        balances,
+        timestamp,
+      }
+    } catch (error) {
+      console.error("❌ Error getting batch quote data:", error)
+      throw error
+    }
+  }
+
+  // Calcular preço baseado no sqrtPriceX96 do pool
   private async calculatePriceFromPool(params: QuoteParams): Promise<string> {
     try {
       if (!this.poolInfo) {
@@ -397,21 +523,10 @@ class UniswapService {
       const tokenOut = TOKENS[params.tokenOut]
       const amountIn = Number.parseFloat(params.amountIn)
 
-      // Obter sqrtPriceX96 atual do pool
       const sqrtPriceX96 = BigInt(this.poolInfo.sqrtPriceX96)
-
-      console.log(`🧮 Calculating price from pool sqrtPriceX96:`)
-      console.log(`├─ sqrtPriceX96: ${sqrtPriceX96.toString()}`)
-      console.log(`├─ Token0: ${this.poolInfo.token0}`)
-      console.log(`└─ Token1: ${this.poolInfo.token1}`)
-
-      // Calcular preço: price = (sqrtPriceX96 / 2^96)^2
       const Q96 = 2n ** 96n
       const price = Number((sqrtPriceX96 * sqrtPriceX96) / (Q96 * Q96))
 
-      console.log(`├─ Raw price: ${price}`)
-
-      // Determinar direção do swap baseado na ordem dos tokens no pool
       const token0Address = this.poolInfo.token0
       const token1Address = this.poolInfo.token1
       const tokenInAddress = tokenIn.address.toLowerCase()
@@ -421,21 +536,16 @@ class UniswapService {
       let amountOut: number
 
       if (tokenInAddress === token0Address && tokenOutAddress === token1Address) {
-        // Token0 -> Token1: usar preço direto
         finalPrice = price
         amountOut = amountIn * finalPrice
       } else if (tokenInAddress === token1Address && tokenOutAddress === token0Address) {
-        // Token1 -> Token0: usar preço inverso
         finalPrice = 1 / price
         amountOut = amountIn * finalPrice
       } else {
         throw new Error("Token addresses don't match pool tokens")
       }
 
-      console.log(`├─ Final price: ${finalPrice}`)
-      console.log(`├─ Amount in: ${amountIn} ${params.tokenIn}`)
-      console.log(`└─ Amount out: ${amountOut} ${params.tokenOut}`)
-
+      console.log(`🧮 Pool-based calculation: ${amountOut} ${params.tokenOut}`)
       return amountOut.toString()
     } catch (error) {
       console.error("❌ Error calculating price from pool:", error)
@@ -461,23 +571,17 @@ class UniswapService {
       const tokenIn = TOKENS[params.tokenIn]
       const tokenOut = TOKENS[params.tokenOut]
 
-      // Converter valores para wei
       const amountIn = ethers.parseUnits(params.amountIn, tokenIn.decimals)
       const amountOutMinimum = ethers.parseUnits(params.amountOutMinimum, tokenOut.decimals)
-
-      // Deadline: 20 minutos a partir de agora
       const deadline = Math.floor(Date.now() / 1000) + 1200
 
-      // Verificar se MiniKit está disponível
       if (typeof window !== "undefined" && (window as any).MiniKit) {
         const MiniKit = (window as any).MiniKit
 
         console.log("📱 MiniKit available, executing real swap...")
 
-        // Primeiro, aprovar o token se necessário
         await this.approveTokenIfNeeded(tokenIn.address, amountIn.toString(), params.recipient)
 
-        // Preparar parâmetros para o swap
         const swapParams = {
           tokenIn: tokenIn.address,
           tokenOut: tokenOut.address,
@@ -489,7 +593,6 @@ class UniswapService {
           sqrtPriceLimitX96: 0n,
         }
 
-        // Codificar a chamada para o SwapRouter02
         const swapData = this.swapRouter!.interface.encodeFunctionData("exactInputSingle", [swapParams])
 
         const transaction = {
@@ -498,9 +601,6 @@ class UniswapService {
           data: swapData,
         }
 
-        console.log("📤 Sending transaction via MiniKit...")
-
-        // Enviar transação via MiniKit
         const result = await MiniKit.commandsAsync.sendTransaction(transaction)
 
         if (result.success) {
@@ -518,21 +618,14 @@ class UniswapService {
     }
   }
 
-  // Aprovar token se necessário
   private async approveTokenIfNeeded(tokenAddress: string, amount: string, userAddress: string): Promise<void> {
     try {
       if (typeof window !== "undefined" && (window as any).MiniKit) {
         const MiniKit = (window as any).MiniKit
 
-        // Verificar allowance atual
         const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider)
         const currentAllowance = await tokenContract.allowance(userAddress, UNISWAP_CONTRACTS.SWAP_ROUTER_02)
 
-        console.log(`🔍 Checking token approval:`)
-        console.log(`├─ Current allowance: ${currentAllowance.toString()}`)
-        console.log(`└─ Required amount: ${amount}`)
-
-        // Se allowance é suficiente, não precisa aprovar
         if (currentAllowance >= BigInt(amount)) {
           console.log("✅ Sufficient allowance, no approval needed")
           return
@@ -540,7 +633,6 @@ class UniswapService {
 
         console.log("🔄 Approval needed, sending approval transaction...")
 
-        // Preparar transação de aprovação
         const approvalData = tokenContract.interface.encodeFunctionData("approve", [
           UNISWAP_CONTRACTS.SWAP_ROUTER_02,
           amount,
@@ -552,7 +644,6 @@ class UniswapService {
           data: approvalData,
         }
 
-        // Enviar aprovação via MiniKit
         const result = await MiniKit.commandsAsync.sendTransaction(approvalTransaction)
 
         if (result.success) {
@@ -567,34 +658,28 @@ class UniswapService {
     }
   }
 
-  // Obter informações dos tokens
   getTokens() {
     return TOKENS
   }
 
-  // Obter informações do pool
   async getPoolInfo(): Promise<PoolInfo | null> {
     if (!this.poolInfo && this.initialized) {
-      await this.setupPool()
+      await this.setupPoolWithMulticall()
     }
     return this.poolInfo
   }
 
-  // Verificar se o serviço está inicializado
   isInitialized(): boolean {
     return this.initialized
   }
 
-  // Obter endereços dos contratos
   getContractAddresses() {
     return UNISWAP_CONTRACTS
   }
 
-  // Obter fee do pool
   getPoolFee(): number | null {
     return this.poolInfo?.fee || null
   }
 }
 
-// Exportar instância única
 export const uniswapService = new UniswapService()
