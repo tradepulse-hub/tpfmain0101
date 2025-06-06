@@ -8,6 +8,7 @@ import { ChevronDown, X, ArrowUpDown, Loader2 } from "lucide-react"
 import { getCurrentLanguage, getTranslations } from "../lib/i18n"
 import { swapService } from "../services/swap-service"
 import { toast } from "sonner"
+import { walletService } from "../services/wallet-service"
 
 interface SwapModalProps {
   isOpen: boolean
@@ -25,6 +26,9 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   const [isQuoting, setIsQuoting] = useState(false)
   const [language, setLanguage] = useState<"en" | "pt">("en")
   const [translations, setTranslations] = useState(getTranslations("en").swap || {})
+  const [walletTokens, setWalletTokens] = useState<any[]>([])
+  const [showTokenInDropdown, setShowTokenInDropdown] = useState(false)
+  const [showTokenOutDropdown, setShowTokenOutDropdown] = useState(false)
 
   useEffect(() => {
     const updateLanguage = () => {
@@ -37,18 +41,29 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     return () => window.removeEventListener("languageChange", updateLanguage)
   }, [])
 
-  const tokens = [
-    { id: "WETH", name: "Wrapped Ethereum", icon: "/ethereum-abstract.png" },
-    { id: "USDCe", name: "USD Coin", icon: "/usdc-coins.png" },
-    { id: "TPF", name: "TPulseFi", icon: "/logo-tpf.png" },
-    { id: "WLD", name: "Worldcoin", icon: "/worldcoin.jpeg" },
-    { id: "DNA", name: "DNA Token", icon: "/dna-token.png" },
-    { id: "CASH", name: "Cash", icon: "/cash-token.png" },
-    { id: "WDD", name: "Drachma", icon: "/drachma-token.png" },
-  ]
+  useEffect(() => {
+    const loadWalletTokens = async () => {
+      if (walletAddress) {
+        try {
+          const tokens = await walletService.getTokenBalances(walletAddress)
+          const tokensWithBalance = tokens.filter((token) => Number.parseFloat(token.balance) > 0)
+          setWalletTokens(tokensWithBalance)
+        } catch (error) {
+          console.error("Error loading wallet tokens:", error)
+          // Fallback para tokens padrão se houver erro
+          setWalletTokens([
+            { symbol: "WETH", name: "Wrapped Ethereum", icon: "/ethereum-abstract.png", balance: "0" },
+            { symbol: "USDCe", name: "USD Coin", icon: "/usdc-coins.png", balance: "0" },
+            { symbol: "TPF", name: "TPulseFi", icon: "/logo-tpf.png", balance: "0" },
+          ])
+        }
+      }
+    }
+    loadWalletTokens()
+  }, [walletAddress])
 
-  const selectedTokenIn = tokens.find((t) => t.id === tokenIn) || tokens[0]
-  const selectedTokenOut = tokens.find((t) => t.id === tokenOut) || tokens[1]
+  const selectedTokenIn = walletTokens.find((t) => t.symbol === tokenIn) || walletTokens[0]
+  const selectedTokenOut = walletTokens.find((t) => t.symbol === tokenOut) || walletTokens[1]
 
   // Obter cotação quando o valor de entrada mudar
   useEffect(() => {
@@ -119,6 +134,18 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     }
   }
 
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setShowTokenInDropdown(false)
+      setShowTokenOutDropdown(false)
+    }
+
+    if (showTokenInDropdown || showTokenOutDropdown) {
+      document.addEventListener("click", handleClickOutside)
+      return () => document.removeEventListener("click", handleClickOutside)
+    }
+  }, [showTokenInDropdown, showTokenOutDropdown])
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -152,22 +179,58 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
             <form onSubmit={handleSwap} className="p-3 space-y-3">
               {/* Token de entrada */}
-              <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+              <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700 relative">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs text-gray-400">{translations.from || "From"}</span>
-                  <div className="flex items-center space-x-1 text-white">
+                  <button
+                    type="button"
+                    className="flex items-center space-x-1 text-white hover:text-gray-300"
+                    onClick={() => setShowTokenInDropdown(!showTokenInDropdown)}
+                  >
                     <div className="w-4 h-4 rounded-full overflow-hidden">
                       <Image
-                        src={selectedTokenIn.icon || "/placeholder.svg"}
-                        alt={selectedTokenIn.name}
+                        src={selectedTokenIn?.icon || "/placeholder.svg"}
+                        alt={selectedTokenIn?.name || "Token"}
                         width={16}
                         height={16}
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <span className="text-sm font-medium">{selectedTokenIn.id}</span>
+                    <span className="text-sm font-medium">{selectedTokenIn?.symbol || "Select"}</span>
                     <ChevronDown size={12} />
-                  </div>
+                  </button>
+
+                  {showTokenInDropdown && (
+                    <div className="absolute z-50 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-32 overflow-y-auto">
+                      {walletTokens
+                        .filter((t) => t.symbol !== tokenOut)
+                        .map((token) => (
+                          <button
+                            key={token.symbol}
+                            type="button"
+                            className="w-full flex items-center px-3 py-2 text-sm hover:bg-gray-700 text-gray-300"
+                            onClick={() => {
+                              setTokenIn(token.symbol)
+                              setShowTokenInDropdown(false)
+                            }}
+                          >
+                            <div className="w-4 h-4 rounded-full overflow-hidden mr-2">
+                              <Image
+                                src={token.icon || "/placeholder.svg"}
+                                alt={token.name}
+                                width={16}
+                                height={16}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="text-left flex-1">
+                              <div className="font-medium">{token.symbol}</div>
+                              <div className="text-xs text-gray-400">{Number.parseFloat(token.balance).toFixed(4)}</div>
+                            </div>
+                          </button>
+                        ))}
+                    </div>
+                  )}
                 </div>
                 <input
                   type="number"
@@ -192,22 +255,58 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
               </div>
 
               {/* Token de saída */}
-              <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+              <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700 relative">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs text-gray-400">{translations.to || "To"}</span>
-                  <div className="flex items-center space-x-1 text-white">
+                  <button
+                    type="button"
+                    className="flex items-center space-x-1 text-white hover:text-gray-300"
+                    onClick={() => setShowTokenOutDropdown(!showTokenOutDropdown)}
+                  >
                     <div className="w-4 h-4 rounded-full overflow-hidden">
                       <Image
-                        src={selectedTokenOut.icon || "/placeholder.svg"}
-                        alt={selectedTokenOut.name}
+                        src={selectedTokenOut?.icon || "/placeholder.svg"}
+                        alt={selectedTokenOut?.name || "Token"}
                         width={16}
                         height={16}
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <span className="text-sm font-medium">{selectedTokenOut.id}</span>
+                    <span className="text-sm font-medium">{selectedTokenOut?.symbol || "Select"}</span>
                     <ChevronDown size={12} />
-                  </div>
+                  </button>
+
+                  {showTokenOutDropdown && (
+                    <div className="absolute z-50 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-32 overflow-y-auto">
+                      {walletTokens
+                        .filter((t) => t.symbol !== tokenIn)
+                        .map((token) => (
+                          <button
+                            key={token.symbol}
+                            type="button"
+                            className="w-full flex items-center px-3 py-2 text-sm hover:bg-gray-700 text-gray-300"
+                            onClick={() => {
+                              setTokenOut(token.symbol)
+                              setShowTokenOutDropdown(false)
+                            }}
+                          >
+                            <div className="w-4 h-4 rounded-full overflow-hidden mr-2">
+                              <Image
+                                src={token.icon || "/placeholder.svg"}
+                                alt={token.name}
+                                width={16}
+                                height={16}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="text-left flex-1">
+                              <div className="font-medium">{token.symbol}</div>
+                              <div className="text-xs text-gray-400">{Number.parseFloat(token.balance).toFixed(4)}</div>
+                            </div>
+                          </button>
+                        ))}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center">
                   <input
