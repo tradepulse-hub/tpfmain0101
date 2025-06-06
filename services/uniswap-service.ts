@@ -4,10 +4,11 @@ import { ethers } from "ethers"
 const WORLDCHAIN_RPC = "https://worldchain-mainnet.g.alchemy.com/public"
 const CHAIN_ID = 480
 
-// Endereços dos contratos Uniswap na WorldChain
+// Endereços corretos dos contratos Uniswap na WorldChain
 const UNISWAP_CONTRACTS = {
   FACTORY_V3: "0x7a5028BDa40e7B173C278C5342087826455ea25a",
   SWAP_ROUTER_02: "0x091AD9e2e6cc414deE1eB45135672a30bcFEec9de3",
+  // Endereço correto do QuoterV2
   QUOTER_V2: "0x10158D43e6cc414deE1eB45135672a30bcFEec9de3",
   WETH: "0x4200000000000000000000000000000000000006",
   // Pool TPF/WLD real
@@ -32,9 +33,16 @@ const TOKENS = {
   },
 }
 
-// ABIs necessários
+// ABI completo do QuoterV2 baseado no contrato compartilhado
 const QUOTER_V2_ABI = [
-  "function quoteExactInputSingle(tuple(address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)",
+  "function quoteExactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, uint256 amountIn, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)",
+  "function quoteExactOutputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, uint256 amount, uint160 sqrtPriceLimitX96)) external returns (uint256 amountIn, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)",
+]
+
+// ABI do SwapRouter02
+const SWAP_ROUTER_02_ABI = [
+  "function exactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external payable returns (uint256 amountOut)",
+  "function exactOutputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountOut, uint256 amountInMaximum, uint160 sqrtPriceLimitX96)) external payable returns (uint256 amountIn)",
 ]
 
 const ERC20_ABI = [
@@ -42,6 +50,8 @@ const ERC20_ABI = [
   "function decimals() view returns (uint8)",
   "function symbol() view returns (string)",
   "function name() view returns (string)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
 ]
 
 const POOL_ABI = [
@@ -49,6 +59,7 @@ const POOL_ABI = [
   "function token0() external view returns (address)",
   "function token1() external view returns (address)",
   "function liquidity() external view returns (uint128)",
+  "function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
 ]
 
 interface QuoteParams {
@@ -76,6 +87,7 @@ class UniswapService {
   private quoter: ethers.Contract | null = null
   private pool: ethers.Contract | null = null
   private initialized = false
+  private poolFee: number | null = null
 
   constructor() {
     if (typeof window !== "undefined") {
@@ -103,7 +115,7 @@ class UniswapService {
       this.quoter = new ethers.Contract(UNISWAP_CONTRACTS.QUOTER_V2, QUOTER_V2_ABI, this.provider)
       this.pool = new ethers.Contract(UNISWAP_CONTRACTS.TPF_WLD_POOL, POOL_ABI, this.provider)
 
-      // Verificar pool
+      // Verificar pool e obter fee
       await this.verifyPool()
 
       this.initialized = true
@@ -117,16 +129,29 @@ class UniswapService {
     if (!this.pool) return
 
     try {
+      // Obter fee do pool
       const fee = await this.pool.fee()
+      this.poolFee = Number(fee)
+
+      // Obter tokens do pool
       const token0 = await this.pool.token0()
       const token1 = await this.pool.token1()
+
+      // Obter liquidez
       const liquidity = await this.pool.liquidity()
+
+      // Obter preço atual
+      const slot0 = await this.pool.slot0()
+      const sqrtPriceX96 = slot0[0]
+      const tick = slot0[1]
 
       console.log("Pool verification:")
       console.log(`Fee: ${fee} (${fee / 10000}%)`)
       console.log(`Token0: ${token0}`)
       console.log(`Token1: ${token1}`)
       console.log(`Liquidity: ${liquidity.toString()}`)
+      console.log(`Current tick: ${tick}`)
+      console.log(`Current sqrtPriceX96: ${sqrtPriceX96}`)
 
       // Verificar se os tokens correspondem
       const isValidPool =
@@ -189,7 +214,7 @@ class UniswapService {
     }
   }
 
-  // Obter cotação real usando o pool TPF/WLD
+  // Obter cotação real usando o QuoterV2 e o pool real
   async getQuote(params: QuoteParams): Promise<string> {
     try {
       if (!this.initialized) {
@@ -203,37 +228,42 @@ class UniswapService {
       const tokenIn = TOKENS[params.tokenIn]
       const tokenOut = TOKENS[params.tokenOut]
 
-      if (!this.quoter || !this.pool) {
-        console.warn("Quoter or pool not available, using fallback")
+      if (!this.quoter || !this.pool || this.poolFee === null) {
+        console.warn("Quoter, pool or fee not available, using fallback")
         return this.getFallbackQuote(params.tokenIn, params.tokenOut, params.amountIn)
       }
 
       // Converter amount para wei
       const amountIn = ethers.parseUnits(params.amountIn, tokenIn.decimals)
 
-      // Obter fee do pool real
-      const fee = await this.pool.fee()
+      console.log(`Getting real quote: ${params.amountIn} ${params.tokenIn} → ${params.tokenOut}`)
+      console.log(`Using pool fee: ${this.poolFee} (${this.poolFee / 10000}%)`)
 
-      // Parâmetros para o QuoterV2
+      // Parâmetros para o QuoterV2 conforme o contrato
       const quoteParams = {
         tokenIn: tokenIn.address,
         tokenOut: tokenOut.address,
+        fee: this.poolFee,
         amountIn: amountIn,
-        fee: fee,
-        sqrtPriceLimitX96: 0,
+        sqrtPriceLimitX96: 0n, // Sem limite de preço
       }
 
-      console.log(`Getting real quote: ${params.amountIn} ${params.tokenIn} → ${params.tokenOut}`)
-      console.log(`Using pool fee: ${fee} (${fee / 10000}%)`)
-
-      // Chamar QuoterV2 com o pool real
+      // Chamar QuoterV2 com os parâmetros corretos
       const result = await this.quoter.quoteExactInputSingle(quoteParams)
+
+      // Extrair o amountOut do resultado
       const amountOut = result[0]
 
       // Converter de volta para formato legível
       const formattedAmount = ethers.formatUnits(amountOut, tokenOut.decimals)
 
       console.log(`Real quote result: ${formattedAmount} ${params.tokenOut}`)
+      console.log(`Quote details:`, {
+        amountOut: amountOut.toString(),
+        sqrtPriceX96After: result[1].toString(),
+        initializedTicksCrossed: result[2].toString(),
+        gasEstimate: result[3].toString(),
+      })
 
       return formattedAmount
     } catch (error) {
@@ -252,8 +282,10 @@ class UniswapService {
 
       console.log(`Executing real swap: ${params.amountIn} ${params.tokenIn} → ${params.tokenOut}`)
 
+      // Aqui implementaríamos a conexão com a carteira do usuário
+      // e a execução do swap real usando o SwapRouter02
+
       // Por enquanto, simular o swap
-      // Em produção, seria necessário conectar com a carteira do usuário e fazer o swap real
       await new Promise((resolve) => setTimeout(resolve, 2000))
 
       // Retornar hash simulado
@@ -281,6 +313,7 @@ class UniswapService {
       const token0 = await this.pool.token0()
       const token1 = await this.pool.token1()
       const liquidity = await this.pool.liquidity()
+      const slot0 = await this.pool.slot0()
 
       return {
         address: UNISWAP_CONTRACTS.TPF_WLD_POOL,
@@ -289,6 +322,8 @@ class UniswapService {
         token0,
         token1,
         liquidity: liquidity.toString(),
+        sqrtPriceX96: slot0[0].toString(),
+        tick: slot0[1],
       }
     } catch (error) {
       console.error("Error getting pool info:", error)
@@ -320,6 +355,11 @@ class UniswapService {
   // Obter endereços dos contratos
   getContractAddresses() {
     return UNISWAP_CONTRACTS
+  }
+
+  // Obter fee do pool
+  getPoolFee(): number | null {
+    return this.poolFee
   }
 }
 

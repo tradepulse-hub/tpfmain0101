@@ -1,10 +1,10 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
-import { X, ArrowUpDown, Loader2, Settings, RefreshCw } from "lucide-react"
+import { X, ArrowUpDown, Loader2, Settings, RefreshCw, Info } from "lucide-react"
 import { getCurrentLanguage, getTranslations } from "../lib/i18n"
 import { uniswapService } from "../services/uniswap-service"
 import { toast } from "sonner"
@@ -27,12 +27,28 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   const [language, setLanguage] = useState<"en" | "pt">("en")
   const [translations, setTranslations] = useState(getTranslations("en").swap || {})
   const [showSettings, setShowSettings] = useState(false)
+  const [poolFee, setPoolFee] = useState<number | null>(null)
   const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({
     WLD: "0.000000",
     TPF: "0.000000",
   })
+  const [poolInfo, setPoolInfo] = useState<any>(null)
 
   const tokens = uniswapService.getTokens()
+
+  // Carregar informações do pool
+  const loadPoolInfo = useCallback(async () => {
+    try {
+      const info = await uniswapService.getPoolInfo()
+      if (info) {
+        setPoolInfo(info)
+        setPoolFee(info.fee)
+        console.log("Pool info loaded:", info)
+      }
+    } catch (error) {
+      console.error("Error loading pool info:", error)
+    }
+  }, [])
 
   useEffect(() => {
     const updateLanguage = () => {
@@ -45,33 +61,40 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     return () => window.removeEventListener("languageChange", updateLanguage)
   }, [])
 
-  // Carregar saldos reais quando o modal abrir
+  // Carregar saldos e informações do pool quando o modal abrir
   useEffect(() => {
-    const loadBalances = async () => {
-      if (!isOpen || !walletAddress) return
+    if (!isOpen) return
 
-      setIsLoadingBalances(true)
-      try {
-        console.log("Loading real token balances...")
-        const balances = await uniswapService.getTokenBalances(walletAddress)
+    loadPoolInfo()
 
-        const balanceMap: Record<string, string> = {}
-        balances.forEach((balance) => {
-          balanceMap[balance.symbol] = balance.formattedBalance
-        })
-
-        setTokenBalances(balanceMap)
-        console.log("Token balances loaded:", balanceMap)
-      } catch (error) {
-        console.error("Error loading balances:", error)
-        toast.error("Erro ao carregar saldos")
-      } finally {
-        setIsLoadingBalances(false)
-      }
+    if (walletAddress) {
+      loadBalances()
     }
+  }, [isOpen, walletAddress, loadPoolInfo])
 
-    loadBalances()
-  }, [isOpen, walletAddress])
+  // Carregar saldos reais
+  const loadBalances = async () => {
+    if (!walletAddress) return
+
+    setIsLoadingBalances(true)
+    try {
+      console.log("Loading real token balances...")
+      const balances = await uniswapService.getTokenBalances(walletAddress)
+
+      const balanceMap: Record<string, string> = {}
+      balances.forEach((balance) => {
+        balanceMap[balance.symbol] = balance.formattedBalance
+      })
+
+      setTokenBalances(balanceMap)
+      console.log("Token balances loaded:", balanceMap)
+    } catch (error) {
+      console.error("Error loading balances:", error)
+      toast.error("Erro ao carregar saldos")
+    } finally {
+      setIsLoadingBalances(false)
+    }
+  }
 
   // Obter cotação quando o valor de entrada mudar
   useEffect(() => {
@@ -122,22 +145,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
   const handleRefreshBalances = async () => {
     if (!walletAddress || isLoadingBalances) return
-
-    setIsLoadingBalances(true)
-    try {
-      const balances = await uniswapService.getTokenBalances(walletAddress)
-      const balanceMap: Record<string, string> = {}
-      balances.forEach((balance) => {
-        balanceMap[balance.symbol] = balance.formattedBalance
-      })
-      setTokenBalances(balanceMap)
-      toast.success("Saldos atualizados")
-    } catch (error) {
-      console.error("Error refreshing balances:", error)
-      toast.error("Erro ao atualizar saldos")
-    } finally {
-      setIsLoadingBalances(false)
-    }
+    await loadBalances()
   }
 
   const handleSwap = async (e: React.FormEvent) => {
@@ -167,6 +175,14 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
       // Calcular minimum amount out com slippage
       const slippageMultiplier = 1 - Number.parseFloat(slippage) / 100
       const amountOutMinimum = (Number.parseFloat(amountOut) * slippageMultiplier).toString()
+
+      console.log("Executing swap with params:", {
+        tokenIn,
+        tokenOut,
+        amountIn,
+        amountOutMinimum,
+        recipient: walletAddress,
+      })
 
       const txHash = await uniswapService.executeSwap({
         tokenIn,
@@ -278,8 +294,18 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                         ))}
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      Pool: {uniswapService.getContractAddresses().TPF_WLD_POOL.slice(0, 10)}...
+                    <div className="text-xs text-gray-500 flex items-center">
+                      <span className="mr-1">Pool:</span>
+                      <a
+                        href={`https://worldchain-mainnet.explorer.alchemy.com/address/${uniswapService.getContractAddresses().TPF_WLD_POOL}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:underline"
+                      >
+                        {uniswapService.getContractAddresses().TPF_WLD_POOL.slice(0, 6)}...
+                        {uniswapService.getContractAddresses().TPF_WLD_POOL.slice(-4)}
+                      </a>
+                      {poolFee && <span className="ml-1">({poolFee / 10000}% fee)</span>}
                     </div>
                   </div>
                 </motion.div>
@@ -384,9 +410,18 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                 </div>
               </div>
 
+              {/* Informações de taxa */}
+              <div className="text-xs text-gray-400 flex items-center justify-between px-1">
+                <span className="flex items-center">
+                  <Info size={12} className="mr-1" />
+                  Taxa: {poolFee ? poolFee / 10000 : "0.3"}%
+                </span>
+                <span>Slippage: {slippage}%</span>
+              </div>
+
               <button
                 type="submit"
-                disabled={isLoading || !amountIn || !amountOut || isLoadingBalances}
+                disabled={isLoading || !amountIn || !amountOut || isLoadingBalances || isQuoting}
                 className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
