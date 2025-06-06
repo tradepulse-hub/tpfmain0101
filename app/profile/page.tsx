@@ -17,6 +17,7 @@ import { DailyCheckIn } from "@/components/daily-check-in"
 import { LevelBadge } from "@/components/level-badge"
 import { LevelInfo } from "@/components/level-info"
 import { levelService } from "@/services/level-service"
+import { EventCountdownBadge } from "@/components/event-countdown-badge"
 
 export default function ProfilePage() {
   // User state with profile data
@@ -656,6 +657,9 @@ export default function ProfilePage() {
                 <path d="M21.731 2.269a2.625 2.625 0 00-3.712 0l-1.157 1.157 3.712 3.712 1.157-1.157a2.625 2.625 0 000-3.712zM19.513 8.199l-3.712-3.712-8.4 8.4a5.25 5.25 0 00-1.32 2.214l-.8 2.685a.75.75 0 00.933.933l2.685-.8a5.25 5.25 0 002.214-1.32l8.4-8.4z" />
               </svg>
             </motion.button>
+
+            {/* Event Countdown Badge */}
+            <EventCountdownBadge />
           </div>
           <div className="mt-1 px-3 py-1 bg-gray-800/50 rounded-full text-xs text-gray-400 border border-gray-700/50">
             {walletAddress ? formatAddress(walletAddress) : translations.profile?.notConnected || "Not connected"}
