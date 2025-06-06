@@ -1,3 +1,7 @@
+"use client"
+
+import { useState, useEffect } from "react"
+
 // Tipos para internacionalização
 export type Language = "en" | "pt"
 
@@ -978,5 +982,29 @@ export function getTranslations(lang: Language): Translations {
           totalExpenses: "Total Expenses",
         },
       }
+  }
+}
+
+// Hook para usar traduções em componentes
+export function useTranslation() {
+  const [language, setLanguage] = useState<Language>("en")
+
+  useEffect(() => {
+    setLanguage(getCurrentLanguage())
+
+    const handleLanguageChange = () => {
+      setLanguage(getCurrentLanguage())
+    }
+
+    window.addEventListener("languageChange", handleLanguageChange)
+    return () => window.removeEventListener("languageChange", handleLanguageChange)
+  }, [])
+
+  const translations = getTranslations(language)
+
+  return {
+    language,
+    setLanguage: setCurrentLanguage,
+    t: translations,
   }
 }
