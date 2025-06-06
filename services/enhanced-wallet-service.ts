@@ -1,6 +1,7 @@
 import { holdstationService } from "./holdstation-service"
+import { formatEther } from "../lib/airdropContractABI"
 
-// Serviço de carteira aprimorado (versão 165 restaurada)
+// Serviço de carteira aprimorado (SEM ethers)
 class EnhancedWalletService {
   private initialized = false
 
@@ -37,8 +38,8 @@ class EnhancedWalletService {
       const tpfAddress = holdstationService.getKnownTokens().TPF
       const balance = await holdstationService.getSingleTokenBalance(tpfAddress, walletAddress)
 
-      // Converter de wei para unidades normais
-      const formattedBalance = Number(balance) / Math.pow(10, 18)
+      // Converter de wei para unidades normais usando função própria
+      const formattedBalance = Number(formatEther(balance))
       console.log("TPF balance:", formattedBalance)
 
       return formattedBalance
@@ -83,7 +84,7 @@ class EnhancedWalletService {
           formattedBalances[symbol] = formattedBalance
         } else {
           // Fallback para 18 decimais
-          const formattedBalance = Number(rawBalance) / Math.pow(10, 18)
+          const formattedBalance = Number(formatEther(rawBalance))
           formattedBalances[symbol] = formattedBalance
         }
       }
@@ -125,7 +126,7 @@ class EnhancedWalletService {
       const formattedTransactions = transactions.map((tx: any, index: number) => ({
         id: tx.hash || `tx-${index}`,
         type: tx.type || "unknown",
-        amount: tx.amount || "0",
+        amount: formatEther(tx.amount || "0"),
         date: tx.timestamp ? new Date(tx.timestamp * 1000).toISOString() : new Date().toISOString(),
         from: tx.from || "",
         to: tx.to || "",

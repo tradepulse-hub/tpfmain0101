@@ -1,216 +1,205 @@
-// Serviço Holdstation com fallback para simulação
+// Serviço simulado do Holdstation SDK
 class HoldstationService {
   private initialized = false
+  private knownTokens = {
+    TPF: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
+    WLD: "0x163f8C2467924be0ae7B5347228CABF260318753",
+    WETH: "0x4200000000000000000000000000000000000006",
+    USDCe: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
+  }
 
   constructor() {
-    this.initializeService()
+    this.initialize()
   }
 
-  private async initializeService() {
-    try {
-      console.log("Initializing Holdstation SDK...")
+  private async initialize() {
+    if (this.initialized) return
 
-      // Tentar importar SDK dinamicamente
+    console.log("Initializing Holdstation service (simulated)...")
+
+    // Simular inicialização
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    this.initialized = true
+    console.log("Holdstation service initialized (simulated)")
+  }
+
+  isInitialized() {
+    return this.initialized
+  }
+
+  getKnownTokens() {
+    return this.knownTokens
+  }
+
+  async getSingleTokenBalance(tokenAddress: string, walletAddress: string): Promise<string> {
+    // Simular chamada de saldo
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    // Retornar saldo simulado baseado no token
+    if (tokenAddress === this.knownTokens.TPF) {
+      // Verificar se há saldo customizado
       if (typeof window !== "undefined") {
-        try {
-          const { Client, Multicall3, TokenProvider } = await import("@holdstation/worldchain-ethers-v5")
-          const { config, inmemoryTokenStorage } = await import("@holdstation/worldchain-sdk")
-
-          console.log("Holdstation SDK loaded successfully")
-          this.initialized = true
-        } catch (error) {
-          console.warn("Holdstation SDK not available, using simulation mode:", error)
-          this.initialized = true // Usar modo simulado
-        }
-      } else {
-        this.initialized = true // Server-side, usar simulado
-      }
-    } catch (error) {
-      console.error("Error initializing Holdstation SDK:", error)
-      this.initialized = true // Fallback para simulado
-    }
-  }
-
-  // Aguardar inicialização
-  private async ensureInitialized() {
-    let attempts = 0
-    while (!this.initialized && attempts < 50) {
-      await new Promise((resolve) => setTimeout(resolve, 100))
-      attempts++
-    }
-  }
-
-  // Obter detalhes de tokens (simulado)
-  async getTokenDetails(tokenAddresses: string[]) {
-    await this.ensureInitialized()
-
-    const details: Record<string, any> = {}
-    const knownTokens = this.getKnownTokens()
-
-    tokenAddresses.forEach((address) => {
-      const symbol = Object.keys(knownTokens).find((key) => knownTokens[key as keyof typeof knownTokens] === address)
-
-      if (symbol) {
-        details[address] = {
-          address,
-          chainId: 480,
-          decimals: symbol === "USDCe" ? 6 : 18,
-          symbol,
-          name: this.getTokenName(symbol),
+        const userBalance = localStorage.getItem("userDefinedTPFBalance")
+        if (userBalance) {
+          const weiBalance = BigInt(Math.floor(Number(userBalance) * Math.pow(10, 18)))
+          return weiBalance.toString()
         }
       }
-    })
+      return (BigInt(1000) * BigInt(Math.pow(10, 18))).toString() // 1000 TPF
+    }
 
-    return details
+    return (BigInt(100) * BigInt(Math.pow(10, 18))).toString() // 100 tokens padrão
   }
 
-  // Obter tokens da carteira (simulado)
-  async getWalletTokens(walletAddress: string) {
-    await this.ensureInitialized()
-    return Object.values(this.getKnownTokens())
-  }
-
-  // Obter saldos de múltiplos tokens (simulado)
-  async getTokenBalances(walletAddress: string, tokenAddresses: string[]) {
-    await this.ensureInitialized()
-
+  async getTokenBalances(walletAddress: string, tokenAddresses: string[]): Promise<Record<string, string>> {
     const balances: Record<string, string> = {}
-    const knownTokens = this.getKnownTokens()
 
-    tokenAddresses.forEach((address) => {
-      const symbol = Object.keys(knownTokens).find((key) => knownTokens[key as keyof typeof knownTokens] === address)
-
-      if (symbol) {
-        balances[address] = this.getSimulatedBalance(symbol)
-      }
-    })
+    for (const address of tokenAddresses) {
+      balances[address] = await this.getSingleTokenBalance(address, walletAddress)
+    }
 
     return balances
   }
 
-  // Obter saldo de um token específico (simulado)
-  async getSingleTokenBalance(tokenAddress: string, walletAddress: string) {
-    await this.ensureInitialized()
-    const balances = await this.getTokenBalances(walletAddress, [tokenAddress])
-    return balances[tokenAddress] || "0"
-  }
+  async getTokenDetails(tokenAddresses: string[]): Promise<Record<string, any>> {
+    const details: Record<string, any> = {}
 
-  // Obter cotação para swap (simulado)
-  async getSwapQuote(params: any) {
-    await this.ensureInitialized()
-
-    return {
-      amountOut: (Number(params.amountIn) * 0.98).toString(),
-      data: "0x",
-      to: "0x0000000000000000000000000000000000000000",
-      value: "0",
-      gasEstimate: "150000",
-      addons: {
-        feeAmountOut: "0",
-      },
+    for (const address of tokenAddresses) {
+      details[address] = {
+        decimals: 18,
+        symbol: this.getTokenSymbol(address),
+        name: this.getTokenName(address),
+      }
     }
+
+    return details
   }
 
-  // Executar swap (simulado)
-  async executeSwap(params: any) {
-    await this.ensureInitialized()
-
-    return {
-      hash: "0x" + Math.random().toString(16).substr(2, 64),
-      success: true,
-      gasUsed: "145000",
+  private getTokenSymbol(address: string): string {
+    for (const [symbol, addr] of Object.entries(this.knownTokens)) {
+      if (addr.toLowerCase() === address.toLowerCase()) {
+        return symbol
+      }
     }
+    return "UNKNOWN"
   }
 
-  // Enviar tokens (simulado)
-  async sendToken(params: { to: string; amount: number; token?: string }) {
-    await this.ensureInitialized()
-
-    return {
-      hash: "0x" + Math.random().toString(16).substr(2, 64),
-      success: true,
-      gasUsed: "21000",
+  private getTokenName(address: string): string {
+    const symbolToName: Record<string, string> = {
+      TPF: "TPulseFi Token",
+      WLD: "Worldcoin",
+      WETH: "Wrapped Ethereum",
+      USDCe: "USD Coin (Bridged)",
     }
+
+    const symbol = this.getTokenSymbol(address)
+    return symbolToName[symbol] || "Unknown Token"
   }
 
-  // Obter histórico de transações (simulado)
-  async getTransactionHistory(walletAddress: string, offset = 0, limit = 50) {
-    await this.ensureInitialized()
+  async getTransactionHistory(walletAddress: string, offset: number, limit: number): Promise<any[]> {
+    // Simular histórico de transações
+    await new Promise((resolve) => setTimeout(resolve, 200))
 
     return [
       {
-        hash: "0x" + Math.random().toString(16).substr(2, 64),
-        type: "send",
-        amount: "100",
-        timestamp: Math.floor(Date.now() / 1000) - 3600,
-        from: walletAddress,
-        to: "0x" + Math.random().toString(16).substr(2, 40),
+        hash: "0xabc123...",
+        type: "receive",
+        amount: "100000000000000000000", // 100 tokens em wei
+        timestamp: Math.floor(Date.now() / 1000) - 86400,
+        from: "0x1234...5678",
+        to: walletAddress,
         status: "completed",
-        blockNumber: 12345678,
+        blockNumber: 12345,
+        token: "TPF",
+      },
+      {
+        hash: "0xdef456...",
+        type: "send",
+        amount: "50000000000000000000", // 50 tokens em wei
+        timestamp: Math.floor(Date.now() / 1000) - 172800,
+        from: walletAddress,
+        to: "0x9876...5432",
+        status: "completed",
+        blockNumber: 12344,
         token: "TPF",
       },
     ]
   }
 
-  // Monitorar histórico de transações (simulado)
   async watchTransactionHistory(walletAddress: string, callback: () => void) {
-    await this.ensureInitialized()
-
-    const interval = setInterval(callback, 30000)
+    // Simular monitoramento
+    const interval = setInterval(() => {
+      if (Math.random() > 0.95) {
+        // 5% chance a cada verificação
+        callback()
+      }
+    }, 10000) // Verificar a cada 10 segundos
 
     return {
       stop: () => {
         clearInterval(interval)
-        console.log("Stopped transaction history monitoring")
+        console.log("Stopped transaction monitoring")
       },
     }
   }
 
-  // Métodos auxiliares
-  private getTokenName(symbol: string): string {
-    const names: Record<string, string> = {
-      WETH: "Wrapped Ether",
-      USDCe: "USD Coin",
-      WLD: "Worldcoin",
-      TPF: "TPulseFi Token",
-    }
-    return names[symbol] || symbol
-  }
+  async getSwapQuote(params: any) {
+    // Simular cotação de swap
+    await new Promise((resolve) => setTimeout(resolve, 300))
 
-  private getSimulatedBalance(symbol: string): string {
-    const balances: Record<string, string> = {
-      TPF: "1000000000000000000000", // 1000 TPF
-      WLD: "42670000000000000000", // 42.67 WLD
-      WETH: "500000000000000000", // 0.5 WETH
-      USDCe: "125450000", // 125.45 USDCe (6 decimals)
-    }
-    return balances[symbol] || "0"
-  }
-
-  // Tokens conhecidos
-  getKnownTokens() {
     return {
-      TPF: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
-      WLD: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
-      WETH: "0x4200000000000000000000000000000000000006",
-      USDCe: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
+      amountOut: "95000000000000000000", // 95 tokens
+      data: "0x",
+      to: "0x1234567890123456789012345678901234567890",
+      value: "0",
+      addons: {
+        feeAmountOut: "5000000000000000000", // 5 tokens de taxa
+      },
     }
   }
 
-  // Verificar se está inicializado
-  isInitialized() {
-    return this.initialized
+  async executeSwap(params: any) {
+    // Simular execução de swap
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    return {
+      hash: "0xswap123...",
+      status: "pending",
+    }
   }
 
-  // Obter informações da rede
+  async sendToken(params: { to: string; amount: number; token?: string }) {
+    // Simular envio de token
+    await new Promise((resolve) => setTimeout(resolve, 400))
+
+    return {
+      hash: "0xsend123...",
+      status: "pending",
+    }
+  }
+
   getNetworkInfo() {
     return {
       chainId: 480,
-      name: "WorldChain",
+      name: "World Chain",
       rpcUrl: "https://worldchain-mainnet.g.alchemy.com/public",
-      blockExplorer: "https://worldscan.org",
     }
+  }
+
+  async getWalletTokens(walletAddress: string) {
+    // Simular tokens da carteira
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    return Object.entries(this.knownTokens).map(([symbol, address]) => ({
+      address,
+      symbol,
+      balance: "1000000000000000000000", // 1000 tokens
+      decimals: 18,
+    }))
   }
 }
 
+// Exportar instância
 export const holdstationService = new HoldstationService()
+export default HoldstationService
