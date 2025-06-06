@@ -29,7 +29,7 @@ interface ScoreEffect {
   score: number
 }
 
-export function FlappyBird({ onBack, minimalUI = false }: FlappyBirdProps) {
+function FlappyBird({ onBack, minimalUI = false }: FlappyBirdProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const gameLoopRef = useRef<number>()
   const [gameState, setGameState] = useState<"menu" | "playing" | "gameOver">("menu")
@@ -489,3 +489,6 @@ export function FlappyBird({ onBack, minimalUI = false }: FlappyBirdProps) {
     </div>
   )
 }
+
+export { FlappyBird }
+export default FlappyBird

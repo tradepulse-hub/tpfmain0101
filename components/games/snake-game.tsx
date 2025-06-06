@@ -29,7 +29,7 @@ const INITIAL_SNAKE = [
   { x: 10, y: 11 },
 ]
 
-export const SnakeGame = ({ onBack, minimalUI = false }: SnakeGameProps) => {
+const SnakeGame = ({ onBack, minimalUI = false }: SnakeGameProps) => {
   const [snake, setSnake] = useState<Position[]>(INITIAL_SNAKE)
   const [food, setFood] = useState<Position>({ x: 5, y: 5 })
   const [direction, setDirection] = useState<Direction>("UP")
@@ -436,3 +436,6 @@ export const SnakeGame = ({ onBack, minimalUI = false }: SnakeGameProps) => {
     </div>
   )
 }
+
+export { SnakeGame }
+export default SnakeGame
