@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { BackgroundEffect } from "@/components/background-effect"
 import { BottomNav } from "@/components/bottom-nav"
-import { Calendar, Clock, MapPin, Users } from "lucide-react"
+import { Calendar, Clock, MapPin, Users, Copy, Trophy, Gamepad2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -13,7 +13,7 @@ import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
 // Tipos para os eventos
 interface Event {
   id: string
-  type: "airdrop" | "community" | "competition" | "education"
+  type: "airdrop" | "community" | "competition" | "education" | "tournament_registration" | "tournament_game"
   date: string
   time: string
   location: string
@@ -42,16 +42,45 @@ export default function AgendaPage() {
     }
   }
 
-  // Dados simulados de eventos
+  // Função para copiar endereço
+  const copyAddress = (address: string) => {
+    navigator.clipboard
+      .writeText(address)
+      .then(() => {
+        alert(language === "pt" ? "Endereço copiado!" : "Address copied!")
+      })
+      .catch(() => {
+        alert(language === "pt" ? "Erro ao copiar" : "Failed to copy")
+      })
+  }
+
+  // Dados dos eventos
   const mockEvents: Event[] = [
     {
       id: "1",
       type: "airdrop",
-      date: "2025-05-09",
-      time: "00:00",
+      date: "2025-06-09",
+      time: "23:59",
       location: t.agenda?.online || "Online",
       participants: 500,
-      endDate: "2025-06-09", // Adicionando data de término para o evento
+    },
+    {
+      id: "2",
+      type: "tournament_registration",
+      date: "2025-01-10",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 0,
+      endDate: "2025-01-15",
+    },
+    {
+      id: "3",
+      type: "tournament_game",
+      date: "2025-01-16",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 0,
+      endDate: "2025-07-09",
     },
   ]
 
@@ -227,14 +256,24 @@ export default function AgendaPage() {
 
   // Renderizar o indicador de tipo de evento
   const renderEventTypeIndicator = (type: Event["type"]) => {
-    const typeColors = {
-      airdrop: "bg-green-500",
-      community: "bg-blue-500",
-      competition: "bg-purple-500",
-      education: "bg-yellow-500",
+    const typeConfig = {
+      airdrop: { color: "bg-green-500", icon: Trophy },
+      tournament_registration: { color: "bg-blue-500", icon: Gamepad2 },
+      tournament_game: { color: "bg-purple-500", icon: Gamepad2 },
+      community: { color: "bg-blue-500", icon: Users },
+      competition: { color: "bg-purple-500", icon: Trophy },
+      education: { color: "bg-yellow-500", icon: Users },
     }
 
-    return <div className={`w-3 h-3 rounded-full ${typeColors[type]}`}></div>
+    const config = typeConfig[type]
+    const IconComponent = config.icon
+
+    return (
+      <div className="flex items-center">
+        <div className={`w-3 h-3 rounded-full ${config.color} mr-2`}></div>
+        <IconComponent className="w-4 h-4 text-gray-400" />
+      </div>
+    )
   }
 
   // Obter o nome do mês
@@ -244,16 +283,19 @@ export default function AgendaPage() {
 
   // Renderizar o conteúdo do evento
   const renderEventContent = (event: Event) => {
-    // Baseado no tipo do evento, retornar o conteúdo apropriado
     if (event.type === "airdrop") {
       return (
         <>
-          <h4 className="text-white font-medium">{t.agenda?.events?.topHoldersIncentive?.title}</h4>
-          <p className="text-gray-400 text-sm mt-1">{t.agenda?.events?.topHoldersIncentive?.description}</p>
+          <h4 className="text-white font-medium">
+            {language === "pt" ? "Incentivo Top Holders" : "Top Holders Incentive"}
+          </h4>
+          <p className="text-gray-400 text-sm mt-1">
+            {language === "pt" ? "10% de bônus para os top holders de TPF" : "10% bonus for top TPF holders"}
+          </p>
 
           {event.endDate && (
             <div className="mt-2 text-xs text-purple-400 font-medium">
-              {formatDate(event.date)} - {formatDate(event.endDate)}
+              {language === "pt" ? "Até" : "Until"} {formatDate(event.endDate || event.date)}
             </div>
           )}
 
@@ -266,27 +308,106 @@ export default function AgendaPage() {
               <MapPin className="w-3 h-3 mr-1" />
               <span>{event.location}</span>
             </div>
-            <div className="flex items-center">
-              <Users className="w-3 h-3 mr-1" />
-              <span>
-                {event.participants} {t.agenda?.participants}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-3 text-xs text-gray-300 border-t border-gray-700/50 pt-2">
-            <p className="font-medium mb-1">{t.agenda?.howToParticipate}</p>
-            <ol className="list-decimal pl-4 space-y-0.5">
-              {t.agenda?.events?.topHoldersIncentive?.howToParticipate?.map((step, index) => (
-                <li key={index}>{step}</li>
-              ))}
-            </ol>
           </div>
         </>
       )
     }
 
-    // Para outros tipos de eventos, podemos adicionar mais casos aqui
+    if (event.type === "tournament_registration") {
+      return (
+        <>
+          <h4 className="text-white font-medium">
+            {language === "pt" ? "Inscrição para o Torneio" : "Tournament Registration"}
+          </h4>
+          <p className="text-gray-400 text-sm mt-1">
+            {language === "pt"
+              ? "Período de inscrição para o Torneio Jogo da Cobra"
+              : "Registration period for Snake Game Tournament"}
+          </p>
+
+          {event.endDate && (
+            <div className="mt-2 text-xs text-blue-400 font-medium">
+              {formatDate(event.date)} - {formatDate(event.endDate)}
+            </div>
+          )}
+
+          <div className="mt-3 p-3 bg-gray-700/30 rounded-lg border border-gray-600/30">
+            <p className="text-white text-sm font-medium mb-2">
+              {language === "pt" ? "Como se inscrever:" : "How to register:"}
+            </p>
+            <p className="text-gray-300 text-xs mb-2">
+              {language === "pt"
+                ? "Envie 200.000 TPF para o endereço abaixo:"
+                : "Send 200,000 TPF to the address below:"}
+            </p>
+            <div className="flex items-center gap-2 p-2 bg-gray-800/50 rounded border">
+              <code className="text-xs text-green-400 flex-1 break-all">
+                0xf04a78df4cc3017c0c23f37528d7b6cbbeea6677
+              </code>
+              <button
+                onClick={() => copyAddress("0xf04a78df4cc3017c0c23f37528d7b6cbbeea6677")}
+                className="p-1 hover:bg-gray-600 rounded transition-colors"
+              >
+                <Copy className="w-3 h-3 text-gray-400" />
+              </button>
+            </div>
+          </div>
+        </>
+      )
+    }
+
+    if (event.type === "tournament_game") {
+      return (
+        <>
+          <h4 className="text-white font-medium">
+            {language === "pt" ? "Torneio Jogo da Cobra" : "Snake Game Tournament"}
+          </h4>
+          <p className="text-gray-400 text-sm mt-1">
+            {language === "pt"
+              ? "Competição para conseguir a maior pontuação no jogo da cobra"
+              : "Competition to achieve the highest score in the snake game"}
+          </p>
+
+          {event.endDate && (
+            <div className="mt-2 text-xs text-purple-400 font-medium">
+              {formatDate(event.date)} - {formatDate(event.endDate)}
+            </div>
+          )}
+
+          <div className="mt-3 text-xs text-gray-300 border-t border-gray-700/50 pt-2">
+            <p className="font-medium mb-1">{language === "pt" ? "Instruções:" : "Instructions:"}</p>
+            <ul className="list-disc pl-4 space-y-1">
+              <li>
+                {language === "pt"
+                  ? "O jogador com mais pontos ganha o grande prêmio"
+                  : "The player with the highest score wins the grand prize"}
+              </li>
+              <li>
+                {language === "pt"
+                  ? "Envie o print do seu score para support@tradepulsetoken.com"
+                  : "Send your score screenshot to support@tradepulsetoken.com"}
+              </li>
+              <li>
+                {language === "pt"
+                  ? "Apenas um envio por jogador será considerado"
+                  : "Only one submission per player will be considered"}
+              </li>
+              <li>
+                {language === "pt"
+                  ? "Em caso de empate, o prêmio será dividido"
+                  : "In case of a tie, the prize will be shared"}
+              </li>
+            </ul>
+            <p className="mt-2 text-yellow-400 text-xs">
+              {language === "pt"
+                ? "O prêmio será anunciado na última semana do evento"
+                : "The prize will be announced in the last week of the event"}
+            </p>
+          </div>
+        </>
+      )
+    }
+
     return null
   }
 
@@ -303,7 +424,7 @@ export default function AgendaPage() {
         <h1 className="text-3xl font-bold tracking-tighter flex items-center justify-center">
           <Calendar className="w-6 h-6 mr-2 text-blue-400" />
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-200 via-white to-gray-300">
-            {t.agenda?.eventsAndActivities}
+            {language === "pt" ? "Eventos e Atividades" : "Events and Activities"}
           </span>
         </h1>
       </motion.div>
@@ -357,15 +478,15 @@ export default function AgendaPage() {
               <div className="mt-4 flex flex-wrap gap-3 text-xs text-gray-400">
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-blue-600 mr-1"></div>
-                  <span>{t.agenda?.today}</span>
+                  <span>{language === "pt" ? "Hoje" : "Today"}</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
-                  <span>{t.agenda?.event}</span>
+                  <span>{language === "pt" ? "Evento" : "Event"}</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-purple-600/40 mr-1"></div>
-                  <span>{t.agenda?.incentivePeriod}</span>
+                  <span>{language === "pt" ? "Período de Evento" : "Event Period"}</span>
                 </div>
               </div>
             </Card>
@@ -398,7 +519,9 @@ export default function AgendaPage() {
                   </div>
                 ) : (
                   <Card className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4 border border-gray-700/30 text-center">
-                    <p className="text-gray-400">{t.agenda?.noEvents}</p>
+                    <p className="text-gray-400">
+                      {language === "pt" ? "Nenhum evento nesta data" : "No events on this date"}
+                    </p>
                   </Card>
                 )}
               </motion.div>
