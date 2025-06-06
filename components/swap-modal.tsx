@@ -4,9 +4,9 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
-import { ChevronDown, X, ArrowUpDown, Loader2 } from "lucide-react"
+import { ChevronDown, X, ArrowUpDown, Loader2, Settings } from "lucide-react"
 import { getCurrentLanguage, getTranslations } from "../lib/i18n"
-import { holdstationService } from "../services/holdstation-service"
+import { uniswapService } from "../services/uniswap-service"
 import { toast } from "sonner"
 
 interface SwapModalProps {
@@ -20,14 +20,15 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   const [tokenOut, setTokenOut] = useState("USDCe")
   const [amountIn, setAmountIn] = useState("")
   const [amountOut, setAmountOut] = useState("")
-  const [slippage, setSlippage] = useState("3")
+  const [slippage, setSlippage] = useState("0.5")
   const [isLoading, setIsLoading] = useState(false)
   const [isQuoting, setIsQuoting] = useState(false)
   const [language, setLanguage] = useState<"en" | "pt">("en")
   const [translations, setTranslations] = useState(getTranslations("en").swap || {})
-  const [walletTokens, setWalletTokens] = useState<any[]>([])
+  const [supportedTokens, setSupportedTokens] = useState<any[]>([])
   const [showTokenInDropdown, setShowTokenInDropdown] = useState(false)
   const [showTokenOutDropdown, setShowTokenOutDropdown] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   const tokenInDropdownRef = useRef<HTMLDivElement>(null)
   const tokenOutDropdownRef = useRef<HTMLDivElement>(null)
@@ -44,46 +45,23 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   }, [])
 
   useEffect(() => {
-    const loadWalletTokens = async () => {
-      if (walletAddress) {
-        try {
-          const tokens = await holdstationService.getTokenBalances(walletAddress)
-          console.log("Loaded wallet tokens:", tokens)
-
-          if (tokens && tokens.length > 0) {
-            setWalletTokens(tokens)
-
-            // Definir tokens padrão se não estiverem definidos
-            if (!tokens.find((t) => t.symbol === tokenIn)) {
-              setTokenIn(tokens[0].symbol)
-            }
-
-            if (!tokens.find((t) => t.symbol === tokenOut) && tokens.length > 1) {
-              setTokenOut(tokens[1].symbol)
-            }
-          }
-        } catch (error) {
-          console.error("Error loading wallet tokens:", error)
-        }
+    const loadSupportedTokens = async () => {
+      try {
+        const tokens = uniswapService.getSupportedTokens()
+        setSupportedTokens(tokens)
+        console.log("Loaded supported tokens:", tokens)
+      } catch (error) {
+        console.error("Error loading supported tokens:", error)
       }
     }
 
-    if (isOpen && walletAddress) {
-      loadWalletTokens()
+    if (isOpen) {
+      loadSupportedTokens()
     }
-  }, [isOpen, walletAddress, tokenIn, tokenOut])
+  }, [isOpen])
 
-  const selectedTokenIn =
-    walletTokens.find((t) => t.symbol === tokenIn) ||
-    (walletTokens.length > 0
-      ? walletTokens[0]
-      : { symbol: "WETH", name: "Wrapped Ethereum", icon: "/ethereum-abstract.png", balance: "0" })
-
-  const selectedTokenOut =
-    walletTokens.find((t) => t.symbol === tokenOut) ||
-    (walletTokens.length > 1
-      ? walletTokens[1]
-      : { symbol: "USDCe", name: "USD Coin", icon: "/usdc-coins.png", balance: "0" })
+  const selectedTokenIn = supportedTokens.find((t) => t.symbol === tokenIn) || supportedTokens[0]
+  const selectedTokenOut = supportedTokens.find((t) => t.symbol === tokenOut) || supportedTokens[1]
 
   // Obter cotação quando o valor de entrada mudar
   useEffect(() => {
@@ -95,12 +73,18 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
       setIsQuoting(true)
       try {
-        const quote = await holdstationService.getSmartQuote(tokenIn, tokenOut, Number.parseFloat(slippage))
-        const outputAmount = Number.parseFloat(amountIn) * Number.parseFloat(quote)
-        setAmountOut(outputAmount.toFixed(6))
+        const quote = await uniswapService.getQuote({
+          tokenIn,
+          tokenOut,
+          amountIn,
+          fee: 3000, // 0.3% fee
+        })
+
+        setAmountOut(Number.parseFloat(quote).toFixed(6))
       } catch (error) {
         console.error("Error getting quote:", error)
         setAmountOut("0")
+        toast.error("Erro ao obter cotação")
       } finally {
         setIsQuoting(false)
       }
@@ -108,7 +92,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
     const timeoutId = setTimeout(getQuote, 500) // Debounce
     return () => clearTimeout(timeoutId)
-  }, [amountIn, tokenIn, tokenOut, slippage])
+  }, [amountIn, tokenIn, tokenOut])
 
   const handleSwapTokens = () => {
     const tempToken = tokenIn
@@ -129,17 +113,35 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     }
 
     if (tokenIn === tokenOut) {
-      toast.error(translations.error || "Cannot swap same token")
+      toast.error("Cannot swap same token")
+      return
+    }
+
+    if (!walletAddress) {
+      toast.error("Please connect your wallet")
       return
     }
 
     setIsLoading(true)
     try {
-      // Simular swap bem-sucedido
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Calcular minimum amount out com slippage
+      const slippageMultiplier = 1 - Number.parseFloat(slippage) / 100
+      const amountOutMinimum = (Number.parseFloat(amountOut) * slippageMultiplier).toString()
+
+      const txHash = await uniswapService.executeSwap({
+        tokenIn,
+        tokenOut,
+        amountIn,
+        amountOutMinimum,
+        recipient: walletAddress,
+      })
 
       toast.success(translations.success || "Swap completed successfully!", {
         description: `${amountIn} ${tokenIn} → ${amountOut} ${tokenOut}`,
+        action: {
+          label: "View TX",
+          onClick: () => window.open(`https://worldchain-mainnet.explorer.alchemy.com/tx/${txHash}`, "_blank"),
+        },
       })
 
       // Limpar campos e fechar modal
@@ -203,10 +205,54 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
           >
             <div className="flex justify-between items-center p-3 border-b border-gray-800">
               <h2 className="text-lg font-bold text-white">{translations.title || "Swap"}</h2>
-              <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close">
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="text-gray-400 hover:text-white p-1"
+                  aria-label="Settings"
+                >
+                  <Settings size={16} />
+                </button>
+                <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close">
+                  <X size={18} />
+                </button>
+              </div>
             </div>
+
+            {/* Settings Panel */}
+            <AnimatePresence>
+              {showSettings && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="border-b border-gray-800 bg-gray-800/30"
+                >
+                  <div className="p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-400">Slippage Tolerance</span>
+                      <div className="flex space-x-1">
+                        {["0.1", "0.5", "1.0"].map((value) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => setSlippage(value)}
+                            className={`px-2 py-1 rounded text-xs ${
+                              slippage === value
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                            }`}
+                          >
+                            {value}%
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500">Powered by Uniswap V3 on WorldChain</div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <form onSubmit={handleSwap} className="p-3 space-y-3">
               {/* Token de entrada */}
@@ -237,39 +283,33 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                       ref={tokenInDropdownRef}
                       className="absolute right-0 top-8 z-50 mt-1 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
                     >
-                      {walletTokens.length > 0 ? (
-                        walletTokens
-                          .filter((t) => t.symbol !== tokenOut)
-                          .map((token) => (
-                            <button
-                              key={token.symbol}
-                              type="button"
-                              className="w-full flex items-center px-3 py-2 text-sm hover:bg-gray-700 text-gray-300"
-                              onClick={() => {
-                                setTokenIn(token.symbol)
-                                setShowTokenInDropdown(false)
-                              }}
-                            >
-                              <div className="w-4 h-4 rounded-full overflow-hidden mr-2">
-                                <Image
-                                  src={token.icon || "/placeholder.svg"}
-                                  alt={token.name}
-                                  width={16}
-                                  height={16}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                              <div className="text-left flex-1">
-                                <div className="font-medium">{token.symbol}</div>
-                                <div className="text-xs text-gray-400">
-                                  {Number.parseFloat(token.balance).toFixed(4)}
-                                </div>
-                              </div>
-                            </button>
-                          ))
-                      ) : (
-                        <div className="p-3 text-sm text-gray-400">Carregando tokens...</div>
-                      )}
+                      {supportedTokens
+                        .filter((t) => t.symbol !== tokenOut)
+                        .map((token) => (
+                          <button
+                            key={token.symbol}
+                            type="button"
+                            className="w-full flex items-center px-3 py-2 text-sm hover:bg-gray-700 text-gray-300"
+                            onClick={() => {
+                              setTokenIn(token.symbol)
+                              setShowTokenInDropdown(false)
+                            }}
+                          >
+                            <div className="w-4 h-4 rounded-full overflow-hidden mr-2">
+                              <Image
+                                src={token.icon || "/placeholder.svg"}
+                                alt={token.name}
+                                width={16}
+                                height={16}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="text-left flex-1">
+                              <div className="font-medium">{token.symbol}</div>
+                              <div className="text-xs text-gray-400">{token.name}</div>
+                            </div>
+                          </button>
+                        ))}
                     </div>
                   )}
                 </div>
@@ -282,11 +322,6 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                   min="0"
                   className="w-full bg-transparent text-lg font-semibold text-white placeholder-gray-500 focus:outline-none"
                 />
-                {selectedTokenIn && (
-                  <div className="text-xs text-gray-400 mt-1">
-                    Saldo: {Number.parseFloat(selectedTokenIn.balance || "0").toFixed(4)} {selectedTokenIn.symbol}
-                  </div>
-                )}
               </div>
 
               {/* Botão de troca */}
@@ -328,39 +363,33 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                       ref={tokenOutDropdownRef}
                       className="absolute right-0 top-8 z-50 mt-1 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
                     >
-                      {walletTokens.length > 0 ? (
-                        walletTokens
-                          .filter((t) => t.symbol !== tokenIn)
-                          .map((token) => (
-                            <button
-                              key={token.symbol}
-                              type="button"
-                              className="w-full flex items-center px-3 py-2 text-sm hover:bg-gray-700 text-gray-300"
-                              onClick={() => {
-                                setTokenOut(token.symbol)
-                                setShowTokenOutDropdown(false)
-                              }}
-                            >
-                              <div className="w-4 h-4 rounded-full overflow-hidden mr-2">
-                                <Image
-                                  src={token.icon || "/placeholder.svg"}
-                                  alt={token.name}
-                                  width={16}
-                                  height={16}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                              <div className="text-left flex-1">
-                                <div className="font-medium">{token.symbol}</div>
-                                <div className="text-xs text-gray-400">
-                                  {Number.parseFloat(token.balance).toFixed(4)}
-                                </div>
-                              </div>
-                            </button>
-                          ))
-                      ) : (
-                        <div className="p-3 text-sm text-gray-400">Carregando tokens...</div>
-                      )}
+                      {supportedTokens
+                        .filter((t) => t.symbol !== tokenIn)
+                        .map((token) => (
+                          <button
+                            key={token.symbol}
+                            type="button"
+                            className="w-full flex items-center px-3 py-2 text-sm hover:bg-gray-700 text-gray-300"
+                            onClick={() => {
+                              setTokenOut(token.symbol)
+                              setShowTokenOutDropdown(false)
+                            }}
+                          >
+                            <div className="w-4 h-4 rounded-full overflow-hidden mr-2">
+                              <Image
+                                src={token.icon || "/placeholder.svg"}
+                                alt={token.name}
+                                width={16}
+                                height={16}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="text-left flex-1">
+                              <div className="font-medium">{token.symbol}</div>
+                              <div className="text-xs text-gray-400">{token.name}</div>
+                            </div>
+                          </button>
+                        ))}
                     </div>
                   )}
                 </div>
@@ -373,30 +402,6 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                     className="w-full bg-transparent text-lg font-semibold text-white placeholder-gray-500 focus:outline-none"
                   />
                   {isQuoting && <Loader2 size={14} className="animate-spin text-gray-400 ml-2" />}
-                </div>
-                {selectedTokenOut && (
-                  <div className="text-xs text-gray-400 mt-1">
-                    Saldo: {Number.parseFloat(selectedTokenOut.balance || "0").toFixed(4)} {selectedTokenOut.symbol}
-                  </div>
-                )}
-              </div>
-
-              {/* Slippage compacto */}
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-400">{translations.slippage || "Slippage"}:</span>
-                <div className="flex space-x-1">
-                  {["1", "3", "5"].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setSlippage(value)}
-                      className={`px-2 py-1 rounded text-xs ${
-                        slippage === value ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                      }`}
-                    >
-                      {value}%
-                    </button>
-                  ))}
                 </div>
               </div>
 

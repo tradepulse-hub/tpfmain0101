@@ -28,11 +28,8 @@ export default function PartnershipsPage() {
     return () => window.removeEventListener("languageChange", handleLanguageChange)
   }, [])
 
-  const handleHoldStationClick = () => {
-    window.open(
-      "https://worldcoin.org/mini-app?app_id=app_0d4b759921490adc1f2bd569fda9b53a&app_mode=mini-app",
-      "_blank",
-    )
+  const handleUniswapClick = () => {
+    window.open("https://app.uniswap.org", "_blank")
   }
 
   return (
@@ -75,15 +72,15 @@ export default function PartnershipsPage() {
             {translations.partnerships?.ourPartners || "Our Partners"}
           </h2>
 
-          {/* HoldStation Partnership Card */}
+          {/* Uniswap Partnership Card */}
           <motion.div
             className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-6 cursor-pointer group"
             whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
-            onClick={handleHoldStationClick}
+            onClick={handleUniswapClick}
           >
             {/* Background glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
             {/* Shine effect */}
             <motion.div
@@ -94,31 +91,34 @@ export default function PartnershipsPage() {
             />
 
             <div className="relative z-10">
-              {/* HoldStation Logo */}
+              {/* Uniswap Logo */}
               <div className="flex items-center justify-center mb-4">
-                <div className="relative w-full h-32 rounded-lg overflow-hidden">
-                  <Image src="/holdstation-logo.jpg" alt="HoldStation" fill className="object-cover" />
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
+                  <svg className="w-10 h-10 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M5.868 8.462c0-1.378 1.117-2.494 2.494-2.494s2.494 1.116 2.494 2.494-1.117 2.494-2.494 2.494-2.494-1.116-2.494-2.494zm7.455 0c0-1.378 1.117-2.494 2.494-2.494s2.494 1.116 2.494 2.494-1.117 2.494-2.494 2.494-2.494-1.116-2.494-2.494zm-3.727 7.455c0-1.378 1.117-2.494 2.494-2.494s2.494 1.116 2.494 2.494-1.117 2.494-2.494 2.494-2.494-1.116-2.494-2.494z" />
+                  </svg>
                 </div>
               </div>
 
               {/* Partnership Info */}
               <div className="text-center">
                 <h3 className="text-lg font-semibold text-white mb-2 flex items-center justify-center gap-2">
-                  {translations.partnerships?.holdstationTitle || "HoldStation"}
+                  Uniswap V3
                   <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
                 </h3>
                 <p className="text-gray-300 text-sm mb-4">
-                  {translations.partnerships?.holdstationDescription ||
-                    "Advanced trading and swap platform for WorldChain"}
+                  {currentLanguage === "pt"
+                    ? "Protocolo de troca descentralizada líder mundial"
+                    : "World's leading decentralized exchange protocol"}
                 </p>
 
                 {/* Visit Button */}
                 <motion.button
-                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 group-hover:from-purple-500 group-hover:to-blue-500 transition-all duration-300"
+                  className="w-full bg-gradient-to-r from-pink-600 to-purple-600 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 group-hover:from-pink-500 group-hover:to-purple-500 transition-all duration-300"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  {translations.partnerships?.visitApp || "Visit App"}
+                  {currentLanguage === "pt" ? "Visitar Uniswap" : "Visit Uniswap"}
                   <ArrowUpRight className="w-4 h-4" />
                 </motion.button>
               </div>
@@ -126,11 +126,45 @@ export default function PartnershipsPage() {
           </motion.div>
         </motion.div>
 
-        {/* More Partnerships Coming Soon */}
+        {/* Integration Info */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.4 }}
+          className="w-full"
+        >
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/20 p-4 text-center">
+            <div className="text-gray-300">
+              <div className="flex items-center justify-center gap-3 mb-3">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center border border-gray-600/20">
+                  <Image src="/logo-tpf.png" alt="TPulseFi" width={20} height={20} />
+                </div>
+                <div className="text-gray-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-600 to-purple-600 flex items-center justify-center text-white font-bold text-xs">
+                  UNI
+                </div>
+              </div>
+              <h3 className="text-sm font-medium text-white mb-1">
+                {currentLanguage === "pt" ? "Integração Uniswap V3" : "Uniswap V3 Integration"}
+              </h3>
+              <p className="text-xs text-gray-400">
+                {currentLanguage === "pt"
+                  ? "Swaps descentralizados na WorldChain"
+                  : "Decentralized swaps on WorldChain"}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* More Partnerships Coming Soon */}
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.6 }}
           className="w-full"
         >
           <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/40 to-gray-900/40 border border-gray-700/20 border-dashed p-6 text-center">
