@@ -585,7 +585,7 @@ class UniswapService {
         throw new Error("Pool not ready for swapping")
       }
 
-      console.log(`🔄 Executing swap with CORRECT SwapRouter:`)
+      console.log(`🔄 Executing swap with MiniKit:`)
       console.log(`├─ ${params.amountIn} ${params.tokenIn} -> ${params.tokenOut}`)
       console.log(`├─ Minimum out: ${params.amountOutMinimum}`)
       console.log(`└─ SwapRouter: ${UNISWAP_CONTRACTS.SWAP_ROUTER_02}`)
@@ -595,49 +595,112 @@ class UniswapService {
 
       const amountIn = ethers.parseUnits(params.amountIn, tokenIn.decimals)
       const amountOutMinimum = ethers.parseUnits(params.amountOutMinimum, tokenOut.decimals)
-      const deadline = Math.floor(Date.now() / 1000) + 1200
 
-      if (typeof window !== "undefined" && (window as any).MiniKit) {
-        const MiniKit = (window as any).MiniKit
+      // Verificar se MiniKit está disponível
+      if (typeof window === "undefined") {
+        throw new Error("Window not available - not in browser")
+      }
 
-        console.log("📱 Executing via MiniKit with CORRECT SwapRouter...")
+      const MiniKit = (window as any).MiniKit
+      if (!MiniKit) {
+        throw new Error("MiniKit not found. Please use World App.")
+      }
 
-        await this.approveTokenIfNeeded(tokenIn.address, amountIn.toString(), params.recipient)
+      console.log("📱 MiniKit found, checking installation...")
 
-        const swapParams = {
-          tokenIn: tokenIn.address,
-          tokenOut: tokenOut.address,
-          fee: this.poolInfo.fee,
-          recipient: params.recipient,
-          deadline: deadline,
-          amountIn: amountIn,
-          amountOutMinimum: amountOutMinimum,
-          sqrtPriceLimitX96: 0n,
-        }
+      if (!MiniKit.isInstalled()) {
+        throw new Error("MiniKit not installed. Please use World App.")
+      }
 
-        const swapData = this.swapRouter!.interface.encodeFunctionData("exactInputSingle", [swapParams])
+      console.log("✅ MiniKit is installed")
 
-        const transaction = {
-          to: UNISWAP_CONTRACTS.SWAP_ROUTER_02, // ✅ ENDEREÇO CORRETO
-          value: "0x0",
-          data: swapData,
-        }
+      // Verificar se há usuário conectado
+      if (!MiniKit.user || !MiniKit.user.walletAddress) {
+        throw new Error("No user connected to MiniKit")
+      }
 
-        console.log("📤 Transaction details:")
-        console.log(`├─ To: ${transaction.to}`)
-        console.log(`├─ Value: ${transaction.value}`)
-        console.log(`└─ Data length: ${transaction.data.length}`)
+      console.log(`👤 MiniKit user: ${MiniKit.user.walletAddress}`)
 
+      // Primeiro, aprovar o token se necessário
+      console.log("🔍 Checking token approval...")
+      await this.approveTokenIfNeeded(tokenIn.address, amountIn.toString(), params.recipient)
+
+      // Preparar parâmetros para o swap
+      const swapParams = {
+        tokenIn: tokenIn.address,
+        tokenOut: tokenOut.address,
+        fee: this.poolInfo.fee,
+        recipient: params.recipient,
+        deadline: Math.floor(Date.now() / 1000) + 1200, // 20 minutos
+        amountIn: amountIn,
+        amountOutMinimum: amountOutMinimum,
+        sqrtPriceLimitX96: 0n,
+      }
+
+      console.log("📋 Swap parameters:")
+      console.log(`├─ tokenIn: ${swapParams.tokenIn}`)
+      console.log(`├─ tokenOut: ${swapParams.tokenOut}`)
+      console.log(`├─ fee: ${swapParams.fee}`)
+      console.log(`├─ recipient: ${swapParams.recipient}`)
+      console.log(`├─ deadline: ${swapParams.deadline}`)
+      console.log(`├─ amountIn: ${swapParams.amountIn.toString()}`)
+      console.log(`└─ amountOutMinimum: ${swapParams.amountOutMinimum.toString()}`)
+
+      // Codificar a chamada para o SwapRouter02
+      const swapData = this.swapRouter!.interface.encodeFunctionData("exactInputSingle", [swapParams])
+
+      const transaction = {
+        to: UNISWAP_CONTRACTS.SWAP_ROUTER_02,
+        value: "0x0",
+        data: swapData,
+      }
+
+      console.log("📤 Transaction to send:")
+      console.log(`├─ to: ${transaction.to}`)
+      console.log(`├─ value: ${transaction.value}`)
+      console.log(`├─ data: ${transaction.data.slice(0, 50)}...`)
+      console.log(`└─ data length: ${transaction.data.length}`)
+
+      // Usar a função correta do MiniKit para enviar transação
+      console.log("🚀 Sending transaction via MiniKit...")
+
+      try {
+        // Tentar o método principal do MiniKit
         const result = await MiniKit.commandsAsync.sendTransaction(transaction)
 
+        console.log("📨 MiniKit response:", result)
+
         if (result.success) {
-          console.log("✅ Swap executed:", result.transaction_id)
+          console.log("✅ Swap executed successfully!")
+          console.log(`├─ Transaction ID: ${result.transaction_id}`)
+          console.log(`└─ Explorer: https://worldscan.org/tx/${result.transaction_id}`)
           return result.transaction_id
         } else {
-          throw new Error(`Swap failed: ${result.error_code}`)
+          console.error("❌ Swap failed:")
+          console.error(`├─ Error code: ${result.error_code}`)
+          console.error(`└─ Error message: ${result.error_message || "Unknown error"}`)
+          throw new Error(`Swap failed: ${result.error_code} - ${result.error_message || "Unknown error"}`)
         }
-      } else {
-        throw new Error("MiniKit not available")
+      } catch (minikitError: any) {
+        console.error("❌ MiniKit transaction error:", minikitError)
+
+        // Tentar método alternativo se disponível
+        if (MiniKit.commands && MiniKit.commands.sendTransaction) {
+          console.log("🔄 Trying alternative MiniKit method...")
+          try {
+            const altResult = await MiniKit.commands.sendTransaction(transaction)
+            console.log("📨 Alternative MiniKit response:", altResult)
+
+            if (altResult.success) {
+              console.log("✅ Swap executed via alternative method!")
+              return altResult.transaction_id
+            }
+          } catch (altError) {
+            console.error("❌ Alternative method also failed:", altError)
+          }
+        }
+
+        throw new Error(`MiniKit transaction failed: ${minikitError.message}`)
       }
     } catch (error) {
       console.error("❌ Error executing swap:", error)
@@ -647,46 +710,76 @@ class UniswapService {
 
   private async approveTokenIfNeeded(tokenAddress: string, amount: string, userAddress: string): Promise<void> {
     try {
-      if (typeof window !== "undefined" && (window as any).MiniKit) {
-        const MiniKit = (window as any).MiniKit
+      console.log("🔍 Checking token approval...")
 
-        const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider)
-        const currentAllowance = await tokenContract.allowance(userAddress, UNISWAP_CONTRACTS.SWAP_ROUTER_02)
+      if (typeof window === "undefined") {
+        throw new Error("Window not available")
+      }
 
-        console.log(`🔍 Token approval check:`)
-        console.log(`├─ Token: ${tokenAddress}`)
-        console.log(`├─ Spender: ${UNISWAP_CONTRACTS.SWAP_ROUTER_02}`)
-        console.log(`├─ Current allowance: ${currentAllowance.toString()}`)
-        console.log(`└─ Required amount: ${amount}`)
+      const MiniKit = (window as any).MiniKit
+      if (!MiniKit || !MiniKit.isInstalled()) {
+        throw new Error("MiniKit not available")
+      }
 
-        if (currentAllowance >= BigInt(amount)) {
-          console.log("✅ Sufficient allowance")
-          return
-        }
+      const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider)
+      const currentAllowance = await tokenContract.allowance(userAddress, UNISWAP_CONTRACTS.SWAP_ROUTER_02)
 
-        console.log("🔄 Approving token...")
+      console.log(`🔍 Token approval status:`)
+      console.log(`├─ Token: ${tokenAddress}`)
+      console.log(`├─ Spender: ${UNISWAP_CONTRACTS.SWAP_ROUTER_02}`)
+      console.log(`├─ User: ${userAddress}`)
+      console.log(`├─ Current allowance: ${currentAllowance.toString()}`)
+      console.log(`└─ Required amount: ${amount}`)
 
-        const approvalData = tokenContract.interface.encodeFunctionData("approve", [
-          UNISWAP_CONTRACTS.SWAP_ROUTER_02,
-          amount,
-        ])
+      if (currentAllowance >= BigInt(amount)) {
+        console.log("✅ Sufficient allowance, no approval needed")
+        return
+      }
 
-        const approvalTransaction = {
-          to: tokenAddress,
-          value: "0x0",
-          data: approvalData,
-        }
+      console.log("🔄 Token approval needed, sending approval transaction...")
 
+      // Preparar transação de aprovação
+      const approvalData = tokenContract.interface.encodeFunctionData("approve", [
+        UNISWAP_CONTRACTS.SWAP_ROUTER_02,
+        amount,
+      ])
+
+      const approvalTransaction = {
+        to: tokenAddress,
+        value: "0x0",
+        data: approvalData,
+      }
+
+      console.log("📤 Approval transaction:")
+      console.log(`├─ to: ${approvalTransaction.to}`)
+      console.log(`├─ value: ${approvalTransaction.value}`)
+      console.log(`└─ data: ${approvalTransaction.data.slice(0, 50)}...`)
+
+      // Enviar aprovação via MiniKit
+      try {
         const result = await MiniKit.commandsAsync.sendTransaction(approvalTransaction)
 
+        console.log("📨 Approval response:", result)
+
         if (result.success) {
-          console.log("✅ Token approved:", result.transaction_id)
+          console.log("✅ Token approved successfully!")
+          console.log(`└─ Transaction ID: ${result.transaction_id}`)
+
+          // Aguardar um pouco para a aprovação ser processada
+          console.log("⏳ Waiting for approval to be processed...")
+          await new Promise((resolve) => setTimeout(resolve, 3000))
         } else {
+          console.error("❌ Approval failed:")
+          console.error(`├─ Error code: ${result.error_code}`)
+          console.error(`└─ Error message: ${result.error_message || "Unknown error"}`)
           throw new Error(`Approval failed: ${result.error_code}`)
         }
+      } catch (approvalError: any) {
+        console.error("❌ Approval transaction error:", approvalError)
+        throw new Error(`Token approval failed: ${approvalError.message}`)
       }
     } catch (error) {
-      console.error("❌ Error approving token:", error)
+      console.error("❌ Error in token approval:", error)
       throw error
     }
   }

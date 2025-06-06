@@ -172,10 +172,31 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     }
 
     // Verificar se MiniKit está disponível
-    if (typeof window === "undefined" || !(window as any).MiniKit) {
-      toast.error("MiniKit não disponível. Use o World App.")
+    if (typeof window === "undefined") {
+      toast.error("Ambiente não suportado")
       return
     }
+
+    const MiniKit = (window as any).MiniKit
+    if (!MiniKit) {
+      toast.error("MiniKit não encontrado. Use o World App.")
+      return
+    }
+
+    if (!MiniKit.isInstalled()) {
+      toast.error("MiniKit não instalado. Use o World App.")
+      return
+    }
+
+    if (!MiniKit.user || !MiniKit.user.walletAddress) {
+      toast.error("Usuário não conectado ao MiniKit")
+      return
+    }
+
+    console.log("🚀 Starting swap process...")
+    console.log(`├─ MiniKit user: ${MiniKit.user.walletAddress}`)
+    console.log(`├─ Wallet address: ${walletAddress}`)
+    console.log(`└─ MiniKit installed: ${MiniKit.isInstalled()}`)
 
     setIsLoading(true)
     try {
@@ -183,15 +204,14 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
       const slippageMultiplier = 1 - Number.parseFloat(slippage) / 100
       const amountOutMinimum = (Number.parseFloat(amountOut) * slippageMultiplier).toString()
 
-      console.log("Executing swap via MiniKit:", {
-        tokenIn,
-        tokenOut,
-        amountIn,
-        amountOutMinimum,
-        recipient: walletAddress,
-      })
+      console.log("📋 Swap details:")
+      console.log(`├─ ${amountIn} ${tokenIn} -> ${tokenOut}`)
+      console.log(`├─ Expected out: ${amountOut}`)
+      console.log(`├─ Minimum out: ${amountOutMinimum}`)
+      console.log(`├─ Slippage: ${slippage}%`)
+      console.log(`└─ Recipient: ${walletAddress}`)
 
-      // Executar swap via MiniKit - isso vai abrir a janela nativa do World App
+      // Executar swap via MiniKit
       const txHash = await uniswapService.executeSwap({
         tokenIn,
         tokenOut,
@@ -200,11 +220,14 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
         recipient: walletAddress,
       })
 
+      console.log("✅ Swap completed successfully!")
+      console.log(`└─ Transaction hash: ${txHash}`)
+
       toast.success("Swap realizado com sucesso!", {
         description: `${amountIn} ${tokenIn} → ${amountOut} ${tokenOut}`,
         action: {
           label: "Ver TX",
-          onClick: () => window.open(`https://worldchain-mainnet.explorer.alchemy.com/tx/${txHash}`, "_blank"),
+          onClick: () => window.open(`https://worldscan.org/tx/${txHash}`, "_blank"),
         },
       })
 
@@ -216,10 +239,23 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
       // Atualizar saldos após o swap
       setTimeout(() => {
         handleRefreshBalances()
-      }, 3000)
-    } catch (error) {
-      console.error("Error executing swap:", error)
-      toast.error("Falha no swap. Tente novamente.")
+      }, 5000) // Aguardar mais tempo para a transação ser processada
+    } catch (error: any) {
+      console.error("❌ Swap failed:", error)
+
+      let errorMessage = "Falha no swap. Tente novamente."
+
+      if (error.message.includes("MiniKit")) {
+        errorMessage = "Erro do MiniKit. Verifique se está usando o World App."
+      } else if (error.message.includes("approval")) {
+        errorMessage = "Erro na aprovação do token. Tente novamente."
+      } else if (error.message.includes("insufficient")) {
+        errorMessage = "Saldo insuficiente para o swap."
+      }
+
+      toast.error(errorMessage, {
+        description: error.message,
+      })
     } finally {
       setIsLoading(false)
     }
