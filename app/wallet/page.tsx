@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
-import { Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw } from "lucide-react"
+import { Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, ArrowUpDown } from "lucide-react"
 import { walletService } from "@/services/wallet-service"
 import { SendTokenModal } from "@/components/send-token-modal"
 import { ReceiveTokenModal } from "@/components/receive-token-modal"
@@ -15,6 +15,7 @@ import Image from "next/image"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
 import { enhancedTokenService } from "@/services/enhanced-token-service"
 import { TokenDetailsModal } from "@/components/token-details-modal"
+import { SwapModal } from "@/components/swap-modal"
 
 export default function WalletPage() {
   const [walletAddress, setWalletAddress] = useState<string>("")
@@ -31,6 +32,7 @@ export default function WalletPage() {
   const [selectedToken, setSelectedToken] = useState<string>("")
   const [selectedTokenBalance, setSelectedTokenBalance] = useState<string>("0")
   const [isTokenDetailsOpen, setIsTokenDetailsOpen] = useState(false)
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false)
 
   // Obter traduções com base no idioma atual
   const translations = getTranslations(language)
@@ -183,6 +185,8 @@ export default function WalletPage() {
         walletAddress={walletAddress}
       />
 
+      <SwapModal isOpen={isSwapModalOpen} onClose={() => setIsSwapModalOpen(false)} walletAddress={walletAddress} />
+
       <div className="z-10 w-full max-w-md mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -244,6 +248,14 @@ export default function WalletPage() {
                 >
                   <ArrowDownLeft className="w-4 h-4 mr-2" />
                   {translations.wallet?.receive || "Receber"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 bg-gray-800 border-gray-700 hover:bg-gray-700 text-white"
+                  onClick={() => setIsSwapModalOpen(true)}
+                >
+                  <ArrowUpDown className="w-4 h-4 mr-2" />
+                  {translations.wallet?.swap || "Swap"}
                 </Button>
               </div>
             </CardContent>

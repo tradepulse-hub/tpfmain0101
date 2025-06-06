@@ -34,7 +34,6 @@ export interface HistoryTranslations {
   yesterday?: string
 }
 
-// Adicionar "finances" à interface NavTranslations:
 export interface NavTranslations {
   home?: string
   wallet?: string
@@ -81,8 +80,35 @@ export interface WalletTranslations {
   balance?: string
   send?: string
   receive?: string
+  swap?: string
   otherTokens?: string
   errorMessage?: string
+}
+
+export interface SwapTranslations {
+  title?: string
+  subtitle?: string
+  from?: string
+  to?: string
+  amount?: string
+  estimatedOutput?: string
+  slippage?: string
+  slippageTooltip?: string
+  swapButton?: string
+  processing?: string
+  success?: string
+  error?: string
+  insufficientBalance?: string
+  selectToken?: string
+  enterAmount?: string
+  gettingQuote?: string
+  noQuoteAvailable?: string
+  swapTokens?: string
+  maxSlippage?: string
+  priceImpact?: string
+  minimumReceived?: string
+  networkFee?: string
+  route?: string
 }
 
 export interface WinnersTranslations {
@@ -92,7 +118,6 @@ export interface WinnersTranslations {
   noWinnersDesc?: string
 }
 
-// Expandir a interface AgendaTranslations para incluir todas as strings necessárias
 export interface AgendaTranslations {
   title?: string
   subtitle?: string
@@ -104,15 +129,14 @@ export interface AgendaTranslations {
   eventsAndActivities?: string
   online?: string
   participants?: string
-  days?: string[] // Array com os nomes dos dias da semana
-  months?: string[] // Array com os nomes dos meses
+  days?: string[]
+  months?: string[]
   eventTypes?: {
     airdrop?: string
     community?: string
     competition?: string
     education?: string
   }
-  // Traduções específicas para eventos
   events?: {
     topHoldersIncentive?: {
       title?: string
@@ -148,7 +172,6 @@ export interface LearnTranslations {
   tokenomicsDesc?: string
   glossary?: string
   glossaryDesc?: string
-  // Glossary sections
   glossaryTitle?: string
   tokenomicsTitle?: string
   tokenomicsIntro?: string
@@ -165,7 +188,6 @@ export interface LearnTranslations {
   team?: string
   marketing?: string
   reserve?: string
-  // Trading simulator
   tradingSimulator?: string
 }
 
@@ -240,7 +262,6 @@ export interface ConnectButtonTranslations {
   errorConnecting?: string
 }
 
-// Adicionar StormTranslations:
 export interface StormTranslations {
   title?: string
   subtitle?: string
@@ -252,7 +273,6 @@ export interface StormTranslations {
   publishing?: string
 }
 
-// Adicionar interface para traduções do perfil
 export interface ProfileTranslations {
   inviteBanner?: string
   shareButton?: string
@@ -263,7 +283,6 @@ export interface ProfileTranslations {
   notConnected?: string
 }
 
-// Adicionar interface para traduções do check-in diário
 export interface DailyCheckInTranslations {
   title?: string
   subtitle?: string
@@ -289,7 +308,6 @@ export interface DailyCheckInTranslations {
   availableNow?: string
 }
 
-// Adicionar interface para traduções das finanças
 export interface FinancesTranslations {
   title?: string
   subtitle?: string
@@ -311,13 +329,13 @@ export interface FinancesTranslations {
   totalExpenses?: string
 }
 
-// Adicionar finances à interface Translations:
 export interface Translations {
   airdrop?: AirdropTranslations
   history?: HistoryTranslations
   nav?: NavTranslations
   games?: GamesTranslations
   wallet?: WalletTranslations
+  swap?: SwapTranslations
   winners?: WinnersTranslations
   agenda?: AgendaTranslations
   furnace?: FurnaceTranslations
@@ -359,7 +377,6 @@ export function setCurrentLanguage(lang: Language): void {
 // Função para obter as traduções para um idioma específico
 export function getTranslations(lang: Language): Translations {
   switch (lang) {
-    // Adicionar traduções em português:
     case "pt":
       return {
         airdrop: {
@@ -433,8 +450,34 @@ export function getTranslations(lang: Language): Translations {
           balance: "Saldo TPF",
           send: "Enviar",
           receive: "Receber",
+          swap: "Trocar",
           otherTokens: "Outros Tokens Confiáveis",
           errorMessage: "Não foi possível obter o saldo real. Tente definir manualmente.",
+        },
+        swap: {
+          title: "Trocar Tokens",
+          subtitle: "Troque tokens de forma rápida e segura",
+          from: "De",
+          to: "Para",
+          amount: "Quantidade",
+          estimatedOutput: "Saída estimada",
+          slippage: "Slippage",
+          slippageTooltip: "Tolerância máxima de variação de preço",
+          swapButton: "Trocar",
+          processing: "Processando...",
+          success: "Troca realizada com sucesso!",
+          error: "Erro ao realizar a troca",
+          insufficientBalance: "Saldo insuficiente",
+          selectToken: "Selecionar token",
+          enterAmount: "Digite a quantidade",
+          gettingQuote: "Obtendo cotação...",
+          noQuoteAvailable: "Cotação não disponível",
+          swapTokens: "Inverter tokens",
+          maxSlippage: "Slippage máximo",
+          priceImpact: "Impacto no preço",
+          minimumReceived: "Mínimo recebido",
+          networkFee: "Taxa de rede",
+          route: "Rota",
         },
         winners: {
           title: "Vencedores",
@@ -515,7 +558,6 @@ export function getTranslations(lang: Language): Translations {
           tokenomicsDesc: "Entenda a economia dos tokens e como ela afeta o valor e a utilidade dos projetos crypto.",
           glossary: "Glossário Crypto",
           glossaryDesc: "Guia completo de termos e conceitos do mundo das criptomoedas para iniciantes e experts.",
-          // Glossary sections
           glossaryTitle: "Glossário Crypto",
           tokenomicsTitle: "Tokenomics",
           tokenomicsIntro:
@@ -534,7 +576,6 @@ export function getTranslations(lang: Language): Translations {
           team: "Equipe:",
           marketing: "Marketing:",
           reserve: "Reserva:",
-          // Trading simulator
           tradingSimulator: "Simulador de Trading",
         },
         about: {
@@ -667,8 +708,8 @@ export function getTranslations(lang: Language): Translations {
           revenueBreakdown: "Detalhamento de Receitas",
           expenseBreakdown: "Detalhamento de Despesas",
           noData: "Sem dados disponíveis",
-          totalRevenue: "Receita Total",
-          totalExpenses: "Despesas Totais",
+          totalRevenue: "Total de Receitas",
+          totalExpenses: "Total de Despesas",
         },
       }
 
@@ -677,7 +718,7 @@ export function getTranslations(lang: Language): Translations {
       return {
         airdrop: {
           title: "Airdrop",
-          subtitle: "Claim your daily TPF tokens",
+          subtitle: "Receive your daily TPF tokens",
           contractBalance: "Contract balance:",
           dailyAirdrop: "Daily airdrop:",
           nextClaimIn: "Next claim in:",
@@ -698,7 +739,7 @@ export function getTranslations(lang: Language): Translations {
           from: "From",
           to: "To",
           block: "Block",
-          txHash: "Transaction hash",
+          txHash: "Transaction Hash",
           today: "Today",
           yesterday: "Yesterday",
         },
@@ -746,25 +787,50 @@ export function getTranslations(lang: Language): Translations {
           balance: "TPF Balance",
           send: "Send",
           receive: "Receive",
+          swap: "Swap",
           otherTokens: "Other Trusted Tokens",
-          errorMessage: "Could not get real balance. Try setting manually.",
+          errorMessage: "Could not get real balance. Try setting it manually.",
+        },
+        swap: {
+          title: "Swap Tokens",
+          subtitle: "Swap tokens quickly and securely",
+          from: "From",
+          to: "To",
+          amount: "Amount",
+          estimatedOutput: "Estimated output",
+          slippage: "Slippage",
+          slippageTooltip: "Maximum price variation tolerance",
+          swapButton: "Swap",
+          processing: "Processing...",
+          success: "Swap completed successfully!",
+          error: "Error performing swap",
+          insufficientBalance: "Insufficient balance",
+          selectToken: "Select token",
+          enterAmount: "Enter amount",
+          gettingQuote: "Getting quote...",
+          noQuoteAvailable: "Quote not available",
+          swapTokens: "Swap tokens",
+          maxSlippage: "Max slippage",
+          priceImpact: "Price impact",
+          minimumReceived: "Minimum received",
+          networkFee: "Network fee",
+          route: "Route",
         },
         winners: {
           title: "Winners",
-          subtitle: "Participants awarded in our events",
+          subtitle: "Participants rewarded in our events",
           noWinners: "No winners yet",
-          noWinnersDesc:
-            "Winners from our events will be displayed here. Stay tuned for upcoming events to participate!",
+          noWinnersDesc: "Winners of our events will be displayed here. Stay tuned for upcoming events to participate!",
         },
         agenda: {
           title: "Agenda",
-          subtitle: "Community events and activities",
+          subtitle: "Events and community activities",
           today: "Today",
           event: "Event",
           noEvents: "No events for this date",
           howToParticipate: "How to participate:",
           incentivePeriod: "Incentive Period",
-          eventsAndActivities: "Community events and activities",
+          eventsAndActivities: "Events and community activities",
           online: "Online",
           participants: "participants",
           days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
@@ -792,18 +858,18 @@ export function getTranslations(lang: Language): Translations {
             topHoldersIncentive: {
               title: "10% Incentive for Top 10 TPF Holders",
               description:
-                "Earn 10% bonus tokens if you're among the top 10 TPF holders during the event period. Example: 10M TPF = 1M bonus tokens",
+                "Earn 10% bonus tokens if you are among the top 10 TPF holders during the event period. Example: 10M TPF = 1M bonus tokens",
               howToParticipate: [
                 "Buy and hold TPF tokens",
                 "Reach a position among the top 10 holders",
-                "Maintain position until June 9th",
+                "Maintain the position until June 9th",
               ],
             },
           },
         },
         furnace: {
           title: "Furnace",
-          subtitle: "Burn TPF tokens and contribute to token sustainability",
+          subtitle: "Burn TPF tokens and contribute to token stability",
           totalBurned: "Total burned",
           amountToBurn: "Amount of TPF to burn",
           startBurn: "Start Burn",
@@ -823,23 +889,23 @@ export function getTranslations(lang: Language): Translations {
           searchInGlossary: "Search in Glossary",
           didYouKnow: "Did you know?",
           bitcoinPizza:
-            "On May 22, 2010, Laszlo Hanyecz made the first Bitcoin purchase: two pizzas for 10,000 BTC. Today, that value would be worth millions of dollars!",
+            "On May 22, 2010, Laszlo Hanyecz made the first Bitcoin purchase: two pizzas for 10,000 BTC. Today, that amount would be worth millions of dollars!",
           tokenomics: "Tokenomics",
           tokenomicsDesc: "Understand token economics and how it affects the value and utility of crypto projects.",
           glossary: "Crypto Glossary",
           glossaryDesc: "Complete guide to terms and concepts from the cryptocurrency world for beginners and experts.",
-          // Glossary sections
           glossaryTitle: "Crypto Glossary",
           tokenomicsTitle: "Tokenomics",
           tokenomicsIntro:
-            "Tokenomics refers to the economics of cryptographic tokens. Understanding a project's tokenomics is essential for evaluating its value and long-term potential.",
+            "Tokenomics refers to the economics of cryptocurrency tokens. Understanding a project's tokenomics is essential for evaluating its value and long-term potential.",
           supplyDistribution: "Supply and Distribution",
           supplyDistributionDesc:
             "The total, circulating, and maximum supply of tokens, as well as their distribution among team, investors, and community.",
           tokenUtility: "Token Utility",
           tokenUtilityDesc: "How the token is used within the ecosystem and what benefits it offers to holders.",
           valueMechanisms: "Value Mechanisms",
-          valueMechanismsDesc: "Token burning, staking, governance, and other mechanisms that affect token value.",
+          valueMechanismsDesc:
+            "Token burning, staking, governance, and other mechanisms that affect the token's value.",
           tpfTokenomics: "TPF Tokenomics",
           totalSupply: "Total Supply:",
           liquidity: "Liquidity:",
@@ -847,7 +913,6 @@ export function getTranslations(lang: Language): Translations {
           team: "Team:",
           marketing: "Marketing:",
           reserve: "Reserve:",
-          // Trading simulator
           tradingSimulator: "Trading Simulator",
         },
         about: {
@@ -860,7 +925,7 @@ export function getTranslations(lang: Language): Translations {
           airdrops: "Daily Airdrops",
           community: "Active Community",
           utility: "Utility",
-          longTerm: "Long-term Vision",
+          longTerm: "Long-Term Vision",
           growthStrategy: "Growth Strategy",
           marketing: "Marketing",
           incentives: "Incentives",
@@ -908,7 +973,7 @@ export function getTranslations(lang: Language): Translations {
           tokenNotSupported: "Token not supported",
           warning: "Please verify the recipient address before sending tokens.",
           warningWorldchain:
-            "Do not send to wallets that do not support Worldchain, otherwise you may lose your assets. Do not send to exchanges.",
+            "Do not send to wallets that don't support Worldchain, otherwise you may lose your assets. Do not send to exchanges.",
           hideWarning: "Hide warning",
           transactionPending: "Transaction pending. Please wait...",
         },
@@ -947,7 +1012,7 @@ export function getTranslations(lang: Language): Translations {
           totalPoints: "Total points",
           streak: "Streak",
           days: "days",
-          checkInSuccess: "Check-in successful! +1 point",
+          checkInSuccess: "Check-in completed! +1 point",
           history: "History",
           showHistory: "Show history",
           hideHistory: "Hide history",
@@ -987,30 +1052,29 @@ export function getTranslations(lang: Language): Translations {
   }
 }
 
-// Hook personalizado para usar traduções
-export function useTranslations() {
-  const [language, setLanguage] = useState<Language>(getCurrentLanguage())
-  const [translations, setTranslations] = useState<Translations>(getTranslations(language))
+// Hook para usar traduções em componentes
+export function useTranslation() {
+  const [language, setLanguage] = useState<Language>("en")
 
   useEffect(() => {
+    setLanguage(getCurrentLanguage())
+
     const handleLanguageChange = () => {
-      const newLanguage = getCurrentLanguage()
-      setLanguage(newLanguage)
-      setTranslations(getTranslations(newLanguage))
+      setLanguage(getCurrentLanguage())
     }
 
-    // Adicionar listener para mudanças de idioma
     window.addEventListener("languageChange", handleLanguageChange)
-
-    // Limpar listener ao desmontar
-    return () => {
-      window.removeEventListener("languageChange", handleLanguageChange)
-    }
+    return () => window.removeEventListener("languageChange", handleLanguageChange)
   }, [])
+
+  const translations = getTranslations(language)
 
   return {
     language,
-    translations,
     setLanguage: setCurrentLanguage,
+    t: translations,
   }
 }
+
+// Alias para compatibilidade
+export const useTranslations = useTranslation
