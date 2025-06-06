@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { BackgroundEffect } from "@/components/background-effect"
 import { BottomNav } from "@/components/bottom-nav"
-import { Calendar, Clock, MapPin, Users, Copy, Trophy, Gamepad2 } from "lucide-react"
+import { Calendar, Clock, MapPin, Users, Copy, Trophy, Gamepad2, ExternalLink } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -54,15 +54,21 @@ export default function AgendaPage() {
       })
   }
 
+  // Função para abrir endereço no explorer
+  const openAddressInExplorer = (address: string) => {
+    window.open(`https://worldscan.org/address/${address}`, "_blank")
+  }
+
   // Dados dos eventos
   const mockEvents: Event[] = [
     {
       id: "1",
       type: "airdrop",
-      date: "2025-06-09",
-      time: "23:59",
+      date: "2025-05-09",
+      time: "00:00",
       location: t.agenda?.online || "Online",
       participants: 500,
+      endDate: "2025-06-09", // Mantendo a data de término original
     },
     {
       id: "2",
@@ -286,16 +292,12 @@ export default function AgendaPage() {
     if (event.type === "airdrop") {
       return (
         <>
-          <h4 className="text-white font-medium">
-            {language === "pt" ? "Incentivo Top Holders" : "Top Holders Incentive"}
-          </h4>
-          <p className="text-gray-400 text-sm mt-1">
-            {language === "pt" ? "10% de bônus para os top holders de TPF" : "10% bonus for top TPF holders"}
-          </p>
+          <h4 className="text-white font-medium">{t.agenda?.events?.topHoldersIncentive?.title}</h4>
+          <p className="text-gray-400 text-sm mt-1">{t.agenda?.events?.topHoldersIncentive?.description}</p>
 
           {event.endDate && (
             <div className="mt-2 text-xs text-purple-400 font-medium">
-              {language === "pt" ? "Até" : "Until"} {formatDate(event.endDate || event.date)}
+              {formatDate(event.date)} - {formatDate(event.endDate)}
             </div>
           )}
 
@@ -308,6 +310,21 @@ export default function AgendaPage() {
               <MapPin className="w-3 h-3 mr-1" />
               <span>{event.location}</span>
             </div>
+            <div className="flex items-center">
+              <Users className="w-3 h-3 mr-1" />
+              <span>
+                {event.participants} {t.agenda?.participants}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-3 text-xs text-gray-300 border-t border-gray-700/50 pt-2">
+            <p className="font-medium mb-1">{t.agenda?.howToParticipate}</p>
+            <ol className="list-decimal pl-4 space-y-0.5">
+              {t.agenda?.events?.topHoldersIncentive?.howToParticipate?.map((step, index) => (
+                <li key={index}>{step}</li>
+              ))}
+            </ol>
           </div>
         </>
       )
@@ -347,8 +364,16 @@ export default function AgendaPage() {
               <button
                 onClick={() => copyAddress("0xf04a78df4cc3017c0c23f37528d7b6cbbeea6677")}
                 className="p-1 hover:bg-gray-600 rounded transition-colors"
+                title={language === "pt" ? "Copiar endereço" : "Copy address"}
               >
                 <Copy className="w-3 h-3 text-gray-400" />
+              </button>
+              <button
+                onClick={() => openAddressInExplorer("0xf04a78df4cc3017c0c23f37528d7b6cbbeea6677")}
+                className="p-1 hover:bg-gray-600 rounded transition-colors"
+                title={language === "pt" ? "Ver no explorer" : "View in explorer"}
+              >
+                <ExternalLink className="w-3 h-3 text-gray-400" />
               </button>
             </div>
           </div>
@@ -424,7 +449,7 @@ export default function AgendaPage() {
         <h1 className="text-3xl font-bold tracking-tighter flex items-center justify-center">
           <Calendar className="w-6 h-6 mr-2 text-blue-400" />
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-200 via-white to-gray-300">
-            {language === "pt" ? "Eventos e Atividades" : "Events and Activities"}
+            {t.agenda?.eventsAndActivities}
           </span>
         </h1>
       </motion.div>
@@ -478,15 +503,15 @@ export default function AgendaPage() {
               <div className="mt-4 flex flex-wrap gap-3 text-xs text-gray-400">
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-blue-600 mr-1"></div>
-                  <span>{language === "pt" ? "Hoje" : "Today"}</span>
+                  <span>{t.agenda?.today}</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
-                  <span>{language === "pt" ? "Evento" : "Event"}</span>
+                  <span>{t.agenda?.event}</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-purple-600/40 mr-1"></div>
-                  <span>{language === "pt" ? "Período de Evento" : "Event Period"}</span>
+                  <span>{t.agenda?.incentivePeriod}</span>
                 </div>
               </div>
             </Card>
@@ -519,9 +544,7 @@ export default function AgendaPage() {
                   </div>
                 ) : (
                   <Card className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-4 border border-gray-700/30 text-center">
-                    <p className="text-gray-400">
-                      {language === "pt" ? "Nenhum evento nesta data" : "No events on this date"}
-                    </p>
+                    <p className="text-gray-400">{t.agenda?.noEvents}</p>
                   </Card>
                 )}
               </motion.div>

@@ -137,11 +137,7 @@ export function DailyCheckIn() {
     const m = translations.dailyCheckIn?.minutes || "m"
     const s = translations.dailyCheckIn?.seconds || "s"
 
-    if (hours > 0) {
-      return `${hours.toString().padStart(2, "0")}${h} ${minutes.toString().padStart(2, "0")}${m}`
-    } else {
-      return `${minutes.toString().padStart(2, "0")}${m} ${seconds.toString().padStart(2, "0")}${s}`
-    }
+    return `${hours.toString().padStart(2, "0")}${h} ${minutes.toString().padStart(2, "0")}${m} ${seconds.toString().padStart(2, "0")}${s}`
   }
 
   return (
@@ -158,7 +154,7 @@ export function DailyCheckIn() {
         </div>
       </div>
 
-      {/* Countdown Timer compacto */}
+      {/* Countdown Timer compacto com segundos */}
       {hasCheckedInToday && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
