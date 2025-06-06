@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
-import { X, ArrowUpDown, Loader2, Settings } from "lucide-react"
+import { X, ArrowUpDown, Loader2, Settings, RefreshCw } from "lucide-react"
 import { getCurrentLanguage, getTranslations } from "../lib/i18n"
 import { uniswapService } from "../services/uniswap-service"
 import { toast } from "sonner"
@@ -23,9 +23,14 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   const [slippage, setSlippage] = useState("0.5")
   const [isLoading, setIsLoading] = useState(false)
   const [isQuoting, setIsQuoting] = useState(false)
+  const [isLoadingBalances, setIsLoadingBalances] = useState(false)
   const [language, setLanguage] = useState<"en" | "pt">("en")
   const [translations, setTranslations] = useState(getTranslations("en").swap || {})
   const [showSettings, setShowSettings] = useState(false)
+  const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({
+    WLD: "0.000000",
+    TPF: "0.000000",
+  })
 
   const tokens = uniswapService.getTokens()
 
@@ -39,6 +44,34 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     window.addEventListener("languageChange", updateLanguage)
     return () => window.removeEventListener("languageChange", updateLanguage)
   }, [])
+
+  // Carregar saldos reais quando o modal abrir
+  useEffect(() => {
+    const loadBalances = async () => {
+      if (!isOpen || !walletAddress) return
+
+      setIsLoadingBalances(true)
+      try {
+        console.log("Loading real token balances...")
+        const balances = await uniswapService.getTokenBalances(walletAddress)
+
+        const balanceMap: Record<string, string> = {}
+        balances.forEach((balance) => {
+          balanceMap[balance.symbol] = balance.formattedBalance
+        })
+
+        setTokenBalances(balanceMap)
+        console.log("Token balances loaded:", balanceMap)
+      } catch (error) {
+        console.error("Error loading balances:", error)
+        toast.error("Erro ao carregar saldos")
+      } finally {
+        setIsLoadingBalances(false)
+      }
+    }
+
+    loadBalances()
+  }, [isOpen, walletAddress])
 
   // Obter cotação quando o valor de entrada mudar
   useEffect(() => {
@@ -80,6 +113,33 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     setAmountOut(tempAmount)
   }
 
+  const handleMaxAmount = () => {
+    const maxBalance = tokenBalances[tokenIn]
+    if (maxBalance && Number.parseFloat(maxBalance) > 0) {
+      setAmountIn(maxBalance)
+    }
+  }
+
+  const handleRefreshBalances = async () => {
+    if (!walletAddress || isLoadingBalances) return
+
+    setIsLoadingBalances(true)
+    try {
+      const balances = await uniswapService.getTokenBalances(walletAddress)
+      const balanceMap: Record<string, string> = {}
+      balances.forEach((balance) => {
+        balanceMap[balance.symbol] = balance.formattedBalance
+      })
+      setTokenBalances(balanceMap)
+      toast.success("Saldos atualizados")
+    } catch (error) {
+      console.error("Error refreshing balances:", error)
+      toast.error("Erro ao atualizar saldos")
+    } finally {
+      setIsLoadingBalances(false)
+    }
+  }
+
   const handleSwap = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -90,6 +150,15 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
     if (!walletAddress) {
       toast.error("Please connect your wallet")
+      return
+    }
+
+    // Verificar se tem saldo suficiente
+    const balance = Number.parseFloat(tokenBalances[tokenIn] || "0")
+    const amount = Number.parseFloat(amountIn)
+
+    if (amount > balance) {
+      toast.error(`Saldo insuficiente. Você tem ${balance} ${tokenIn}`)
       return
     }
 
@@ -107,10 +176,10 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
         recipient: walletAddress,
       })
 
-      toast.success(translations.success || "Swap completed successfully!", {
+      toast.success("Swap realizado com sucesso!", {
         description: `${amountIn} ${tokenIn} → ${amountOut} ${tokenOut}`,
         action: {
-          label: "View TX",
+          label: "Ver TX",
           onClick: () => window.open(`https://worldchain-mainnet.explorer.alchemy.com/tx/${txHash}`, "_blank"),
         },
       })
@@ -119,9 +188,14 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
       setAmountIn("")
       setAmountOut("")
       onClose()
+
+      // Atualizar saldos após o swap
+      setTimeout(() => {
+        handleRefreshBalances()
+      }, 2000)
     } catch (error) {
       console.error("Error executing swap:", error)
-      toast.error(translations.error || "Swap failed. Please try again.")
+      toast.error("Falha no swap. Tente novamente.")
     } finally {
       setIsLoading(false)
     }
@@ -154,6 +228,14 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
             <div className="flex justify-between items-center p-3 border-b border-gray-800">
               <h2 className="text-lg font-bold text-white">WLD ⇄ TPF Swap</h2>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handleRefreshBalances}
+                  disabled={isLoadingBalances}
+                  className="text-gray-400 hover:text-white p-1"
+                  aria-label="Refresh Balances"
+                >
+                  <RefreshCw size={16} className={isLoadingBalances ? "animate-spin" : ""} />
+                </button>
                 <button
                   onClick={() => setShowSettings(!showSettings)}
                   className="text-gray-400 hover:text-white p-1"
@@ -196,7 +278,9 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                         ))}
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500">Powered by Uniswap V3 on WorldChain</div>
+                    <div className="text-xs text-gray-500">
+                      Pool: {uniswapService.getContractAddresses().TPF_WLD_POOL.slice(0, 10)}...
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -220,15 +304,34 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                     <span className="text-sm font-medium">{tokens[tokenIn].symbol}</span>
                   </div>
                 </div>
-                <input
-                  type="number"
-                  value={amountIn}
-                  onChange={(e) => setAmountIn(e.target.value)}
-                  placeholder="0.00"
-                  step="0.000001"
-                  min="0"
-                  className="w-full bg-transparent text-lg font-semibold text-white placeholder-gray-500 focus:outline-none"
-                />
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    value={amountIn}
+                    onChange={(e) => setAmountIn(e.target.value)}
+                    placeholder="0.00"
+                    step="0.000001"
+                    min="0"
+                    className="flex-1 bg-transparent text-lg font-semibold text-white placeholder-gray-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleMaxAmount}
+                    className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded"
+                  >
+                    MAX
+                  </button>
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  {isLoadingBalances ? (
+                    <span className="flex items-center">
+                      <Loader2 size={10} className="animate-spin mr-1" />
+                      Loading...
+                    </span>
+                  ) : (
+                    `Balance: ${tokenBalances[tokenIn]} ${tokenIn}`
+                  )}
+                </div>
               </div>
 
               {/* Botão de troca */}
@@ -269,11 +372,21 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                   />
                   {isQuoting && <Loader2 size={14} className="animate-spin text-gray-400 ml-2" />}
                 </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  {isLoadingBalances ? (
+                    <span className="flex items-center">
+                      <Loader2 size={10} className="animate-spin mr-1" />
+                      Loading...
+                    </span>
+                  ) : (
+                    `Balance: ${tokenBalances[tokenOut]} ${tokenOut}`
+                  )}
+                </div>
               </div>
 
               <button
                 type="submit"
-                disabled={isLoading || !amountIn || !amountOut}
+                disabled={isLoading || !amountIn || !amountOut || isLoadingBalances}
                 className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
