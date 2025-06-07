@@ -36,12 +36,15 @@ export default function ProfilePage() {
   const [walletAddress, setWalletAddress] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isAutoUpdating, setIsAutoUpdating] = useState(false)
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  // Refs para os menus
+  // Refs para os menus e intervalos
   const settingsRef = useRef<HTMLDivElement>(null)
   const languageMenuRef = useRef<HTMLDivElement>(null)
+  const autoUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Dentro da função ProfilePage, adicionar estado para o idioma
   const [currentLanguage, setLanguage] = useState<Language>("en")
@@ -54,16 +57,29 @@ export default function ProfilePage() {
   const [tpfBalance, setTpfBalance] = useState(0)
 
   // Função para obter saldo TPF da carteira usando o serviço correto
-  const getTPFBalance = async (address: string) => {
+  const getTPFBalance = async (address: string, isAutoUpdate = false) => {
     try {
-      console.log("=== Getting TPF Balance ===")
+      if (isAutoUpdate) {
+        setIsAutoUpdating(true)
+      }
+
+      console.log(`=== Getting TPF Balance ${isAutoUpdate ? "(Auto Update)" : ""} ===`)
       console.log(`Wallet Address: ${address}`)
 
       // Primeiro, tentar obter saldo real da blockchain
       const realBalance = await balanceSyncService.getRealTPFBalance(address)
       if (realBalance > 0) {
         console.log(`Real TPF balance found: ${realBalance.toLocaleString()}`)
+
+        // Salvar no localStorage com múltiplas chaves para reforçar persistência
+        localStorage.setItem(`tpf_balance_${address}`, realBalance.toString())
+        localStorage.setItem("current_tpf_balance", realBalance.toString())
+        localStorage.setItem("last_tpf_balance", realBalance.toString())
+        localStorage.setItem("wallet_tpf_balance", realBalance.toString())
+        localStorage.setItem("tpf_balance_timestamp", Date.now().toString())
+
         balanceSyncService.updateTPFBalance(address, realBalance)
+        setLastUpdateTime(new Date())
         return realBalance
       }
 
@@ -77,29 +93,51 @@ export default function ProfilePage() {
       // Como último recurso, usar um valor padrão para demonstração
       const defaultBalance = 108567827.002
       console.log(`Using default balance for demo: ${defaultBalance.toLocaleString()}`)
+
+      // Salvar valor padrão no localStorage também
+      localStorage.setItem(`tpf_balance_${address}`, defaultBalance.toString())
+      localStorage.setItem("current_tpf_balance", defaultBalance.toString())
+      localStorage.setItem("last_tpf_balance", defaultBalance.toString())
+      localStorage.setItem("wallet_tpf_balance", defaultBalance.toString())
+      localStorage.setItem("tpf_balance_timestamp", Date.now().toString())
+
       balanceSyncService.updateTPFBalance(address, defaultBalance)
+      setLastUpdateTime(new Date())
       return defaultBalance
     } catch (error) {
       console.error("Error getting TPF balance:", error)
+
+      // Em caso de erro, tentar usar valor do localStorage
+      const storedBalance = balanceSyncService.getCurrentTPFBalance(address)
+      if (storedBalance > 0) {
+        return storedBalance
+      }
+
       const defaultBalance = 108567827.002
+      localStorage.setItem(`tpf_balance_${address}`, defaultBalance.toString())
+      localStorage.setItem("current_tpf_balance", defaultBalance.toString())
       balanceSyncService.updateTPFBalance(address, defaultBalance)
       return defaultBalance
+    } finally {
+      if (isAutoUpdate) {
+        setIsAutoUpdating(false)
+      }
     }
   }
 
   // Função para atualizar nível usando o serviço correto
-  const updateLevel = async () => {
+  const updateLevel = async (isAutoUpdate = false) => {
     if (!walletAddress) {
       console.log("No wallet address, skipping level update")
       return
     }
 
     try {
-      console.log("=== Updating Level ===")
+      console.log(`=== Updating Level ${isAutoUpdate ? "(Auto Update)" : ""} ===`)
       console.log(`Wallet Address: ${walletAddress}`)
 
       // Obter saldo atualizado
-      const balance = await getTPFBalance(walletAddress)
+      const balance = await getTPFBalance(walletAddress, isAutoUpdate)
       console.log(`TPF Balance for level calculation: ${balance.toLocaleString()}`)
 
       // Atualizar o estado do saldo ANTES do cálculo
@@ -111,7 +149,7 @@ export default function ProfilePage() {
 
       setUserLevel(levelInfo.level)
 
-      console.log("=== Level Updated Successfully ===")
+      console.log(`=== Level Updated Successfully ${isAutoUpdate ? "(Auto)" : ""} ===`)
       console.log(`TPF Balance: ${balance.toLocaleString()}`)
       console.log(`Level: ${levelInfo.level}`)
       console.log(`Total XP: ${levelInfo.totalXP.toLocaleString()}`)
@@ -124,6 +162,31 @@ export default function ProfilePage() {
       setTpfBalance(defaultBalance)
       const levelInfo = levelService.getUserLevelInfo(walletAddress, defaultBalance)
       setUserLevel(levelInfo.level)
+    }
+  }
+
+  // Função para iniciar atualização automática
+  const startAutoUpdate = () => {
+    if (autoUpdateIntervalRef.current) {
+      clearInterval(autoUpdateIntervalRef.current)
+    }
+
+    console.log("🔄 Starting auto-update every 3 seconds...")
+
+    autoUpdateIntervalRef.current = setInterval(async () => {
+      if (walletAddress) {
+        console.log("🔄 Auto-updating TPF balance...")
+        await updateLevel(true)
+      }
+    }, 3000) // 3 segundos
+  }
+
+  // Função para parar atualização automática
+  const stopAutoUpdate = () => {
+    if (autoUpdateIntervalRef.current) {
+      console.log("⏹️ Stopping auto-update...")
+      clearInterval(autoUpdateIntervalRef.current)
+      autoUpdateIntervalRef.current = null
     }
   }
 
@@ -187,6 +250,9 @@ export default function ProfilePage() {
 
   // Função para fazer logout
   const handleLogout = () => {
+    // Parar atualização automática
+    stopAutoUpdate()
+
     // Limpar dados do localStorage
     localStorage.removeItem("walletAddress")
     localStorage.removeItem("userNickname")
@@ -256,6 +322,13 @@ export default function ProfilePage() {
       const updatedBalance = await balanceSyncService.forceBalanceUpdate(walletAddress)
       console.log(`Forced balance update: ${updatedBalance.toLocaleString()}`)
 
+      // Reforçar localStorage
+      localStorage.setItem(`tpf_balance_${walletAddress}`, updatedBalance.toString())
+      localStorage.setItem("current_tpf_balance", updatedBalance.toString())
+      localStorage.setItem("last_tpf_balance", updatedBalance.toString())
+      localStorage.setItem("wallet_tpf_balance", updatedBalance.toString())
+      localStorage.setItem("tpf_balance_timestamp", Date.now().toString())
+
       // Atualizar o estado do saldo
       setTpfBalance(updatedBalance)
 
@@ -263,6 +336,7 @@ export default function ProfilePage() {
       const levelInfo = levelService.getUserLevelInfo(walletAddress, updatedBalance)
       setUserLevel(levelInfo.level)
 
+      setLastUpdateTime(new Date())
       console.log("Level refreshed successfully!")
       console.log(`New level: ${levelInfo.level}`)
     } catch (error) {
@@ -270,6 +344,18 @@ export default function ProfilePage() {
     } finally {
       setIsRefreshing(false)
     }
+  }
+
+  // Função para formatar tempo da última atualização
+  const formatLastUpdateTime = () => {
+    if (!lastUpdateTime) return ""
+
+    const now = new Date()
+    const diff = Math.floor((now.getTime() - lastUpdateTime.getTime()) / 1000)
+
+    if (diff < 60) return `${diff}s ago`
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+    return lastUpdateTime.toLocaleTimeString()
   }
 
   useEffect(() => {
@@ -288,10 +374,21 @@ export default function ProfilePage() {
       setWalletAddress(savedAddress)
       setIsLoading(false)
 
+      // Carregar timestamp da última atualização
+      const lastTimestamp = localStorage.getItem("tpf_balance_timestamp")
+      if (lastTimestamp) {
+        setLastUpdateTime(new Date(Number.parseInt(lastTimestamp)))
+      }
+
       // Aguardar um pouco para garantir que tudo carregou
       setTimeout(async () => {
-        console.log("Starting level update after delay...")
+        console.log("Starting initial level update...")
         await updateLevel()
+
+        // Iniciar atualização automática após a primeira atualização
+        setTimeout(() => {
+          startAutoUpdate()
+        }, 1000)
       }, 1000)
     }
 
@@ -333,8 +430,10 @@ export default function ProfilePage() {
 
     document.addEventListener("mousedown", handleClickOutside)
 
+    // Cleanup function
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
+      stopAutoUpdate() // Parar atualização automática quando o componente for desmontado
     }
   }, [router])
 
@@ -378,6 +477,27 @@ export default function ProfilePage() {
       window.removeEventListener("tpf_balance_updated", handleBalanceUpdate)
       window.removeEventListener("xp_updated", handleXPUpdate)
       window.removeEventListener("level_updated", handleBalanceUpdate)
+    }
+  }, [walletAddress])
+
+  // useEffect para gerenciar visibilidade da página (pausar/retomar auto-update)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log("Page hidden, stopping auto-update")
+        stopAutoUpdate()
+      } else {
+        console.log("Page visible, resuming auto-update")
+        if (walletAddress) {
+          startAutoUpdate()
+        }
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
   }, [walletAddress])
 
@@ -711,9 +831,24 @@ export default function ProfilePage() {
             {walletAddress ? formatAddress(walletAddress) : translations.profile?.notConnected || "Not connected"}
           </div>
 
-          {/* TPF Balance Display */}
-          <div className="mt-2 px-3 py-1 bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-full text-sm text-blue-300 border border-blue-500/30">
-            <span className="font-medium">{tpfBalance.toLocaleString()}</span> TPF
+          {/* TPF Balance Display com indicador de atualização automática */}
+          <div className="mt-2 px-3 py-1 bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-full text-sm text-blue-300 border border-blue-500/30 relative">
+            <div className="flex items-center justify-center gap-2">
+              <span className="font-medium">{tpfBalance.toLocaleString()}</span>
+              <span>TPF</span>
+              {isAutoUpdating && (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                  className="w-3 h-3"
+                >
+                  <RefreshCw size={12} className="text-blue-400" />
+                </motion.div>
+              )}
+            </div>
+
+            {/* Indicador de última atualização */}
+            {lastUpdateTime && <div className="text-xs text-blue-400/60 mt-1">Updated {formatLastUpdateTime()}</div>}
           </div>
 
           {/* Level Info Button with Refresh */}
@@ -736,6 +871,12 @@ export default function ProfilePage() {
             >
               <RefreshCw size={12} className={`text-gray-400 ${isRefreshing ? "animate-spin" : ""}`} />
             </motion.button>
+          </div>
+
+          {/* Indicador de auto-update ativo */}
+          <div className="mt-1 flex items-center justify-center gap-1">
+            <div className={`w-2 h-2 rounded-full ${autoUpdateIntervalRef.current ? "bg-green-500" : "bg-gray-500"}`} />
+            <span className="text-xs text-gray-500">Auto-sync {autoUpdateIntervalRef.current ? "ON" : "OFF"}</span>
           </div>
         </motion.div>
 
