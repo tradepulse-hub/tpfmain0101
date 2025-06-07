@@ -59,34 +59,156 @@ export default function AgendaPage() {
     window.open(`https://worldscan.org/address/${address}`, "_blank")
   }
 
-  // Dados dos eventos - CORRIGIDOS
+  // Dados dos eventos - CORRIGIDOS COM MÚLTIPLAS ENTRADAS
   const mockEvents: Event[] = [
+    // Top Holders Event - Verde (1-9 Janeiro)
     {
-      id: "1",
+      id: "top-holders-1",
       type: "airdrop",
-      date: "2025-01-01", // Começa em janeiro
+      date: "2025-01-01",
       time: "00:00",
       location: t.agenda?.online || "Online",
       participants: 500,
-      endDate: "2025-01-09", // Termina dia 9 de janeiro
+      endDate: "2025-01-09",
     },
     {
-      id: "2",
+      id: "top-holders-2",
+      type: "airdrop",
+      date: "2025-01-02",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 500,
+      endDate: "2025-01-09",
+    },
+    {
+      id: "top-holders-3",
+      type: "airdrop",
+      date: "2025-01-03",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 500,
+      endDate: "2025-01-09",
+    },
+    {
+      id: "top-holders-4",
+      type: "airdrop",
+      date: "2025-01-04",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 500,
+      endDate: "2025-01-09",
+    },
+    {
+      id: "top-holders-5",
+      type: "airdrop",
+      date: "2025-01-05",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 500,
+      endDate: "2025-01-09",
+    },
+    {
+      id: "top-holders-6",
+      type: "airdrop",
+      date: "2025-01-06",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 500,
+      endDate: "2025-01-09",
+    },
+    {
+      id: "top-holders-7",
+      type: "airdrop",
+      date: "2025-01-07",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 500,
+      endDate: "2025-01-09",
+    },
+    {
+      id: "top-holders-8",
+      type: "airdrop",
+      date: "2025-01-08",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 500,
+      endDate: "2025-01-09",
+    },
+    {
+      id: "top-holders-9",
+      type: "airdrop",
+      date: "2025-01-09",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 500,
+      endDate: "2025-01-09",
+    },
+
+    // Tournament Registration - Azul (10-15 Janeiro)
+    {
+      id: "registration-10",
       type: "tournament_registration",
-      date: "2025-01-10", // Começa dia 10 de janeiro
+      date: "2025-01-10",
       time: "00:00",
       location: t.agenda?.online || "Online",
       participants: 0,
-      endDate: "2025-01-15", // Termina dia 15 de janeiro
+      endDate: "2025-01-15",
     },
     {
-      id: "3",
-      type: "tournament_game",
-      date: "2025-01-16", // Começa dia 16 de janeiro
+      id: "registration-11",
+      type: "tournament_registration",
+      date: "2025-01-11",
       time: "00:00",
       location: t.agenda?.online || "Online",
       participants: 0,
-      endDate: "2025-07-09", // Termina dia 9 de julho
+      endDate: "2025-01-15",
+    },
+    {
+      id: "registration-12",
+      type: "tournament_registration",
+      date: "2025-01-12",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 0,
+      endDate: "2025-01-15",
+    },
+    {
+      id: "registration-13",
+      type: "tournament_registration",
+      date: "2025-01-13",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 0,
+      endDate: "2025-01-15",
+    },
+    {
+      id: "registration-14",
+      type: "tournament_registration",
+      date: "2025-01-14",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 0,
+      endDate: "2025-01-15",
+    },
+    {
+      id: "registration-15",
+      type: "tournament_registration",
+      date: "2025-01-15",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 0,
+      endDate: "2025-01-15",
+    },
+
+    // Snake Game Tournament - Roxo (16 Janeiro - 9 Julho)
+    {
+      id: "tournament-start",
+      type: "tournament_game",
+      date: "2025-01-16",
+      time: "00:00",
+      location: t.agenda?.online || "Online",
+      participants: 0,
+      endDate: "2025-07-09",
     },
   ]
 
@@ -108,6 +230,7 @@ export default function AgendaPage() {
       setTimeout(() => {
         setEvents(mockEvents)
         setIsLoading(false)
+        console.log("📅 Eventos carregados:", mockEvents.length)
       }, 1000)
     }
 
@@ -161,8 +284,14 @@ export default function AgendaPage() {
   const hasEvents = (day: number) => {
     const dateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
 
+    console.log(`🔍 Verificando eventos para ${dateString}`)
+
     // Verificar eventos que começam nesta data
-    const hasStartEvent = events.some((event) => event.date === dateString)
+    const hasStartEvent = events.some((event) => {
+      const match = event.date === dateString
+      if (match) console.log(`✅ Evento encontrado: ${event.type} em ${dateString}`)
+      return match
+    })
 
     // Verificar se a data está no intervalo de algum evento
     const isInEventRange = events.some((event) => {
@@ -172,10 +301,14 @@ export default function AgendaPage() {
       const eventEndDate = new Date(event.endDate)
       const currentDateCheck = new Date(dateString)
 
-      return currentDateCheck >= eventStartDate && currentDateCheck <= eventEndDate
+      const inRange = currentDateCheck >= eventStartDate && currentDateCheck <= eventEndDate
+      if (inRange) console.log(`📅 Data ${dateString} está no intervalo do evento ${event.type}`)
+      return inRange
     })
 
-    return hasStartEvent || isInEventRange
+    const result = hasStartEvent || isInEventRange
+    console.log(`🎯 Resultado para ${dateString}: ${result}`)
+    return result
   }
 
   // Obter cor do dia baseado nos eventos ativos
@@ -193,12 +326,18 @@ export default function AgendaPage() {
       return currentDateCheck >= eventStartDate && currentDateCheck <= eventEndDate
     })
 
-    if (activeEvents.length > 0) {
+    // Também verificar eventos que começam exatamente nesta data
+    const startingEvents = events.filter((event) => event.date === dateString)
+
+    const allActiveEvents = [...activeEvents, ...startingEvents]
+
+    if (allActiveEvents.length > 0) {
       // Priorizar por tipo de evento (mais recente primeiro)
       const priorityOrder = ["tournament_game", "tournament_registration", "airdrop"]
       for (const priority of priorityOrder) {
-        const event = activeEvents.find((e) => e.type === priority)
+        const event = allActiveEvents.find((e) => e.type === priority)
         if (event) {
+          console.log(`🎨 Cor para ${dateString}: ${event.type}`)
           return getEventColor(event.type)
         }
       }
@@ -213,8 +352,14 @@ export default function AgendaPage() {
 
     const dateString = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`
 
+    console.log(`🔍 Buscando eventos para data selecionada: ${dateString}`)
+
     // Verificar eventos que começam nesta data
-    const startEvents = events.filter((event) => event.date === dateString)
+    const startEvents = events.filter((event) => {
+      const match = event.date === dateString
+      if (match) console.log(`✅ Evento de início encontrado: ${event.type}`)
+      return match
+    })
 
     // Verificar se a data está no intervalo de algum evento
     const rangeEvents = events.filter((event) => {
@@ -224,11 +369,19 @@ export default function AgendaPage() {
       const eventEndDate = new Date(event.endDate)
       const currentDateCheck = new Date(dateString)
 
-      return currentDateCheck >= eventStartDate && currentDateCheck <= eventEndDate
+      const inRange = currentDateCheck >= eventStartDate && currentDateCheck <= eventEndDate
+      if (inRange) console.log(`📅 Evento de intervalo encontrado: ${event.type}`)
+      return inRange
     })
 
-    // Combinar os resultados sem duplicatas
-    return [...new Set([...startEvents, ...rangeEvents])]
+    // Combinar os resultados sem duplicatas baseado no tipo
+    const allEvents = [...startEvents, ...rangeEvents]
+    const uniqueEvents = allEvents.filter(
+      (event, index, self) => index === self.findIndex((e) => e.type === event.type),
+    )
+
+    console.log(`🎯 Eventos únicos encontrados: ${uniqueEvents.length}`)
+    return uniqueEvents
   }
 
   // Renderizar o calendário
