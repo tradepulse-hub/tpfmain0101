@@ -19,7 +19,6 @@ import { LevelInfo } from "@/components/level-info"
 import { levelService } from "@/services/level-service"
 import { EventCountdownBadge } from "@/components/event-countdown-badge"
 import { balanceSyncService } from "@/services/balance-sync-service"
-import { enhancedTokenService } from "@/services/enhanced-token-service"
 
 export default function ProfilePage() {
   // User state with profile data
@@ -60,29 +59,22 @@ export default function ProfilePage() {
       console.log("=== Getting TPF Balance ===")
       console.log(`Wallet Address: ${address}`)
 
-      // Tentar obter saldo real via enhanced token service
-      try {
-        const { enhancedTokenService } = await import("@/services/enhanced-token-service")
-        const balances = await enhancedTokenService.getAllTokenBalances(address)
-        const realBalance = Number(balances.TPF || "0")
-
-        if (realBalance > 0) {
-          console.log(`Real TPF balance found: ${realBalance.toLocaleString()}`)
-          balanceSyncService.updateTPFBalance(address, realBalance)
-          return realBalance
-        }
-      } catch (error) {
-        console.error("Error getting real balance:", error)
+      // Primeiro, tentar obter saldo real da blockchain
+      const realBalance = await balanceSyncService.getRealTPFBalance(address)
+      if (realBalance > 0) {
+        console.log(`Real TPF balance found: ${realBalance.toLocaleString()}`)
+        balanceSyncService.updateTPFBalance(address, realBalance)
+        return realBalance
       }
 
-      // Verificar localStorage
+      // Se não conseguiu obter saldo real, verificar localStorage
       const storedBalance = balanceSyncService.getCurrentTPFBalance(address)
       if (storedBalance > 0) {
         console.log(`Found stored balance: ${storedBalance.toLocaleString()}`)
         return storedBalance
       }
 
-      // Usar valor padrão alto para demonstração
+      // Como último recurso, usar um valor padrão para demonstração
       const defaultBalance = 108567827.002
       console.log(`Using default balance for demo: ${defaultBalance.toLocaleString()}`)
       balanceSyncService.updateTPFBalance(address, defaultBalance)
@@ -260,7 +252,7 @@ export default function ProfilePage() {
     console.log("Forcing level refresh...")
 
     try {
-      // Forçar atualização do saldo
+      // Forçar atualização do saldo real
       const updatedBalance = await balanceSyncService.forceBalanceUpdate(walletAddress)
       console.log(`Forced balance update: ${updatedBalance.toLocaleString()}`)
 
@@ -277,25 +269,6 @@ export default function ProfilePage() {
       console.error("Error refreshing level:", error)
     } finally {
       setIsRefreshing(false)
-    }
-  }
-
-  // Inicializar serviços e carregar dados
-  const initializeServices = async () => {
-    try {
-      // Inicializar enhanced token service
-      if (!enhancedTokenService.isInitialized()) {
-        console.log("Initializing enhanced token service...")
-        await enhancedTokenService.getAllTokenBalances(walletAddress)
-      }
-
-      // Forçar atualização do saldo
-      await balanceSyncService.forceBalanceUpdate(walletAddress)
-
-      // Atualizar nível
-      await updateLevel()
-    } catch (error) {
-      console.error("Error initializing services:", error)
     }
   }
 

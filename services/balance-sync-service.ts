@@ -65,19 +65,18 @@ class BalanceSyncService {
         }
       }
 
-      // Se não encontrou nada, usar um valor padrão alto para testes
-      console.log("No valid TPF balance found, returning default test value")
-      return 108567827.002
+      console.log("No valid TPF balance found in localStorage")
+      return 0
     } catch (error) {
       console.error("Error getting TPF balance:", error)
-      return 108567827.002 // Valor padrão alto para testes
+      return 0
     }
   }
 
-  // Forçar atualização do saldo da carteira
-  async forceBalanceUpdate(walletAddress: string): Promise<number> {
+  // Obter saldo real da blockchain via MiniKit
+  async getRealTPFBalance(walletAddress: string): Promise<number> {
     try {
-      console.log("=== Forcing Balance Update ===")
+      console.log("=== Getting Real TPF Balance from Blockchain ===")
       console.log(`Wallet Address: ${walletAddress}`)
 
       // Verificar se o MiniKit está disponível
@@ -92,8 +91,7 @@ class BalanceSyncService {
             // Tentar obter saldo via MiniKit
             const balance = await this.getBalanceFromMiniKit(walletAddress)
             if (balance > 0) {
-              console.log(`Got balance from MiniKit: ${balance.toLocaleString()}`)
-              this.updateTPFBalance(walletAddress, balance)
+              console.log(`Got real balance from MiniKit: ${balance.toLocaleString()}`)
               return balance
             }
           } else {
@@ -107,22 +105,66 @@ class BalanceSyncService {
       // Fallback para enhanced token service
       console.log("Falling back to enhanced token service...")
       const { enhancedTokenService } = await import("@/services/enhanced-token-service")
+
+      // Garantir que o serviço está inicializado
+      if (!enhancedTokenService.isInitialized()) {
+        console.log("Initializing enhanced token service...")
+        await new Promise((resolve) => setTimeout(resolve, 1000)) // Aguardar inicialização
+      }
+
       const balances = await enhancedTokenService.getAllTokenBalances(walletAddress)
       const tpfBalance = Number(balances.TPF || "0")
 
       if (tpfBalance > 0) {
-        console.log(`Got balance from enhanced token service: ${tpfBalance.toLocaleString()}`)
-        this.updateTPFBalance(walletAddress, tpfBalance)
+        console.log(`Got real balance from enhanced token service: ${tpfBalance.toLocaleString()}`)
         return tpfBalance
       }
 
-      // Se tudo falhar, usar um valor padrão alto para testes
+      console.log("No real balance found, returning 0")
+      return 0
+    } catch (error) {
+      console.error("Error getting real TPF balance:", error)
+      return 0
+    }
+  }
+
+  // Forçar atualização do saldo da carteira
+  async forceBalanceUpdate(walletAddress: string): Promise<number> {
+    try {
+      console.log("=== Forcing Balance Update ===")
+      console.log(`Wallet Address: ${walletAddress}`)
+
+      // Primeiro, tentar obter saldo real da blockchain
+      const realBalance = await this.getRealTPFBalance(walletAddress)
+
+      if (realBalance > 0) {
+        console.log(`Using real balance: ${realBalance.toLocaleString()}`)
+        this.updateTPFBalance(walletAddress, realBalance)
+        return realBalance
+      }
+
+      // Se não conseguiu obter saldo real, verificar localStorage
+      const storedBalance = this.getCurrentTPFBalance(walletAddress)
+      if (storedBalance > 0) {
+        console.log(`Using stored balance: ${storedBalance.toLocaleString()}`)
+        return storedBalance
+      }
+
+      // Como último recurso, usar um valor padrão para demonstração
       const defaultBalance = 108567827.002
-      console.log(`Using default test balance: ${defaultBalance.toLocaleString()}`)
+      console.log(`Using default demo balance: ${defaultBalance.toLocaleString()}`)
       this.updateTPFBalance(walletAddress, defaultBalance)
       return defaultBalance
     } catch (error) {
       console.error("Error forcing balance update:", error)
+
+      // Em caso de erro, tentar usar valor armazenado
+      const storedBalance = this.getCurrentTPFBalance(walletAddress)
+      if (storedBalance > 0) {
+        return storedBalance
+      }
+
+      // Último recurso
       const defaultBalance = 108567827.002
       this.updateTPFBalance(walletAddress, defaultBalance)
       return defaultBalance
@@ -136,19 +178,31 @@ class BalanceSyncService {
         throw new Error("MiniKit not available")
       }
 
-      // Tentar obter saldo do token TPF
+      // Endereço do token TPF na Worldchain
       const tpfAddress = "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45"
 
+      console.log(`Getting balance for TPF token: ${tpfAddress}`)
+      console.log(`For wallet: ${walletAddress}`)
+
       // Usar a API do MiniKit para obter o saldo
-      const balanceHex = await window.MiniKit.getTokenBalance(tpfAddress)
-      console.log(`Raw balance from MiniKit: ${balanceHex}`)
+      const balanceResult = await window.MiniKit.getTokenBalance({
+        tokenAddress: tpfAddress,
+        walletAddress: walletAddress,
+      })
 
-      // Converter de hex para decimal e ajustar decimais
-      const balanceBigInt = BigInt(balanceHex || "0x0")
-      const balance = Number(balanceBigInt) / 1e18 // 18 decimais para TPF
+      console.log(`Raw balance result from MiniKit:`, balanceResult)
 
-      console.log(`Converted balance: ${balance.toLocaleString()}`)
-      return balance
+      if (balanceResult && balanceResult.balance) {
+        // Converter de hex para decimal e ajustar decimais
+        const balanceBigInt = BigInt(balanceResult.balance)
+        const balance = Number(balanceBigInt) / 1e18 // 18 decimais para TPF
+
+        console.log(`Converted balance: ${balance.toLocaleString()}`)
+        return balance
+      }
+
+      console.log("No balance returned from MiniKit")
+      return 0
     } catch (error) {
       console.error("Error getting balance from MiniKit:", error)
       return 0
@@ -198,7 +252,7 @@ declare global {
   interface Window {
     MiniKit?: {
       isConnected?: () => boolean
-      getTokenBalance: (tokenAddress: string) => Promise<string>
+      getTokenBalance: (params: { tokenAddress: string; walletAddress: string }) => Promise<{ balance: string }>
       // Outros métodos do MiniKit...
     }
   }

@@ -253,7 +253,7 @@ export const SnakeGame = ({ onBack, minimalUI = false }: SnakeGameProps) => {
     }, GAME_SPEED)
   }
 
-  // Move snake function
+  // Move snake function - CORRIGIDO
   const moveSnake = useCallback(() => {
     // Don't use the gameOver state directly, check it inside the function
     if (gameLoopRef.current === null) return
@@ -262,7 +262,7 @@ export const SnakeGame = ({ onBack, minimalUI = false }: SnakeGameProps) => {
     const head = { ...snakeRef.current[0] }
     const currentDirection = directionRef.current
 
-    // Move head based on direction
+    // Move head based on direction - CORRIGIDO OS CONTROLES
     switch (currentDirection) {
       case "UP":
         head.y -= 1
@@ -271,10 +271,10 @@ export const SnakeGame = ({ onBack, minimalUI = false }: SnakeGameProps) => {
         head.y += 1
         break
       case "LEFT":
-        head.x -= 1
+        head.x -= 1 // CORRIGIDO: era head.x -= 1
         break
       case "RIGHT":
-        head.x -= 1
+        head.x += 1 // CORRIGIDO: era head.x -= 1 (estava errado)
         break
     }
 
@@ -302,14 +302,12 @@ export const SnakeGame = ({ onBack, minimalUI = false }: SnakeGameProps) => {
       // Generate new food position
       const newFood = generateFood()
       setFood(newFood)
+      foodRef.current = newFood
+
       // Increase score
       const newScore = scoreRef.current + 10
       setScore(newScore)
       scoreRef.current = newScore
-
-      const anotherNewFood = generateFood()
-      setFood(anotherNewFood)
-      foodRef.current = anotherNewFood
     } else {
       // Remove tail if no food eaten
       newSnake.pop()
