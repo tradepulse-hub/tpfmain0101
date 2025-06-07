@@ -40,13 +40,13 @@ export function EventCountdownBadge() {
     setTranslations(getTranslations(lang))
   }, [])
 
-  // Definir eventos com suas datas CORRIGIDAS (ordenados por prioridade/data)
+  // Definir eventos com suas datas CORRETAS (ordenados por prioridade/data)
   const events: EventInfo[] = [
     {
       type: "topHolders",
       title: "Top 10 Event",
       description: "10% Bonus for Top Holders",
-      endDate: new Date("2025-01-09T23:59:59Z"), // Termina dia 9 de janeiro
+      endDate: new Date("2025-06-09T23:59:59Z"), // Termina dia 9 de junho
       icon: <Trophy className="w-4 h-4 text-white" />,
       color: "from-yellow-500 to-orange-600",
     },
@@ -54,7 +54,7 @@ export function EventCountdownBadge() {
       type: "snakeRegistration",
       title: "Tournament Registration",
       description: "Send 200,000 TPF to register",
-      endDate: new Date("2025-01-15T23:59:59Z"), // Termina dia 15 de janeiro
+      endDate: new Date("2025-06-15T23:59:59Z"), // Termina dia 15 de junho
       icon: <Gamepad2 className="w-4 h-4 text-white" />,
       color: "from-green-500 to-emerald-600",
     },

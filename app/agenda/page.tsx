@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { BackgroundEffect } from "@/components/background-effect"
 import { BottomNav } from "@/components/bottom-nav"
-import { Calendar, Clock, MapPin, Users, Copy, Trophy, Gamepad2, ExternalLink } from "lucide-react"
+import { Calendar, Users, Copy, Trophy, Gamepad2, ExternalLink } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -18,7 +18,7 @@ interface Event {
   time: string
   location: string
   participants: number
-  endDate?: string // Data de término opcional
+  endDate?: string
 }
 
 export default function AgendaPage() {
@@ -59,152 +59,33 @@ export default function AgendaPage() {
     window.open(`https://worldscan.org/address/${address}`, "_blank")
   }
 
-  // Dados dos eventos - CORRIGIDOS COM MÚLTIPLAS ENTRADAS
+  // Dados dos eventos - DATAS CORRETAS
   const mockEvents: Event[] = [
-    // Top Holders Event - Verde (1-9 Janeiro)
+    // Top Holders Event - Verde (9 Maio - 9 Junho 2025)
     {
-      id: "top-holders-1",
+      id: "top-holders",
       type: "airdrop",
-      date: "2025-01-01",
+      date: "2025-05-09",
       time: "00:00",
       location: t.agenda?.online || "Online",
       participants: 500,
-      endDate: "2025-01-09",
+      endDate: "2025-06-09",
     },
+    // Tournament Registration - Azul (10 Junho - 15 Junho 2025)
     {
-      id: "top-holders-2",
-      type: "airdrop",
-      date: "2025-01-02",
-      time: "00:00",
-      location: t.agenda?.online || "Online",
-      participants: 500,
-      endDate: "2025-01-09",
-    },
-    {
-      id: "top-holders-3",
-      type: "airdrop",
-      date: "2025-01-03",
-      time: "00:00",
-      location: t.agenda?.online || "Online",
-      participants: 500,
-      endDate: "2025-01-09",
-    },
-    {
-      id: "top-holders-4",
-      type: "airdrop",
-      date: "2025-01-04",
-      time: "00:00",
-      location: t.agenda?.online || "Online",
-      participants: 500,
-      endDate: "2025-01-09",
-    },
-    {
-      id: "top-holders-5",
-      type: "airdrop",
-      date: "2025-01-05",
-      time: "00:00",
-      location: t.agenda?.online || "Online",
-      participants: 500,
-      endDate: "2025-01-09",
-    },
-    {
-      id: "top-holders-6",
-      type: "airdrop",
-      date: "2025-01-06",
-      time: "00:00",
-      location: t.agenda?.online || "Online",
-      participants: 500,
-      endDate: "2025-01-09",
-    },
-    {
-      id: "top-holders-7",
-      type: "airdrop",
-      date: "2025-01-07",
-      time: "00:00",
-      location: t.agenda?.online || "Online",
-      participants: 500,
-      endDate: "2025-01-09",
-    },
-    {
-      id: "top-holders-8",
-      type: "airdrop",
-      date: "2025-01-08",
-      time: "00:00",
-      location: t.agenda?.online || "Online",
-      participants: 500,
-      endDate: "2025-01-09",
-    },
-    {
-      id: "top-holders-9",
-      type: "airdrop",
-      date: "2025-01-09",
-      time: "00:00",
-      location: t.agenda?.online || "Online",
-      participants: 500,
-      endDate: "2025-01-09",
-    },
-
-    // Tournament Registration - Azul (10-15 Janeiro)
-    {
-      id: "registration-10",
+      id: "tournament-registration",
       type: "tournament_registration",
-      date: "2025-01-10",
+      date: "2025-06-10",
       time: "00:00",
       location: t.agenda?.online || "Online",
       participants: 0,
-      endDate: "2025-01-15",
+      endDate: "2025-06-15",
     },
+    // Snake Game Tournament - Roxo (16 Junho - 9 Julho 2025)
     {
-      id: "registration-11",
-      type: "tournament_registration",
-      date: "2025-01-11",
-      time: "00:00",
-      location: t.agenda?.online || "Online",
-      participants: 0,
-      endDate: "2025-01-15",
-    },
-    {
-      id: "registration-12",
-      type: "tournament_registration",
-      date: "2025-01-12",
-      time: "00:00",
-      location: t.agenda?.online || "Online",
-      participants: 0,
-      endDate: "2025-01-15",
-    },
-    {
-      id: "registration-13",
-      type: "tournament_registration",
-      date: "2025-01-13",
-      time: "00:00",
-      location: t.agenda?.online || "Online",
-      participants: 0,
-      endDate: "2025-01-15",
-    },
-    {
-      id: "registration-14",
-      type: "tournament_registration",
-      date: "2025-01-14",
-      time: "00:00",
-      location: t.agenda?.online || "Online",
-      participants: 0,
-      endDate: "2025-01-15",
-    },
-    {
-      id: "registration-15",
-      type: "tournament_registration",
-      date: "2025-01-15",
-      time: "00:00",
-      location: t.agenda?.online || "Online",
-      participants: 0,
-      endDate: "2025-01-15",
-    },
-
-    // Snake Game Tournament - Roxo (16 Janeiro - 9 Julho)
-    {
-      id: "tournament-start",
+      id: "tournament-game",
       type: "tournament_game",
-      date: "2025-01-16",
+      date: "2025-06-16",
       time: "00:00",
       location: t.agenda?.online || "Online",
       participants: 0,
@@ -217,26 +98,22 @@ export default function AgendaPage() {
     const checkAuth = async () => {
       const savedAddress = localStorage.getItem("walletAddress")
       if (!savedAddress) {
-        // Redirecionar para a página inicial se não estiver autenticado
         router.push("/")
         return
       }
 
-      // Obter o idioma atual
       const currentLang = getCurrentLanguage()
       setLanguage(currentLang)
 
-      // Simular carregamento de eventos
       setTimeout(() => {
         setEvents(mockEvents)
         setIsLoading(false)
-        console.log("📅 Eventos carregados:", mockEvents.length)
+        console.log("📅 Eventos carregados com datas corretas:", mockEvents)
       }, 1000)
     }
 
     checkAuth()
 
-    // Adicionar listener para mudanças de idioma
     const handleLanguageChange = () => {
       setLanguage(getCurrentLanguage())
     }
@@ -266,81 +143,51 @@ export default function AgendaPage() {
     setSelectedDate(newDate)
   }
 
+  // Verificar qual evento está ativo em uma data específica
+  const getActiveEventForDate = (dateString: string) => {
+    const checkDate = new Date(dateString)
+
+    for (const event of events) {
+      const startDate = new Date(event.date)
+      const endDate = event.endDate ? new Date(event.endDate) : startDate
+
+      if (checkDate >= startDate && checkDate <= endDate) {
+        console.log(`🎯 Evento ativo em ${dateString}: ${event.type}`)
+        return event
+      }
+    }
+
+    return null
+  }
+
   // Obter cor do evento baseado no tipo
   const getEventColor = (eventType: Event["type"]) => {
     switch (eventType) {
       case "airdrop":
-        return "bg-emerald-600/60" // Verde esmeralda para airdrop
+        return "bg-emerald-600/60" // Verde para Top Holders
       case "tournament_registration":
-        return "bg-blue-600/60" // Azul para registro
+        return "bg-blue-600/60" // Azul para Registration
       case "tournament_game":
-        return "bg-purple-600/60" // Roxo para torneio
+        return "bg-purple-600/60" // Roxo para Tournament
       default:
-        return "bg-gray-600/60"
+        return ""
     }
   }
 
-  // Verificar se uma data tem eventos ou está no intervalo de um evento
+  // Verificar se uma data tem eventos
   const hasEvents = (day: number) => {
     const dateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-
-    console.log(`🔍 Verificando eventos para ${dateString}`)
-
-    // Verificar eventos que começam nesta data
-    const hasStartEvent = events.some((event) => {
-      const match = event.date === dateString
-      if (match) console.log(`✅ Evento encontrado: ${event.type} em ${dateString}`)
-      return match
-    })
-
-    // Verificar se a data está no intervalo de algum evento
-    const isInEventRange = events.some((event) => {
-      if (!event.endDate) return false
-
-      const eventStartDate = new Date(event.date)
-      const eventEndDate = new Date(event.endDate)
-      const currentDateCheck = new Date(dateString)
-
-      const inRange = currentDateCheck >= eventStartDate && currentDateCheck <= eventEndDate
-      if (inRange) console.log(`📅 Data ${dateString} está no intervalo do evento ${event.type}`)
-      return inRange
-    })
-
-    const result = hasStartEvent || isInEventRange
-    console.log(`🎯 Resultado para ${dateString}: ${result}`)
-    return result
+    const activeEvent = getActiveEventForDate(dateString)
+    return activeEvent !== null
   }
 
   // Obter cor do dia baseado nos eventos ativos
   const getDayColor = (day: number) => {
     const dateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+    const activeEvent = getActiveEventForDate(dateString)
 
-    // Verificar qual evento está ativo nesta data
-    const activeEvents = events.filter((event) => {
-      if (!event.endDate) return false
-
-      const eventStartDate = new Date(event.date)
-      const eventEndDate = new Date(event.endDate)
-      const currentDateCheck = new Date(dateString)
-
-      return currentDateCheck >= eventStartDate && currentDateCheck <= eventEndDate
-    })
-
-    // Também verificar eventos que começam exatamente nesta data
-    const startingEvents = events.filter((event) => event.date === dateString)
-
-    const allActiveEvents = [...activeEvents, ...startingEvents]
-
-    if (allActiveEvents.length > 0) {
-      // Priorizar por tipo de evento (mais recente primeiro)
-      const priorityOrder = ["tournament_game", "tournament_registration", "airdrop"]
-      for (const priority of priorityOrder) {
-        const event = allActiveEvents.find((e) => e.type === priority)
-        if (event) {
-          console.log(`🎨 Cor para ${dateString}: ${event.type}`)
-          return getEventColor(event.type)
-        }
-      }
+    if (activeEvent) {
+      return getEventColor(activeEvent.type)
     }
 
     return ""
@@ -351,37 +198,9 @@ export default function AgendaPage() {
     if (!selectedDate) return []
 
     const dateString = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`
+    const activeEvent = getActiveEventForDate(dateString)
 
-    console.log(`🔍 Buscando eventos para data selecionada: ${dateString}`)
-
-    // Verificar eventos que começam nesta data
-    const startEvents = events.filter((event) => {
-      const match = event.date === dateString
-      if (match) console.log(`✅ Evento de início encontrado: ${event.type}`)
-      return match
-    })
-
-    // Verificar se a data está no intervalo de algum evento
-    const rangeEvents = events.filter((event) => {
-      if (!event.endDate) return false
-
-      const eventStartDate = new Date(event.date)
-      const eventEndDate = new Date(event.endDate)
-      const currentDateCheck = new Date(dateString)
-
-      const inRange = currentDateCheck >= eventStartDate && currentDateCheck <= eventEndDate
-      if (inRange) console.log(`📅 Evento de intervalo encontrado: ${event.type}`)
-      return inRange
-    })
-
-    // Combinar os resultados sem duplicatas baseado no tipo
-    const allEvents = [...startEvents, ...rangeEvents]
-    const uniqueEvents = allEvents.filter(
-      (event, index, self) => index === self.findIndex((e) => e.type === event.type),
-    )
-
-    console.log(`🎯 Eventos únicos encontrados: ${uniqueEvents.length}`)
-    return uniqueEvents
+    return activeEvent ? [activeEvent] : []
   }
 
   // Renderizar o calendário
@@ -504,32 +323,11 @@ export default function AgendaPage() {
               : "10% bonus for the top 10 TPF holders"}
           </p>
 
-          {event.endDate && (
-            <div className="mt-3 text-xs text-emerald-400 font-medium">
-              <span className="bg-emerald-500/20 px-2 py-1 rounded text-emerald-300 border border-emerald-500/30">
-                🏆 {language === "pt" ? "Evento Top Holders" : "Top Holders Event"}
-              </span>
-              <span className="ml-2">
-                {formatDate(event.date)} - {formatDate(event.endDate)}
-              </span>
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-3 mt-3 text-xs text-gray-300">
-            <div className="flex items-center">
-              <Clock className="w-3 h-3 mr-1" />
-              <span>{event.time}</span>
-            </div>
-            <div className="flex items-center">
-              <MapPin className="w-3 h-3 mr-1" />
-              <span>{event.location}</span>
-            </div>
-            <div className="flex items-center">
-              <Users className="w-3 h-3 mr-1" />
-              <span>
-                {event.participants} {language === "pt" ? "participantes" : "participants"}
-              </span>
-            </div>
+          <div className="mt-3 text-xs text-emerald-400 font-medium">
+            <span className="bg-emerald-500/20 px-2 py-1 rounded text-emerald-300 border border-emerald-500/30">
+              🏆 {language === "pt" ? "Evento Top Holders" : "Top Holders Event"}
+            </span>
+            <span className="ml-2">{language === "pt" ? "9 de Maio - 9 de Junho 2025" : "May 9 - June 9, 2025"}</span>
           </div>
 
           <div className="mt-4 text-xs text-gray-200 border-t border-emerald-700/30 pt-3">
@@ -558,20 +356,12 @@ export default function AgendaPage() {
               : "Registration period for Snake Game Tournament. Send 200,000 TPF to register."}
           </p>
 
-          {event.endDate && (
-            <div className="mt-3 text-xs text-blue-400 font-medium">
-              <span className="bg-blue-500/20 px-2 py-1 rounded text-blue-300 border border-blue-500/30">
-                📝 {language === "pt" ? "Fase: Registro" : "Phase: Registration"}
-              </span>
-              <span className="ml-2">
-                {formatDate(event.date)} - {formatDate(event.endDate)}
-              </span>
-              <span className="ml-2 text-yellow-400">
-                {Math.ceil((new Date(event.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}{" "}
-                {language === "pt" ? "dias restantes" : "days remaining"}
-              </span>
-            </div>
-          )}
+          <div className="mt-3 text-xs text-blue-400 font-medium">
+            <span className="bg-blue-500/20 px-2 py-1 rounded text-blue-300 border border-blue-500/30">
+              📝 {language === "pt" ? "Fase: Registro" : "Phase: Registration"}
+            </span>
+            <span className="ml-2">{language === "pt" ? "10 - 15 de Junho 2025" : "June 10-15, 2025"}</span>
+          </div>
 
           <div className="mt-4 p-3 bg-blue-900/20 rounded-lg border border-blue-600/20">
             <p className="text-blue-300 text-sm font-medium mb-3">
@@ -593,29 +383,7 @@ export default function AgendaPage() {
                 <span className="text-blue-400 font-bold">⏰</span>
                 <div>
                   <span className="font-medium text-blue-300">{language === "pt" ? "Prazo:" : "Deadline:"}</span>
-                  <span className="ml-1">{formatDate(event.endDate || "")}</span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2">
-                <span className="text-blue-400 font-bold">🎯</span>
-                <div>
-                  <span className="font-medium text-blue-300">{language === "pt" ? "Objetivo:" : "Goal:"}</span>
-                  <span className="ml-1">
-                    {language === "pt"
-                      ? "Conseguir a maior pontuação no jogo da cobra"
-                      : "Achieve highest score in snake game"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2">
-                <span className="text-blue-400 font-bold">🏆</span>
-                <div>
-                  <span className="font-medium text-blue-300">{language === "pt" ? "Prêmio:" : "Prize:"}</span>
-                  <span className="ml-1">
-                    {language === "pt" ? "Será anunciado na última semana" : "Will be announced in the last week"}
-                  </span>
+                  <span className="ml-1">{language === "pt" ? "15 de Junho 2025" : "June 15, 2025"}</span>
                 </div>
               </div>
             </div>
@@ -643,15 +411,6 @@ export default function AgendaPage() {
                   <ExternalLink className="w-3 h-3 text-blue-400" />
                 </button>
               </div>
-
-              <div className="mt-2">
-                <p className="text-blue-300 text-xs font-medium mb-1">
-                  {language === "pt" ? "Email para Envio do Score:" : "Email for Score Submission:"}
-                </p>
-                <div className="p-2 bg-gray-800/50 rounded border border-blue-600/20">
-                  <code className="text-xs text-blue-400">support@tradepulsetoken.com</code>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -670,20 +429,14 @@ export default function AgendaPage() {
               : "Active competition! Get the highest score in the snake game to win the grand prize."}
           </p>
 
-          {event.endDate && (
-            <div className="mt-3 text-xs text-purple-400 font-medium">
-              <span className="bg-purple-500/20 px-2 py-1 rounded text-purple-300 border border-purple-500/30">
-                🎮 {language === "pt" ? "Fase: Torneio Ativo" : "Phase: Active Tournament"}
-              </span>
-              <span className="ml-2">
-                {formatDate(event.date)} - {formatDate(event.endDate)}
-              </span>
-              <span className="ml-2 text-yellow-400">
-                {Math.ceil((new Date(event.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}{" "}
-                {language === "pt" ? "dias restantes" : "days remaining"}
-              </span>
-            </div>
-          )}
+          <div className="mt-3 text-xs text-purple-400 font-medium">
+            <span className="bg-purple-500/20 px-2 py-1 rounded text-purple-300 border border-purple-500/30">
+              🎮 {language === "pt" ? "Fase: Torneio Ativo" : "Phase: Active Tournament"}
+            </span>
+            <span className="ml-2">
+              {language === "pt" ? "16 de Junho - 9 de Julho 2025" : "June 16 - July 9, 2025"}
+            </span>
+          </div>
 
           <div className="mt-4 text-xs text-gray-200 border-t border-purple-700/30 pt-3">
             <p className="font-medium mb-2 text-purple-300">{language === "pt" ? "Instruções:" : "Instructions:"}</p>
@@ -696,18 +449,13 @@ export default function AgendaPage() {
               <li>{language === "pt" ? "Tire um screenshot da sua pontuação" : "Take a screenshot of your score"}</li>
               <li>
                 {language === "pt"
-                  ? "Envie para support@tradepulsetoken.com até o último dia"
-                  : "Send to support@tradepulsetoken.com by the last day"}
+                  ? "Envie para support@tradepulsetoken.com até 9 de julho"
+                  : "Send to support@tradepulsetoken.com by July 9"}
               </li>
               <li>
                 {language === "pt"
                   ? "Em caso de empate, o prêmio será dividido"
                   : "In case of a tie, the prize will be shared"}
-              </li>
-              <li>
-                {language === "pt"
-                  ? "Apenas um envio por jogador será considerado"
-                  : "Only one submission per player will be considered"}
               </li>
             </ol>
 
@@ -755,7 +503,6 @@ export default function AgendaPage() {
 
       <div className="w-full max-w-md px-4 relative z-10">
         {isLoading ? (
-          // Esqueleto de carregamento
           <div className="space-y-4">
             <div className="bg-gray-800/50 rounded-lg p-4 animate-pulse">
               <div className="h-6 bg-gray-700 rounded w-3/4 mb-3"></div>
@@ -777,9 +524,7 @@ export default function AgendaPage() {
           </div>
         ) : (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            {/* Calendário */}
             <Card className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 border border-gray-700/50 mb-4">
-              {/* Cabeçalho do mês */}
               <div className="flex justify-between items-center mb-4">
                 <Button variant="ghost" size="sm" onClick={prevMonth} className="text-gray-400 hover:text-white">
                   &lt;
@@ -792,13 +537,9 @@ export default function AgendaPage() {
                 </Button>
               </div>
 
-              {/* Dias da semana */}
               <div className="grid grid-cols-7 gap-1 mb-2">{renderDaysOfWeek()}</div>
-
-              {/* Dias do mês */}
               <div className="grid grid-cols-7 gap-1">{renderCalendar()}</div>
 
-              {/* Legenda */}
               <div className="mt-4 flex flex-wrap gap-3 text-xs text-gray-400">
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-blue-600 mr-1 border border-blue-400"></div>
@@ -806,20 +547,19 @@ export default function AgendaPage() {
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-emerald-600 mr-1 border border-emerald-400"></div>
-                  <span>{language === "pt" ? "Top Holders (1-9)" : "Top Holders (1-9)"}</span>
+                  <span>{language === "pt" ? "Top Holders (Mai 9-Jun 9)" : "Top Holders (May 9-Jun 9)"}</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-blue-600 mr-1 border border-blue-400"></div>
-                  <span>{language === "pt" ? "Registro (10-15)" : "Registration (10-15)"}</span>
+                  <span>{language === "pt" ? "Registro (Jun 10-15)" : "Registration (Jun 10-15)"}</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-purple-600 mr-1 border border-purple-400"></div>
-                  <span>{language === "pt" ? "Torneio (16-Jul 9)" : "Tournament (16-Jul 9)"}</span>
+                  <span>{language === "pt" ? "Torneio (Jun 16-Jul 9)" : "Tournament (Jun 16-Jul 9)"}</span>
                 </div>
               </div>
             </Card>
 
-            {/* Eventos do dia selecionado */}
             {selectedDate && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
