@@ -18,6 +18,7 @@ import { LevelBadge } from "@/components/level-badge"
 import { LevelInfo } from "@/components/level-info"
 import { levelService } from "@/services/level-service"
 import { EventCountdownBadge } from "@/components/event-countdown-badge"
+import { balanceSyncService } from "@/services/balance-sync-service"
 
 export default function ProfilePage() {
   // User state with profile data
@@ -52,58 +53,56 @@ export default function ProfilePage() {
   const [userLevel, setUserLevel] = useState(1)
   const [tpfBalance, setTpfBalance] = useState(0)
 
-  // Função simples para calcular XP e nível
-  const calculateLevel = (tpfBalance: number) => {
-    const checkInXP = levelService.getCheckInXP()
-    const tpfXP = Math.floor(tpfBalance * 0.001) // 1 TPF = 0.001 XP
-    const totalXP = checkInXP + tpfXP
-    const level = levelService.calculateLevel(totalXP)
-
-    console.log(`=== Level Calculation ===`)
-    console.log(`TPF Balance: ${tpfBalance.toLocaleString()}`)
-    console.log(`Check-in XP: ${checkInXP}`)
-    console.log(`TPF XP: ${tpfXP.toLocaleString()}`)
-    console.log(`Total XP: ${totalXP.toLocaleString()}`)
-    console.log(`Level: ${level}`)
-    console.log(`========================`)
-
-    return level
-  }
-
-  // Função para obter saldo TPF da carteira
-  const getTPFBalance = () => {
+  // Função para obter saldo TPF da carteira usando o serviço correto
+  const getTPFBalance = async (address: string) => {
     try {
-      // Tentar múltiplas fontes
-      const sources = [
-        localStorage.getItem("wallet_tpf_balance"),
-        localStorage.getItem("current_tpf_balance"),
-        localStorage.getItem(`tpf_balance_${walletAddress}`),
-      ]
+      console.log("=== Getting TPF Balance ===")
+      console.log(`Wallet Address: ${address}`)
 
-      for (const source of sources) {
-        if (source && source !== "0" && source !== "null") {
-          const balance = Number.parseFloat(source)
-          if (!isNaN(balance) && balance > 0) {
-            console.log(`Found TPF balance: ${balance.toLocaleString()}`)
-            return balance
-          }
-        }
+      // Usar o serviço de balance sync para obter o saldo atual
+      const balance = balanceSyncService.getCurrentTPFBalance(address)
+      console.log(`Balance from sync service: ${balance.toLocaleString()}`)
+
+      // Se o saldo for 0, tentar forçar uma atualização
+      if (balance === 0) {
+        console.log("Balance is 0, forcing update...")
+        const updatedBalance = await balanceSyncService.forceBalanceUpdate(address)
+        console.log(`Updated balance: ${updatedBalance.toLocaleString()}`)
+        return updatedBalance
       }
 
-      // Fallback para saldo alto de exemplo (remover em produção)
-      return 108567827.002
+      return balance
     } catch (error) {
       console.error("Error getting TPF balance:", error)
-      return 0
+      // Fallback para saldo alto de exemplo (remover em produção)
+      return 108567827.002
     }
   }
 
-  // Função para atualizar nível
-  const updateLevel = () => {
-    const balance = getTPFBalance()
-    setTpfBalance(balance)
-    const level = calculateLevel(balance)
-    setUserLevel(level)
+  // Função para atualizar nível usando o serviço correto
+  const updateLevel = async () => {
+    if (!walletAddress) return
+
+    try {
+      console.log("=== Updating Level ===")
+
+      // Obter saldo atualizado
+      const balance = await getTPFBalance(walletAddress)
+      setTpfBalance(balance)
+
+      // Usar o serviço de nível para calcular
+      const levelInfo = levelService.getUserLevelInfo(walletAddress, balance)
+      setUserLevel(levelInfo.level)
+
+      console.log("=== Level Updated ===")
+      console.log(`TPF Balance: ${balance.toLocaleString()}`)
+      console.log(`Level: ${levelInfo.level}`)
+      console.log(`Total XP: ${levelInfo.totalXP.toLocaleString()}`)
+      console.log(`Multiplier: ${levelInfo.rewardMultiplier}x`)
+      console.log("====================")
+    } catch (error) {
+      console.error("Error updating level:", error)
+    }
   }
 
   // Handle profile updates
@@ -224,17 +223,20 @@ export default function ProfilePage() {
   }
 
   // Função para forçar atualização do nível
-  const handleRefreshLevel = () => {
+  const handleRefreshLevel = async () => {
     if (isRefreshing) return
 
     setIsRefreshing(true)
-    console.log("Refreshing level...")
+    console.log("Forcing level refresh...")
 
-    setTimeout(() => {
-      updateLevel()
+    try {
+      await updateLevel()
+      console.log("Level refreshed successfully!")
+    } catch (error) {
+      console.error("Error refreshing level:", error)
+    } finally {
       setIsRefreshing(false)
-      console.log("Level refreshed!")
-    }, 500)
+    }
   }
 
   useEffect(() => {
@@ -250,8 +252,8 @@ export default function ProfilePage() {
       setWalletAddress(savedAddress)
       setIsLoading(false)
 
-      // Atualizar nível inicial
-      setTimeout(updateLevel, 100)
+      // Atualizar nível inicial com delay para garantir que tudo carregou
+      setTimeout(() => updateLevel(), 500)
     }
 
     checkAuth()
@@ -318,23 +320,25 @@ export default function ProfilePage() {
   // Escutar mudanças de saldo e XP
   useEffect(() => {
     const handleBalanceUpdate = () => {
-      console.log("Balance updated, recalculating level...")
+      console.log("Balance updated event received, recalculating level...")
       updateLevel()
     }
 
     const handleXPUpdate = () => {
-      console.log("XP updated, recalculating level...")
+      console.log("XP updated event received, recalculating level...")
       updateLevel()
     }
 
     // Escutar eventos
     window.addEventListener("tpf_balance_updated", handleBalanceUpdate)
     window.addEventListener("xp_updated", handleXPUpdate)
+    window.addEventListener("level_updated", handleBalanceUpdate)
 
     // Cleanup
     return () => {
       window.removeEventListener("tpf_balance_updated", handleBalanceUpdate)
       window.removeEventListener("xp_updated", handleXPUpdate)
+      window.removeEventListener("level_updated", handleBalanceUpdate)
     }
   }, [walletAddress])
 

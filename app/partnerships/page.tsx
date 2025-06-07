@@ -35,6 +35,10 @@ export default function PartnershipsPage() {
     )
   }
 
+  const handleAstraCoinClick = (url: string) => {
+    window.open(url, "_blank")
+  }
+
   return (
     <main className="relative flex min-h-screen flex-col items-center pt-6 pb-20 overflow-hidden">
       {/* Background effects */}
@@ -69,7 +73,7 @@ export default function PartnershipsPage() {
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="w-full"
+          className="w-full space-y-4"
         >
           <h2 className="text-xl font-semibold text-white mb-4 text-center">
             {translations.partnerships?.ourPartners || "Our Partners"}
@@ -124,6 +128,89 @@ export default function PartnershipsPage() {
               </div>
             </div>
           </motion.div>
+
+          {/* AstraCoin Partnership Cards */}
+          <div className="space-y-3">
+            {/* AstraCoin App 1 */}
+            <motion.div
+              className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-4 cursor-pointer group"
+              whileHover={{ scale: 1.02, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() =>
+                handleAstraCoinClick(
+                  "https://worldcoin.org/mini-app?app_id=app_f50d7c645d30623eb495a81d58b838e6&app_mode=mini-app",
+                )
+              }
+            >
+              {/* Background glow effect */}
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+              <div className="relative z-10 flex items-center gap-4">
+                {/* AstraCoin Logo */}
+                <div className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
+                  <Image src="/astracoin-logo.jpg" alt="AstraCoin" fill className="object-cover" />
+                </div>
+
+                {/* Info */}
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+                    AstraCoin
+                    <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                  </h3>
+                  <p className="text-gray-300 text-sm mb-2">
+                    {translations.partnerships?.astracoinDescription || "Decentralized finance platform"}
+                  </p>
+                  <motion.div
+                    className="bg-gradient-to-r from-orange-600 to-purple-600 text-white py-1 px-3 rounded-full text-xs font-medium inline-flex items-center gap-1 group-hover:from-orange-500 group-hover:to-purple-500 transition-all duration-300"
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    {translations.partnerships?.visitApp || "Visit App"}
+                    <ArrowUpRight className="w-3 h-3" />
+                  </motion.div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* AstraCoin App 2 */}
+            <motion.div
+              className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-4 cursor-pointer group"
+              whileHover={{ scale: 1.02, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() =>
+                handleAstraCoinClick(
+                  "https://worldcoin.org/mini-app?app_id=app_2db51f9f374e2c4ba8ebf1f132f96f52&app_mode=mini-app",
+                )
+              }
+            >
+              {/* Background glow effect */}
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+              <div className="relative z-10 flex items-center gap-4">
+                {/* AstraCoin Logo */}
+                <div className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
+                  <Image src="/astracoin-logo.jpg" alt="AstraCoin" fill className="object-cover" />
+                </div>
+
+                {/* Info */}
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+                    AstraCoin Pro
+                    <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                  </h3>
+                  <p className="text-gray-300 text-sm mb-2">
+                    {translations.partnerships?.astracoinProDescription || "Advanced trading features"}
+                  </p>
+                  <motion.div
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-1 px-3 rounded-full text-xs font-medium inline-flex items-center gap-1 group-hover:from-purple-500 group-hover:to-pink-500 transition-all duration-300"
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    {translations.partnerships?.visitApp || "Visit App"}
+                    <ArrowUpRight className="w-3 h-3" />
+                  </motion.div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </motion.div>
 
         {/* More Partnerships Coming Soon */}
