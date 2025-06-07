@@ -143,6 +143,20 @@ export default function AgendaPage() {
     setSelectedDate(newDate)
   }
 
+  // Obter cor do evento baseado no tipo
+  const getEventColor = (eventType: Event["type"]) => {
+    switch (eventType) {
+      case "airdrop":
+        return "bg-emerald-600/60" // Verde esmeralda para airdrop
+      case "tournament_registration":
+        return "bg-blue-600/60" // Azul para registro
+      case "tournament_game":
+        return "bg-purple-600/60" // Roxo para torneio
+      default:
+        return "bg-gray-600/60"
+    }
+  }
+
   // Verificar se uma data tem eventos ou está no intervalo de um evento
   const hasEvents = (day: number) => {
     const dateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
@@ -162,6 +176,35 @@ export default function AgendaPage() {
     })
 
     return hasStartEvent || isInEventRange
+  }
+
+  // Obter cor do dia baseado nos eventos ativos
+  const getDayColor = (day: number) => {
+    const dateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+
+    // Verificar qual evento está ativo nesta data
+    const activeEvents = events.filter((event) => {
+      if (!event.endDate) return false
+
+      const eventStartDate = new Date(event.date)
+      const eventEndDate = new Date(event.endDate)
+      const currentDateCheck = new Date(dateString)
+
+      return currentDateCheck >= eventStartDate && currentDateCheck <= eventEndDate
+    })
+
+    if (activeEvents.length > 0) {
+      // Priorizar por tipo de evento
+      const priorityOrder = ["airdrop", "tournament_registration", "tournament_game"]
+      for (const priority of priorityOrder) {
+        const event = activeEvents.find((e) => e.type === priority)
+        if (event) {
+          return getEventColor(event.type)
+        }
+      }
+    }
+
+    return ""
   }
 
   // Obter eventos para a data selecionada
@@ -211,19 +254,7 @@ export default function AgendaPage() {
       const isSelected =
         selectedDate?.getDate() === day && selectedDate?.getMonth() === month && selectedDate?.getFullYear() === year
 
-      const dateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-
-      // Verificar se a data está no intervalo do evento especial
-      const isInEventRange = events.some((event) => {
-        if (!event.endDate) return false
-
-        const eventStartDate = new Date(event.date)
-        const eventEndDate = new Date(event.endDate)
-        const currentDateCheck = new Date(dateString)
-
-        return currentDateCheck >= eventStartDate && currentDateCheck <= eventEndDate
-      })
-
+      const dayColor = getDayColor(day)
       const hasEventToday = hasEvents(day)
 
       days.push(
@@ -234,14 +265,18 @@ export default function AgendaPage() {
           onClick={() => handleDateClick(day)}
           className={`
             h-10 w-10 rounded-full flex items-center justify-center cursor-pointer relative
-            ${isToday ? "bg-blue-600 text-white" : ""}
-            ${isSelected ? "bg-gray-700 text-white" : ""}
-            ${isInEventRange && !isToday && !isSelected ? "bg-purple-600/40 text-white" : ""}
-            ${!isToday && !isSelected && !isInEventRange ? "hover:bg-gray-800" : ""}
+            ${isToday ? "bg-blue-600 text-white border-2 border-blue-400" : ""}
+            ${isSelected ? "bg-gray-700 text-white border-2 border-gray-500" : ""}
+            ${dayColor && !isToday && !isSelected ? `${dayColor} text-white` : ""}
+            ${!isToday && !isSelected && !dayColor ? "hover:bg-gray-800" : ""}
           `}
         >
           {day}
-          {hasEventToday && <div className="absolute bottom-0.5 w-1.5 h-1.5 rounded-full bg-green-500"></div>}
+          {hasEventToday && (
+            <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-yellow-400 border-2 border-gray-900 flex items-center justify-center">
+              <div className="w-1 h-1 rounded-full bg-gray-900"></div>
+            </div>
+          )}
         </motion.div>,
       )
     }
@@ -263,12 +298,12 @@ export default function AgendaPage() {
   // Renderizar o indicador de tipo de evento
   const renderEventTypeIndicator = (type: Event["type"]) => {
     const typeConfig = {
-      airdrop: { color: "bg-green-500", icon: Trophy },
-      tournament_registration: { color: "bg-blue-500", icon: Gamepad2 },
-      tournament_game: { color: "bg-purple-500", icon: Gamepad2 },
-      community: { color: "bg-blue-500", icon: Users },
-      competition: { color: "bg-purple-500", icon: Trophy },
-      education: { color: "bg-yellow-500", icon: Users },
+      airdrop: { color: "bg-emerald-500", icon: Trophy, borderColor: "border-emerald-400" },
+      tournament_registration: { color: "bg-blue-500", icon: Gamepad2, borderColor: "border-blue-400" },
+      tournament_game: { color: "bg-purple-500", icon: Gamepad2, borderColor: "border-purple-400" },
+      community: { color: "bg-blue-500", icon: Users, borderColor: "border-blue-400" },
+      competition: { color: "bg-purple-500", icon: Trophy, borderColor: "border-purple-400" },
+      education: { color: "bg-yellow-500", icon: Users, borderColor: "border-yellow-400" },
     }
 
     const config = typeConfig[type]
@@ -276,8 +311,8 @@ export default function AgendaPage() {
 
     return (
       <div className="flex items-center">
-        <div className={`w-3 h-3 rounded-full ${config.color} mr-2`}></div>
-        <IconComponent className="w-4 h-4 text-gray-400" />
+        <div className={`w-4 h-4 rounded-full ${config.color} mr-3 border-2 ${config.borderColor} shadow-lg`}></div>
+        <IconComponent className="w-5 h-5 text-gray-300" />
       </div>
     )
   }
@@ -289,19 +324,39 @@ export default function AgendaPage() {
 
   // Renderizar o conteúdo do evento
   const renderEventContent = (event: Event) => {
+    const getEventCardStyle = (eventType: Event["type"]) => {
+      switch (eventType) {
+        case "airdrop":
+          return "bg-gradient-to-br from-emerald-900/30 to-emerald-800/20 border-emerald-600/30"
+        case "tournament_registration":
+          return "bg-gradient-to-br from-blue-900/30 to-blue-800/20 border-blue-600/30"
+        case "tournament_game":
+          return "bg-gradient-to-br from-purple-900/30 to-purple-800/20 border-purple-600/30"
+        default:
+          return "bg-gray-800/50 border-gray-700/50"
+      }
+    }
+
+    const cardStyle = getEventCardStyle(event.type)
+
     if (event.type === "airdrop") {
       return (
-        <>
-          <h4 className="text-white font-medium">{t.agenda?.events?.topHoldersIncentive?.title}</h4>
-          <p className="text-gray-400 text-sm mt-1">{t.agenda?.events?.topHoldersIncentive?.description}</p>
+        <div className={`p-4 rounded-lg border ${cardStyle}`}>
+          <h4 className="text-emerald-300 font-medium text-lg">{t.agenda?.events?.topHoldersIncentive?.title}</h4>
+          <p className="text-gray-300 text-sm mt-1">{t.agenda?.events?.topHoldersIncentive?.description}</p>
 
           {event.endDate && (
-            <div className="mt-2 text-xs text-purple-400 font-medium">
-              {formatDate(event.date)} - {formatDate(event.endDate)}
+            <div className="mt-3 text-xs text-emerald-400 font-medium">
+              <span className="bg-emerald-500/20 px-2 py-1 rounded text-emerald-300 border border-emerald-500/30">
+                🏆 Top Holders Event
+              </span>
+              <span className="ml-2">
+                {formatDate(event.date)} - {formatDate(event.endDate)}
+              </span>
             </div>
           )}
 
-          <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-400">
+          <div className="flex flex-wrap gap-3 mt-3 text-xs text-gray-300">
             <div className="flex items-center">
               <Clock className="w-3 h-3 mr-1" />
               <span>{event.time}</span>
@@ -318,118 +373,178 @@ export default function AgendaPage() {
             </div>
           </div>
 
-          <div className="mt-3 text-xs text-gray-300 border-t border-gray-700/50 pt-2">
-            <p className="font-medium mb-1">{t.agenda?.howToParticipate}</p>
-            <ol className="list-decimal pl-4 space-y-0.5">
+          <div className="mt-4 text-xs text-gray-200 border-t border-emerald-700/30 pt-3">
+            <p className="font-medium mb-2 text-emerald-300">{t.agenda?.howToParticipate}</p>
+            <ol className="list-decimal pl-4 space-y-1">
               {t.agenda?.events?.topHoldersIncentive?.howToParticipate?.map((step, index) => (
                 <li key={index}>{step}</li>
               ))}
             </ol>
           </div>
-        </>
+        </div>
       )
     }
 
     if (event.type === "tournament_registration") {
       return (
-        <>
-          <h4 className="text-white font-medium">
-            {language === "pt" ? "Inscrição para o Torneio" : "Tournament Registration"}
+        <div className={`p-4 rounded-lg border ${cardStyle}`}>
+          <h4 className="text-blue-300 font-medium text-lg">
+            {t.events?.snakeTournament?.registrationTitle || "Tournament Registration"}
           </h4>
-          <p className="text-gray-400 text-sm mt-1">
-            {language === "pt"
-              ? "Período de inscrição para o Torneio Jogo da Cobra"
-              : "Registration period for Snake Game Tournament"}
+          <p className="text-gray-300 text-sm mt-1">
+            {t.events?.snakeTournament?.registrationDescription || "Send 200,000 TPF to register for the tournament"}
           </p>
 
           {event.endDate && (
-            <div className="mt-2 text-xs text-blue-400 font-medium">
-              {formatDate(event.date)} - {formatDate(event.endDate)}
+            <div className="mt-3 text-xs text-blue-400 font-medium">
+              <span className="bg-blue-500/20 px-2 py-1 rounded text-blue-300 border border-blue-500/30">
+                📝 {t.events?.snakeTournament?.phase || "Phase"}:{" "}
+                {t.events?.snakeTournament?.registration || "Registration"}
+              </span>
+              <span className="ml-2">
+                {formatDate(event.date)} - {formatDate(event.endDate)}
+              </span>
+              <span className="ml-2 text-yellow-400">
+                {Math.ceil((new Date(event.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}{" "}
+                {t.events?.snakeTournament?.remaining || "days remaining"}
+              </span>
             </div>
           )}
 
-          <div className="mt-3 p-3 bg-gray-700/30 rounded-lg border border-gray-600/30">
-            <p className="text-white text-sm font-medium mb-2">
-              {language === "pt" ? "Como se inscrever:" : "How to register:"}
+          <div className="mt-4 p-3 bg-blue-900/20 rounded-lg border border-blue-600/20">
+            <p className="text-blue-300 text-sm font-medium mb-2">
+              {t.events?.snakeTournament?.instructions || "Instructions:"}
             </p>
-            <p className="text-gray-300 text-xs mb-2">
-              {language === "pt"
-                ? "Envie 200.000 TPF para o endereço abaixo:"
-                : "Send 200,000 TPF to the address below:"}
-            </p>
-            <div className="flex items-center gap-2 p-2 bg-gray-800/50 rounded border">
-              <code className="text-xs text-green-400 flex-1 break-all">
-                0xf04a78df4cc3017c0c23f37528d7b6cbbeea6677
-              </code>
-              <button
-                onClick={() => copyAddress("0xf04a78df4cc3017c0c23f37528d7b6cbbeea6677")}
-                className="p-1 hover:bg-gray-600 rounded transition-colors"
-                title={language === "pt" ? "Copiar endereço" : "Copy address"}
-              >
-                <Copy className="w-3 h-3 text-gray-400" />
-              </button>
-              <button
-                onClick={() => openAddressInExplorer("0xf04a78df4cc3017c0c23f37528d7b6cbbeea6677")}
-                className="p-1 hover:bg-gray-600 rounded transition-colors"
-                title={language === "pt" ? "Ver no explorer" : "View in explorer"}
-              >
-                <ExternalLink className="w-3 h-3 text-gray-400" />
-              </button>
+            <ol className="list-decimal pl-4 text-xs text-gray-200 space-y-1">
+              <li>
+                {t.events?.snakeTournament?.rules?.rule1 ||
+                  "The player who achieves the highest score in the snake game wins the grand prize"}
+              </li>
+              <li>
+                {t.events?.snakeTournament?.rules?.rule2 ||
+                  "Screenshot of your score must be sent to support@tradepulsetoken.com by the last day of the tournament"}
+              </li>
+              <li>
+                {t.events?.snakeTournament?.rules?.rule3 ||
+                  "In case of a tie with any other player, the prize will be divided"}
+              </li>
+              <li>
+                {t.events?.snakeTournament?.rules?.rule4 || "The prize will be announced in the last week of the event"}
+              </li>
+              <li>
+                {t.events?.snakeTournament?.rules?.rule5 ||
+                  "You can only send one screenshot to the email, more than one will be disregarded, so send carefully"}
+              </li>
+            </ol>
+
+            <div className="mt-3">
+              <p className="text-blue-300 text-xs font-medium mb-1">
+                {t.events?.snakeTournament?.registrationAddress || "Registration address:"}
+              </p>
+              <div className="flex items-center gap-2 p-2 bg-gray-800/50 rounded border border-blue-600/20">
+                <code className="text-xs text-green-400 flex-1 break-all">
+                  0xf04a78df4cc3017c0c23f37528d7b6cbbeea6677
+                </code>
+                <button
+                  onClick={() => copyAddress("0xf04a78df4cc3017c0c23f37528d7b6cbbeea6677")}
+                  className="p-1 hover:bg-blue-600/20 rounded transition-colors"
+                  title={t.events?.snakeTournament?.copyAddress || "Copy address"}
+                >
+                  <Copy className="w-3 h-3 text-blue-400" />
+                </button>
+                <button
+                  onClick={() => openAddressInExplorer("0xf04a78df4cc3017c0c23f37528d7b6cbbeea6677")}
+                  className="p-1 hover:bg-blue-600/20 rounded transition-colors"
+                  title={language === "pt" ? "Ver no explorer" : "View in explorer"}
+                >
+                  <ExternalLink className="w-3 h-3 text-blue-400" />
+                </button>
+              </div>
+              <div className="mt-2">
+                <p className="text-blue-300 text-xs font-medium mb-1">
+                  {t.events?.snakeTournament?.email || "Email for score submission:"}
+                </p>
+                <div className="p-2 bg-gray-800/50 rounded border border-blue-600/20">
+                  <code className="text-xs text-blue-400">support@tradepulsetoken.com</code>
+                </div>
+              </div>
             </div>
           </div>
-        </>
+        </div>
       )
     }
 
     if (event.type === "tournament_game") {
       return (
-        <>
-          <h4 className="text-white font-medium">
-            {language === "pt" ? "Torneio Jogo da Cobra" : "Snake Game Tournament"}
+        <div className={`p-4 rounded-lg border ${cardStyle}`}>
+          <h4 className="text-purple-300 font-medium text-lg">
+            {t.events?.snakeTournament?.tournamentTitle || "Snake Game Tournament"}
           </h4>
-          <p className="text-gray-400 text-sm mt-1">
-            {language === "pt"
-              ? "Competição para conseguir a maior pontuação no jogo da cobra"
-              : "Competition to achieve the highest score in the snake game"}
+          <p className="text-gray-300 text-sm mt-1">
+            {t.events?.snakeTournament?.tournamentDescription ||
+              "Get the highest score in the snake game to win the grand prize"}
           </p>
 
           {event.endDate && (
-            <div className="mt-2 text-xs text-purple-400 font-medium">
-              {formatDate(event.date)} - {formatDate(event.endDate)}
+            <div className="mt-3 text-xs text-purple-400 font-medium">
+              <span className="bg-purple-500/20 px-2 py-1 rounded text-purple-300 border border-purple-500/30">
+                🎮 {t.events?.snakeTournament?.phase || "Phase"}:{" "}
+                {t.events?.snakeTournament?.tournament || "Tournament"}
+              </span>
+              <span className="ml-2">
+                {formatDate(event.date)} - {formatDate(event.endDate)}
+              </span>
+              <span className="ml-2 text-yellow-400">
+                {Math.ceil((new Date(event.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))}{" "}
+                {t.events?.snakeTournament?.remaining || "days remaining"}
+              </span>
             </div>
           )}
 
-          <div className="mt-3 text-xs text-gray-300 border-t border-gray-700/50 pt-2">
-            <p className="font-medium mb-1">{language === "pt" ? "Instruções:" : "Instructions:"}</p>
-            <ul className="list-disc pl-4 space-y-1">
-              <li>
-                {language === "pt"
-                  ? "O jogador com mais pontos ganha o grande prêmio"
-                  : "The player with the highest score wins the grand prize"}
-              </li>
-              <li>
-                {language === "pt"
-                  ? "Envie o print do seu score para support@tradepulsetoken.com"
-                  : "Send your score screenshot to support@tradepulsetoken.com"}
-              </li>
-              <li>
-                {language === "pt"
-                  ? "Apenas um envio por jogador será considerado"
-                  : "Only one submission per player will be considered"}
-              </li>
-              <li>
-                {language === "pt"
-                  ? "Em caso de empate, o prêmio será dividido"
-                  : "In case of a tie, the prize will be shared"}
-              </li>
-            </ul>
-            <p className="mt-2 text-yellow-400 text-xs">
-              {language === "pt"
-                ? "O prêmio será anunciado na última semana do evento"
-                : "The prize will be announced in the last week of the event"}
+          <div className="mt-4 text-xs text-gray-200 border-t border-purple-700/30 pt-3">
+            <p className="font-medium mb-2 text-purple-300">
+              {t.events?.snakeTournament?.instructions || "Instructions:"}
             </p>
+            <ol className="list-decimal pl-4 space-y-1">
+              <li>
+                {t.events?.snakeTournament?.rules?.rule1 ||
+                  "The player who achieves the highest score in the snake game wins the grand prize"}
+              </li>
+              <li>
+                {t.events?.snakeTournament?.rules?.rule2 ||
+                  "Screenshot of your score must be sent to support@tradepulsetoken.com by the last day of the tournament"}
+              </li>
+              <li>
+                {t.events?.snakeTournament?.rules?.rule3 ||
+                  "In case of a tie with any other player, the prize will be divided"}
+              </li>
+              <li>
+                {t.events?.snakeTournament?.rules?.rule4 || "The prize will be announced in the last week of the event"}
+              </li>
+              <li>
+                {t.events?.snakeTournament?.rules?.rule5 ||
+                  "You can only send one screenshot to the email, more than one will be disregarded, so send carefully"}
+              </li>
+            </ol>
+
+            <div className="mt-3 p-2 bg-purple-900/20 rounded border border-purple-600/20">
+              <p className="text-purple-300 text-xs font-medium mb-1">
+                {t.events?.snakeTournament?.email || "Email for score submission:"}
+              </p>
+              <code className="text-xs text-purple-400">support@tradepulsetoken.com</code>
+            </div>
+
+            <div className="mt-3">
+              <Button
+                size="sm"
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 border border-purple-500/30"
+                onClick={() => router.push("/games")}
+              >
+                {language === "pt" ? "🎮 Jogar Agora" : "🎮 Play Now"}
+              </Button>
+            </div>
           </div>
-        </>
+        </div>
       )
     }
 
@@ -502,16 +617,20 @@ export default function AgendaPage() {
               {/* Legenda */}
               <div className="mt-4 flex flex-wrap gap-3 text-xs text-gray-400">
                 <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-blue-600 mr-1"></div>
+                  <div className="w-3 h-3 rounded-full bg-blue-600 mr-1 border border-blue-400"></div>
                   <span>{t.agenda?.today}</span>
                 </div>
                 <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
-                  <span>{t.agenda?.event}</span>
+                  <div className="w-3 h-3 rounded-full bg-emerald-600 mr-1 border border-emerald-400"></div>
+                  <span>Top Holders</span>
                 </div>
                 <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-purple-600/40 mr-1"></div>
-                  <span>{t.agenda?.incentivePeriod}</span>
+                  <div className="w-3 h-3 rounded-full bg-blue-600 mr-1 border border-blue-400"></div>
+                  <span>Registration</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-purple-600 mr-1 border border-purple-400"></div>
+                  <span>Tournament</span>
                 </div>
               </div>
             </Card>
@@ -523,21 +642,21 @@ export default function AgendaPage() {
                 animate={{ opacity: 1, height: "auto" }}
                 transition={{ duration: 0.3 }}
               >
-                <h3 className="text-lg font-medium text-white mb-2">
+                <h3 className="text-lg font-medium text-white mb-3">
                   {language === "pt" ? "Eventos para " : "Events for "}
                   {formatDate(selectedDate.toISOString())}
                 </h3>
 
                 {getEventsForSelectedDate().length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {getEventsForSelectedDate().map((event) => (
                       <Card
                         key={event.id}
-                        className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-4 border border-gray-700/50"
+                        className="bg-gray-800/30 backdrop-blur-sm rounded-lg border border-gray-700/30 overflow-hidden"
                       >
-                        <div className="flex items-start">
-                          <div className="flex-shrink-0 mr-3 mt-1">{renderEventTypeIndicator(event.type)}</div>
-                          <div className="flex-1">{renderEventContent(event)}</div>
+                        <div className="flex items-start p-1">
+                          <div className="flex-shrink-0 mr-3 mt-3 ml-3">{renderEventTypeIndicator(event.type)}</div>
+                          <div className="flex-1 pr-3">{renderEventContent(event)}</div>
                         </div>
                       </Card>
                     ))}

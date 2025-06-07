@@ -40,7 +40,7 @@ export function EventCountdownBadge() {
     setTranslations(getTranslations(lang))
   }, [])
 
-  // Definir eventos com suas datas
+  // Definir eventos com suas datas (ordenados por prioridade/data)
   const events: EventInfo[] = [
     {
       type: "topHolders",
@@ -72,27 +72,37 @@ export function EventCountdownBadge() {
     const updateCountdown = () => {
       const now = new Date()
 
-      // Encontrar o evento ativo atual
+      // Encontrar o próximo evento ativo (que ainda não terminou)
       let activeEvent: EventInfo | null = null
 
-      for (const event of events) {
+      // Ordenar eventos por data de término para pegar o próximo
+      const sortedEvents = [...events].sort((a, b) => a.endDate.getTime() - b.endDate.getTime())
+
+      for (const event of sortedEvents) {
         if (now < event.endDate) {
           activeEvent = event
           break
         }
       }
 
+      // Se não há eventos ativos, não mostrar nada
       if (!activeEvent) {
         setCurrentEvent(null)
         return
       }
 
-      setCurrentEvent(activeEvent)
+      // Se mudou de evento, atualizar
+      if (!currentEvent || currentEvent.type !== activeEvent.type) {
+        setCurrentEvent(activeEvent)
+        console.log(`🎯 Evento ativo mudou para: ${activeEvent.type}`)
+      }
 
       const timeDiff = activeEvent.endDate.getTime() - now.getTime()
 
       if (timeDiff <= 0) {
         setTimeRemaining({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+        // Forçar uma nova verificação na próxima execução
+        setTimeout(updateCountdown, 1000)
         return
       }
 
@@ -108,7 +118,7 @@ export function EventCountdownBadge() {
     const interval = setInterval(updateCountdown, 1000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [currentEvent]) // Dependência do currentEvent para reagir a mudanças
 
   const formatTime = (time: TimeRemaining): string => {
     const { days, hours, minutes, seconds } = time
