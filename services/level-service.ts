@@ -120,8 +120,16 @@ class LevelService {
     tpfXP: number
     tpfBalance: number
   } {
+    console.log("=== Getting User Level Info ===")
+    console.log(`Wallet: ${walletAddress}`)
+    console.log(`Manual TPF Balance: ${manualTPFBalance?.toLocaleString() || "Not provided"}`)
+
     const checkInXP = this.getCheckInXP()
     const tpfBalance = manualTPFBalance !== undefined ? manualTPFBalance : this.getCurrentTPFBalance(walletAddress)
+
+    console.log(`Using TPF Balance: ${tpfBalance.toLocaleString()}`)
+    console.log(`Check-in XP: ${checkInXP}`)
+
     const totalXP = this.calculateTotalXP(checkInXP, tpfBalance)
     const level = this.calculateLevel(totalXP)
     const currentLevelXP = this.getCurrentLevelXP(totalXP)
@@ -130,17 +138,7 @@ class LevelService {
     const progressPercentage = nextLevelXP > 0 ? (currentLevelXP / nextLevelXP) * 100 : 100
     const tpfXP = Math.floor(tpfBalance * 0.001)
 
-    console.log("=== Level Info Debug ===")
-    console.log(`Wallet: ${walletAddress}`)
-    console.log(`TPF Balance: ${tpfBalance.toLocaleString()}`)
-    console.log(`Check-in XP: ${checkInXP}`)
-    console.log(`TPF XP: ${tpfXP}`)
-    console.log(`Total XP: ${totalXP}`)
-    console.log(`Level: ${level}`)
-    console.log(`Multiplier: ${rewardMultiplier}x`)
-    console.log("=======================")
-
-    return {
+    const result = {
       level,
       totalXP,
       currentLevelXP,
@@ -151,6 +149,17 @@ class LevelService {
       tpfXP,
       tpfBalance,
     }
+
+    console.log("=== Level Info Result ===")
+    console.log(`TPF Balance: ${tpfBalance.toLocaleString()}`)
+    console.log(`Check-in XP: ${checkInXP}`)
+    console.log(`TPF XP: ${tpfXP}`)
+    console.log(`Total XP: ${totalXP}`)
+    console.log(`Level: ${level}`)
+    console.log(`Multiplier: ${rewardMultiplier}x`)
+    console.log("========================")
+
+    return result
   }
 
   // Forçar recálculo do nível
@@ -165,10 +174,11 @@ class LevelService {
     tpfXP: number
     tpfBalance: number
   }> {
-    console.log("Forcing level recalculation...")
+    console.log("=== Forcing Level Recalculation ===")
 
     // Forçar atualização do saldo
     const updatedBalance = await balanceSyncService.forceBalanceUpdate(walletAddress)
+    console.log(`Forced balance update result: ${updatedBalance.toLocaleString()}`)
 
     // Recalcular com saldo atualizado
     const levelInfo = this.getUserLevelInfo(walletAddress, updatedBalance)
@@ -179,6 +189,7 @@ class LevelService {
     })
     window.dispatchEvent(event)
 
+    console.log("=== Level Recalculation Complete ===")
     return levelInfo
   }
 
