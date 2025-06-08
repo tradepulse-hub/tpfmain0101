@@ -5,6 +5,26 @@ import { useState, useEffect } from "react"
 // Tipos para internacionalização
 export type Language = "en" | "pt"
 
+export interface MembershipTranslations {
+  title?: string
+  subtitle?: string
+  readyQuestion?: string
+  whatWeOffer?: string
+  benefitDescription?: string
+  benefitNote?: string
+  price?: string
+  priceForever?: string
+  priceExplanation?: string
+  becomeButton?: string
+  processing?: string
+  paymentInfo?: string
+  destinationWallet?: string
+  afterPayment?: string
+  contactSupport?: string
+  tip?: string
+  tipDescription?: string
+}
+
 export interface AirdropTranslations {
   title?: string
   subtitle?: string
@@ -47,6 +67,7 @@ export interface NavTranslations {
   about?: string
   finances?: string
   partnerships?: string
+  membership?: string
   menu?: string
   close?: string
 }
@@ -412,6 +433,7 @@ export interface Translations {
   partnerships?: PartnershipsTranslations
   level?: LevelTranslations
   events?: EventsTranslations
+  membership?: MembershipTranslations
 }
 
 // Função para obter o idioma atual do navegador ou o padrão (inglês)
@@ -484,6 +506,7 @@ export function getTranslations(lang: Language): Translations {
           about: "Sobre",
           finances: "Finanças",
           partnerships: "Parcerias",
+          membership: "Membership",
           menu: "Menu",
           close: "Fechar",
         },
@@ -837,6 +860,26 @@ export function getTranslations(lang: Language): Translations {
             tournament: "Torneio",
           },
         },
+        membership: {
+          title: "TPulseFi Membership",
+          subtitle: "Membership Premium",
+          readyQuestion: "Estás pronto para ser um verdadeiro membership TPulseFi?",
+          whatWeOffer: "O que temos para oferecer?",
+          benefitDescription:
+            "Parte das taxas de transações TPF vai para os nossos membership no dia 9 todos os meses!",
+          benefitNote: "E não é assim tão pouco!",
+          price: "20 WLD",
+          priceForever: "para sempre!",
+          priceExplanation: "Ou seja, pagas 20 WLD e tens as taxas para sempre!",
+          becomeButton: "Tornar-me Membership",
+          processing: "Processando...",
+          paymentInfo: "Informações de Pagamento",
+          destinationWallet: "Wallet de Destino:",
+          afterPayment: "Após o Pagamento",
+          contactSupport: "No fim do pagamento, contacta a equipa de suporte com o print para:",
+          tip: "Dica:",
+          tipDescription: "Inclui o screenshot da transação e o teu endereço de wallet no email.",
+        },
       }
 
     case "en":
@@ -882,6 +925,7 @@ export function getTranslations(lang: Language): Translations {
           about: "About",
           finances: "Finances",
           partnerships: "Partnerships",
+          membership: "Membership",
           menu: "Menu",
           close: "Close",
         },
@@ -1234,6 +1278,25 @@ export function getTranslations(lang: Language): Translations {
             registration: "Registration",
             tournament: "Tournament",
           },
+        },
+        membership: {
+          title: "TPulseFi Membership",
+          subtitle: "Premium Membership",
+          readyQuestion: "Are you ready to become a true TPulseFi membership?",
+          whatWeOffer: "What do we have to offer?",
+          benefitDescription: "Part of TPF transaction fees goes to our members on the 9th of every month!",
+          benefitNote: "And it's not that little!",
+          price: "20 WLD",
+          priceForever: "forever!",
+          priceExplanation: "That means you pay 20 WLD and get the fees forever!",
+          becomeButton: "Become Membership",
+          processing: "Processing...",
+          paymentInfo: "Payment Information",
+          destinationWallet: "Destination Wallet:",
+          afterPayment: "After Payment",
+          contactSupport: "After payment, contact the support team with the screenshot to:",
+          tip: "Tip:",
+          tipDescription: "Include the transaction screenshot and your wallet address in the email.",
         },
       }
   }
