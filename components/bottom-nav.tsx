@@ -96,6 +96,7 @@ export function BottomNav({ activeTab = "agenda" }: BottomNavProps) {
                   { name: translations.nav?.learn || "Aprende", icon: "book", path: "/learn" },
                   { name: translations.nav?.games || "Fi Games", icon: "gamepad", path: "/games" },
                   { name: translations.nav?.storm || "Storm", icon: "zap", path: "/storm" },
+                  { name: "Membership", icon: "crown", path: "/membership" },
                   { name: translations.nav?.partnerships || "Parcerias", icon: "handshake", path: "/partnerships" },
                   { name: translations.nav?.about || "Sobre", icon: "info", path: "/about" },
                 ].map((item) => (
@@ -173,6 +174,15 @@ export function BottomNav({ activeTab = "agenda" }: BottomNavProps) {
                               <path
                                 fillRule="evenodd"
                                 d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm8.706-1.442c1.146-.573 2.437.463 2.126 1.706l-.709 2.836.042-.02a.75.75 0 01.67 1.34l-.04.022c-1.147.573-2.438-.463-2.127-1.706l.71-2.836-.042.02a.75.75 0 11-.671-1.34l.041-.022zM12 9a.75.75 0 100-1.5.75.75 0 000 1.5z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          )}
+                          {item.icon === "crown" && (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                              <path
+                                fillRule="evenodd"
+                                d="M20.599 1.5c-.376 0-.743.111-1.055.32l-5.08 3.385a18.747 18.747 0 00-4.914 0L4.456 1.82A1.875 1.875 0 001.5 3.111v.44c0 15.76 4.258 20.296 9.695 20.325.37.002.74.002 1.11 0 5.437-.029 9.695-4.566 9.695-20.325v-.44c0-.65-.421-1.223-1.055-1.291zM10.5 6.75a.75.75 0 00-.75.75v.5c0 .414.336.75.75.75h3a.75.75 0 00.75-.75v-.5a.75.75 0 00-.75-.75h-3z"
                                 clipRule="evenodd"
                               />
                             </svg>
