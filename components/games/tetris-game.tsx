@@ -58,7 +58,27 @@ interface Piece {
   position: Position
 }
 
-export default function TetrisGame() {
+interface TetrisGameProps {
+  onBack?: () => void
+  minimalUI?: boolean
+}
+
+export function TetrisGame({ onBack, minimalUI = false }: TetrisGameProps) {
+  // Adicionar este useEffect no início, logo após as declarações de estado:
+  useEffect(() => {
+    // Inicializar o jogo automaticamente quando o componente monta
+    const initGame = () => {
+      const firstPiece = getRandomPiece()
+      const secondPiece = getRandomPiece()
+      setCurrentPiece(createPiece(firstPiece))
+      setNextPiece(secondPiece)
+      setIsPlaying(true)
+    }
+
+    initGame()
+  }, [])
+
+  // Alterar os estados iniciais para:
   const [board, setBoard] = useState<Board>(() =>
     Array(BOARD_HEIGHT)
       .fill(null)
@@ -70,7 +90,7 @@ export default function TetrisGame() {
   const [lines, setLines] = useState(0)
   const [level, setLevel] = useState(1)
   const [gameOver, setGameOver] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(true) // Mudar de false para true
   const [isPaused, setIsPaused] = useState(false)
 
   const gameLoopRef = useRef<NodeJS.Timeout>()
@@ -219,19 +239,26 @@ export default function TetrisGame() {
     const newBoard = Array(BOARD_HEIGHT)
       .fill(null)
       .map(() => Array(BOARD_WIDTH).fill(0))
-    const firstPiece = getRandomPiece()
-    const secondPiece = getRandomPiece()
 
     setBoard(newBoard)
-    setCurrentPiece(createPiece(firstPiece))
-    setNextPiece(secondPiece)
     setScore(0)
     setLines(0)
     setLevel(1)
     setGameOver(false)
     setIsPlaying(true)
     setIsPaused(false)
-  }, [getRandomPiece, createPiece])
+
+    // Na função startGame, adicionar após setIsPaused(false):
+    // Forçar a criação da primeira peça imediatamente
+    setTimeout(() => {
+      if (!currentPiece) {
+        const firstPiece = getRandomPiece()
+        const secondPiece = getRandomPiece()
+        setCurrentPiece(createPiece(firstPiece))
+        setNextPiece(secondPiece)
+      }
+    }, 100)
+  }, [getRandomPiece, createPiece, currentPiece])
 
   // Controles touch
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -298,6 +325,14 @@ export default function TetrisGame() {
     setLevel(Math.floor(lines / 10) + 1)
   }, [lines])
 
+  // Adicionar este useEffect após os outros useEffects existentes
+  useEffect(() => {
+    // Auto-iniciar o jogo quando o componente é montado
+    if (!isPlaying && !gameOver && !currentPiece) {
+      startGame()
+    }
+  }, [isPlaying, startGame, gameOver, currentPiece])
+
   // Renderizar tabuleiro com peça atual
   const renderBoard = () => {
     const displayBoard = board.map((row) => [...row])
@@ -347,7 +382,18 @@ export default function TetrisGame() {
 
   return (
     <div className="flex flex-col items-center min-h-screen bg-gray-800 text-white p-4">
-      <h1 className="text-3xl font-bold mb-4">Tetris Mobile</h1>
+      {/* Header com botão de voltar */}
+      {onBack && (
+        <div className="w-full max-w-md flex items-center justify-between mb-4">
+          <Button onClick={onBack} variant="outline" size="sm">
+            ← Voltar
+          </Button>
+          <h1 className="text-2xl font-bold">Tetris</h1>
+          <div className="w-16"></div>
+        </div>
+      )}
+
+      {!onBack && <h1 className="text-3xl font-bold mb-4">Tetris Mobile</h1>}
 
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         {/* Tabuleiro principal */}
@@ -401,14 +447,16 @@ export default function TetrisGame() {
       </div>
 
       {/* Instruções */}
-      <Card className="mt-4 p-4 bg-gray-900 border-gray-700 max-w-md">
-        <div className="text-center text-sm text-gray-400">
-          <div className="font-semibold mb-2">Como Jogar:</div>
-          <div>• Toque na peça para rotacionar</div>
-          <div>• Arraste horizontalmente para mover</div>
-          <div>• Arraste para baixo para acelerar</div>
-        </div>
-      </Card>
+      {!minimalUI && (
+        <Card className="mt-4 p-4 bg-gray-900 border-gray-700 max-w-md">
+          <div className="text-center text-sm text-gray-400">
+            <div className="font-semibold mb-2">Como Jogar:</div>
+            <div>• Toque na peça para rotacionar</div>
+            <div>• Arraste horizontalmente para mover</div>
+            <div>• Arraste para baixo para acelerar</div>
+          </div>
+        </Card>
+      )}
 
       {gameOver && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
