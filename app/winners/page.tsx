@@ -4,13 +4,14 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { BackgroundEffect } from "@/components/background-effect"
 import { BottomNav } from "@/components/bottom-nav"
-import { Trophy, Calendar } from "lucide-react"
+import { Trophy, Calendar, Copy, Check } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
 
 interface Winner {
   id: string
   name: string
+  fullAddress: string
   event: string
   date: string
   amount: number
@@ -20,6 +21,7 @@ interface Winner {
 export default function WinnersPage() {
   const [winners, setWinners] = useState<Winner[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null)
   const router = useRouter()
   const [language, setLanguage] = useState<"en" | "pt">("en")
   const [translations, setTranslations] = useState(getTranslations("en").winners || {})
@@ -52,7 +54,8 @@ export default function WinnersPage() {
           {
             id: "1",
             name: "0x5533...631A",
-            event: "Trading Championship",
+            fullAddress: "0x5533474ee4827780C3EF9eE98f6b83a4f9c0631A",
+            event: "Holding Championship",
             date: "2025-06-01",
             amount: 1314776.2,
             position: 1,
@@ -60,7 +63,8 @@ export default function WinnersPage() {
           {
             id: "2",
             name: "0x208f...c4A5",
-            event: "Trading Championship",
+            fullAddress: "0x208f440ed1B6f64bc6Afa473EC4FD96bf858c4A5",
+            event: "Holding Championship",
             date: "2025-06-01",
             amount: 1254219.4,
             position: 2,
@@ -68,7 +72,8 @@ export default function WinnersPage() {
           {
             id: "3",
             name: "0x3287...B3F5",
-            event: "Trading Championship",
+            fullAddress: "0x3287918269341D3b75c3bBFC03d5Ee19a867B3F5",
+            event: "Holding Championship",
             date: "2025-06-01",
             amount: 1091087.1,
             position: 3,
@@ -76,7 +81,8 @@ export default function WinnersPage() {
           {
             id: "4",
             name: "0x4cdA...EF0a",
-            event: "Trading Championship",
+            fullAddress: "0x4cdA00B603D88962aD96d193e304e1dd220AEF0a",
+            event: "Holding Championship",
             date: "2025-06-01",
             amount: 984631.9,
             position: 4,
@@ -84,7 +90,8 @@ export default function WinnersPage() {
           {
             id: "5",
             name: "0xf7e7...349",
-            event: "Trading Championship",
+            fullAddress: "0xf7e79770Bf7cBdD140F10893c8E7e341a4498349",
+            event: "Holding Championship",
             date: "2025-06-01",
             amount: 600713.8,
             position: 5,
@@ -92,7 +99,8 @@ export default function WinnersPage() {
           {
             id: "6",
             name: "0x816f...c69A",
-            event: "Trading Championship",
+            fullAddress: "0x816fEd7F500F34D1b6ec86b0b2e2ac0edB29c69A",
+            event: "Holding Championship",
             date: "2025-06-01",
             amount: 557640.5,
             position: 6,
@@ -100,7 +108,8 @@ export default function WinnersPage() {
           {
             id: "7",
             name: "0xa248...1Efc",
-            event: "Trading Championship",
+            fullAddress: "0xa248251f09D70beCd9747f6e9bCD9dEB87d11Efc",
+            event: "Holding Championship",
             date: "2025-06-01",
             amount: 522343.9,
             position: 7,
@@ -108,7 +117,8 @@ export default function WinnersPage() {
           {
             id: "8",
             name: "0xC88A...eDC9",
-            event: "Trading Championship",
+            fullAddress: "0xC88AB6661B16fd41F8477DfF8565eabFFd74eDC9",
+            event: "Holding Championship",
             date: "2025-06-01",
             amount: 305680.4,
             position: 8,
@@ -116,7 +126,8 @@ export default function WinnersPage() {
           {
             id: "9",
             name: "0x99DC...1EA1",
-            event: "Trading Championship",
+            fullAddress: "0x99DC5B03f3748A717Db69FDEdd213537B8c61EA1",
+            event: "Holding Championship",
             date: "2025-06-01",
             amount: 219192.1,
             position: 9,
@@ -124,7 +135,8 @@ export default function WinnersPage() {
           {
             id: "10",
             name: "0x0467...a62",
-            event: "Trading Championship",
+            fullAddress: "0x0467FC82736b0D7684A55455F18d9284B9d53a62",
+            event: "Holding Championship",
             date: "2025-06-01",
             amount: 203607.3,
             position: 10,
@@ -150,6 +162,12 @@ export default function WinnersPage() {
     if (position === 2) return "text-gray-300"
     if (position === 3) return "text-amber-600"
     return "text-blue-400"
+  }
+
+  const copyToClipboard = (address: string) => {
+    navigator.clipboard.writeText(address)
+    setCopiedAddress(address)
+    setTimeout(() => setCopiedAddress(null), 2000)
   }
 
   return (
@@ -235,7 +253,21 @@ export default function WinnersPage() {
 
                   <div className="ml-3 flex-1">
                     <div className="flex justify-between items-start">
-                      <div className="font-mono text-sm text-gray-300 truncate max-w-[120px]">{winner.name}</div>
+                      <div className="font-mono text-sm text-gray-300 truncate max-w-[120px] flex items-center">
+                        {winner.name}
+                        <button
+                          onClick={() => copyToClipboard(winner.fullAddress)}
+                          className="ml-1 focus:outline-none"
+                          aria-label="Copy full address"
+                          title="Copy full address"
+                        >
+                          {copiedAddress === winner.fullAddress ? (
+                            <Check className="w-3 h-3 text-green-400" />
+                          ) : (
+                            <Copy className="w-3 h-3 text-gray-400 hover:text-white transition-colors" />
+                          )}
+                        </button>
+                      </div>
                       <motion.div className="font-bold text-right" whileHover={{ scale: 1.05 }}>
                         <div className="text-green-400 text-sm">
                           {winner.amount.toLocaleString("pt-BR", {
