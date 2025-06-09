@@ -12,7 +12,6 @@ export default function PartnershipsPage() {
   const [currentLanguage, setLanguage] = useState<Language>("en")
   const [translations, setTranslations] = useState(getTranslations("en"))
 
-  // Atualizar traduções quando o idioma mudar
   useEffect(() => {
     const lang = getCurrentLanguage()
     setLanguage(lang)
@@ -52,17 +51,14 @@ export default function PartnershipsPage() {
 
   return (
     <main className="relative flex min-h-screen flex-col items-center pt-6 pb-20 overflow-hidden">
-      {/* Background effects */}
       <BackgroundEffect />
 
-      {/* Content */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8 }}
         className="relative z-10 flex flex-col items-center gap-6 max-w-md w-full px-4"
       >
-        {/* Header */}
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -79,7 +75,6 @@ export default function PartnershipsPage() {
           </p>
         </motion.div>
 
-        {/* Our Partners Section */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -90,17 +85,14 @@ export default function PartnershipsPage() {
             {translations.partnerships?.ourPartners || "Our Partners"}
           </h2>
 
-          {/* Wallet Drop Partnership Card */}
           <motion.div
             className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-6 cursor-pointer group"
             whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleWalletDropClick}
           >
-            {/* Background glow effect */}
             <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-            {/* Shine effect */}
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100"
               initial={{ x: "-100%" }}
@@ -109,14 +101,12 @@ export default function PartnershipsPage() {
             />
 
             <div className="relative z-10">
-              {/* Wallet Drop Image */}
               <div className="flex items-center justify-center mb-4">
                 <div className="relative w-full h-32 rounded-lg overflow-hidden">
                   <Image src="/HUB.png" alt="Wallet Drop - Up to 10 HUB" fill className="object-cover" />
                 </div>
               </div>
 
-              {/* Partnership Info */}
               <div className="text-center">
                 <h3 className="text-lg font-semibold text-white mb-2 flex items-center justify-center gap-2">
                   Drop Wallet
@@ -124,7 +114,6 @@ export default function PartnershipsPage() {
                 </h3>
                 <p className="text-gray-300 text-sm mb-4">Claim crypto airdrops & earn by swapping - Up to 10 HUB</p>
 
-                {/* Visit Button */}
                 <motion.button
                   className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 group-hover:from-yellow-500 group-hover:to-orange-500 transition-all duration-300"
                   whileHover={{ scale: 1.05 }}
@@ -137,18 +126,15 @@ export default function PartnershipsPage() {
             </div>
           </motion.div>
 
-          {/* Human Tap Partnership Card */}
           <motion.div
             className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-6"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.3 }}
           >
-            {/* Background glow effect */}
             <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 opacity-100 transition-opacity duration-300" />
 
             <div className="relative z-10">
-              {/* Human Tap Image */}
               <div className="flex items-center justify-center mb-4">
                 <div className="relative w-full h-40 rounded-lg overflow-hidden">
                   <Image
@@ -160,12 +146,10 @@ export default function PartnershipsPage() {
                 </div>
               </div>
 
-              {/* Partnership Info */}
               <div className="text-center">
                 <h3 className="text-lg font-semibold text-white mb-2">Human Tap</h3>
                 <p className="text-gray-300 text-sm mb-4">Invite friends - For real humans only</p>
 
-                {/* Two buttons for Human Tap */}
                 <div className="space-y-2">
                   <motion.button
                     className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:from-cyan-500 hover:to-blue-500 transition-all duration-300"
@@ -199,17 +183,14 @@ export default function PartnershipsPage() {
             </div>
           </motion.div>
 
-          {/* HoldStation Partnership Card */}
           <motion.div
             className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-6 cursor-pointer group"
             whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleHoldStationClick}
           >
-            {/* Background glow effect */}
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-            {/* Shine effect */}
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100"
               initial={{ x: "-100%" }}
@@ -218,14 +199,12 @@ export default function PartnershipsPage() {
             />
 
             <div className="relative z-10">
-              {/* HoldStation Logo */}
               <div className="flex items-center justify-center mb-4">
                 <div className="relative w-full h-32 rounded-lg overflow-hidden">
                   <Image src="/holdstation-logo.jpg" alt="HoldStation" fill className="object-cover" />
                 </div>
               </div>
 
-              {/* Partnership Info */}
               <div className="text-center">
                 <h3 className="text-lg font-semibold text-white mb-2 flex items-center justify-center gap-2">
                   {translations.partnerships?.holdstationTitle || "HoldStation"}
@@ -236,7 +215,6 @@ export default function PartnershipsPage() {
                     "Advanced trading and swap platform for WorldChain"}
                 </p>
 
-                {/* Visit Button */}
                 <motion.button
                   className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 group-hover:from-purple-500 group-hover:to-blue-500 transition-all duration-300"
                   whileHover={{ scale: 1.05 }}
@@ -249,32 +227,28 @@ export default function PartnershipsPage() {
             </div>
           </motion.div>
 
-          {/* AstraCoin Partnership Card */}
           <motion.div
             className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-6"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.4 }}
           >
-            {/* Background glow effect */}
             <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-purple-500/10 opacity-100 transition-opacity duration-300" />
 
             <div className="relative z-10">
-              {/* AstraCoin Logo */}
               <div className="flex items-center justify-center mb-4">
                 <div className="relative w-20 h-20 rounded-full overflow-hidden">
                   <Image src="/astracoin-logo.jpg" alt="AstraCoin" fill className="object-cover" />
                 </div>
               </div>
 
-              {/* Partnership Info */}
               <div className="text-center">
                 <h3 className="text-lg font-semibold text-white mb-2">AstraCoin</h3>
                 <p className="text-gray-300 text-sm mb-4">
-                  {translations.partnerships?.astracoinDescription || "Decentralized finance platform with advanced trading features"}
+                  {translations.partnerships?.astracoinDescription ||
+                    "Decentralized finance platform with advanced trading features"}
                 </p>
 
-                {/* Two buttons for AstraCoin */}
                 <div className="space-y-2">
                   <motion.button
                     className="w-full bg-gradient-to-r from-orange-600 to-purple-600 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:from-orange-500 hover:to-purple-500 transition-all duration-300"
@@ -307,8 +281,8 @@ export default function PartnershipsPage() {
               </div>
             </div>
           </motion.div>
+        </motion.div>
 
-        {/* More Partnerships Coming Soon */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -331,7 +305,6 @@ export default function PartnershipsPage() {
         </motion.div>
       </motion.div>
 
-      {/* Bottom navigation */}
       <BottomNav activeTab="partnerships" />
     </main>
   )
