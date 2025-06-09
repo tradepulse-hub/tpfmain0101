@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import { X, ArrowUpDown, Loader2, Settings, RefreshCw, Zap, Info } from "lucide-react"
 import { toast } from "sonner"
-import { holdstationService } from "../services/swap-service"
+import { swapService } from "../services/swap-service"
 
 interface SwapModalProps {
   isOpen: boolean
@@ -14,7 +14,7 @@ interface SwapModalProps {
   walletAddress?: string
 }
 
-export default function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
+export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   const [tokenIn, setTokenIn] = useState<"WLD" | "TPF" | "DNA" | "WDD" | "CASH">("WLD")
   const [tokenOut, setTokenOut] = useState<"WLD" | "TPF" | "DNA" | "WDD" | "CASH">("TPF")
   const [amountIn, setAmountIn] = useState("")
@@ -33,7 +33,7 @@ export default function SwapModal({ isOpen, onClose, walletAddress }: SwapModalP
     CASH: "0.000000",
   })
 
-  const tokens = holdstationService.getTokens()
+  const tokens = swapService.getTokens()
 
   // Carregar saldos quando o modal abrir
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function SwapModal({ isOpen, onClose, walletAddress }: SwapModalP
     setIsLoadingBalances(true)
     try {
       console.log("Loading token balances...")
-      const balances = await holdstationService.getTokenBalances(walletAddress)
+      const balances = await swapService.getTokenBalances(walletAddress)
 
       const balanceMap: Record<string, string> = {}
       balances.forEach((balance) => {
@@ -84,7 +84,7 @@ export default function SwapModal({ isOpen, onClose, walletAddress }: SwapModalP
       setIsQuoting(true)
       try {
         console.log("Getting quote...")
-        const quote = await holdstationService.getQuote({
+        const quote = await swapService.getQuote({
           tokenIn,
           tokenOut,
           amountIn,
@@ -172,7 +172,7 @@ export default function SwapModal({ isOpen, onClose, walletAddress }: SwapModalP
       console.log(`└─ Recipient: ${walletAddress}`)
 
       // Executar swap
-      const txHash = await holdstationService.executeSwap({
+      const txHash = await swapService.executeSwap({
         tokenIn,
         tokenOut,
         amountIn,
@@ -439,3 +439,5 @@ export default function SwapModal({ isOpen, onClose, walletAddress }: SwapModalP
     </AnimatePresence>
   )
 }
+
+export default SwapModal
