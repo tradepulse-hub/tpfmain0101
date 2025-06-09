@@ -10,6 +10,7 @@ import { SnakeGame } from "@/components/games/snake-game"
 import { Chess3D } from "@/components/games/chess-3d"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
 import { FlappyBird } from "@/components/games/flappy-bird"
+import { TetrisGame } from "@/components/games/tetris-game"
 
 export default function GamesPage() {
   const [selectedGame, setSelectedGame] = useState<number | null>(null)
@@ -113,6 +114,21 @@ export default function GamesPage() {
       controls: {
         en: "Tap screen or press Space to fly",
         pt: "Toque na tela ou pressione Espaço para voar",
+      },
+    },
+    {
+      id: 6,
+      title: "Tetris",
+      icon: "🧩",
+      image: "/tetris-game.png",
+      component: TetrisGame,
+      instructions: {
+        en: "Stack falling blocks to complete horizontal lines. Tap to rotate pieces and drag to move them. Clear lines to score points and level up!",
+        pt: "Empilhe blocos que caem para completar linhas horizontais. Toque para rotacionar peças e arraste para movê-las. Limpe linhas para pontuar e subir de nível!",
+      },
+      controls: {
+        en: "Tap to rotate, drag horizontally to move, drag down to drop faster",
+        pt: "Toque para rotacionar, arraste horizontalmente para mover, arraste para baixo para acelerar",
       },
     },
   ]
