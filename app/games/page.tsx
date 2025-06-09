@@ -13,12 +13,14 @@ import { FlappyBird } from "@/components/games/flappy-bird"
 import { TetrisGame } from "@/components/games/tetris-game"
 
 export default function GamesPage() {
-  const [selectedGame, setSelectedGame] = useState<number | null>(null)
   const [showGameInfo, setShowGameInfo] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [language, setLanguage] = useState(getCurrentLanguage())
   const [translations, setTranslations] = useState(getTranslations(language).games || {})
+
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [selectedGame, setSelectedGame] = useState<number | null>(null)
 
   // Atualizar traduções quando o idioma mudar
   useEffect(() => {
@@ -39,99 +41,169 @@ export default function GamesPage() {
     }
   }, [])
 
-  // Dados dos jogos
-  const games = [
+  const gameCategories = [
     {
-      id: 1,
-      title: "Duck Hunt",
-      icon: "🦆",
-      image: "/duck-hunt-game.png",
-      component: DuckHuntGame,
-      instructions: {
-        en: "Tap or click to shoot the ducks before they escape. Each round gets progressively harder with more ducks and faster movement.",
-        pt: "Toque ou clique para atirar nos patos antes que eles escapem. Cada rodada fica progressivamente mais difícil com mais patos e movimento mais rápido.",
+      id: "action",
+      name: {
+        en: "Action",
+        pt: "Ação",
       },
-      controls: {
-        en: "Tap/click on ducks to shoot them",
-        pt: "Toque/clique nos patos para atirar neles",
-      },
+      icon: "⚡",
+      color: "from-red-500 to-orange-500",
+      games: [
+        {
+          id: 1,
+          title: "Duck Hunt",
+          icon: "🦆",
+          image: "/duck-hunt-game.png",
+          component: DuckHuntGame,
+          instructions: {
+            en: "Tap or click to shoot the ducks before they escape. Each round gets progressively harder with more ducks and faster movement.",
+            pt: "Toque ou clique para atirar nos patos antes que eles escapem. Cada rodada fica progressivamente mais difícil com mais patos e movimento mais rápido.",
+          },
+          controls: {
+            en: "Tap/click on ducks to shoot them",
+            pt: "Toque/clique nos patos para atirar neles",
+          },
+        },
+        {
+          id: 5,
+          title: "Flappy Bird",
+          icon: "🐦",
+          image: "/flappy-bird-game.png",
+          component: FlappyBird,
+          instructions: {
+            en: "Tap or press space to make the bird fly. Avoid the pipes and try to get the highest score possible. The game gets faster as you score more points!",
+            pt: "Toque ou pressione espaço para fazer o pássaro voar. Evite os canos e tente conseguir a maior pontuação possível. O jogo fica mais rápido conforme você pontua!",
+          },
+          controls: {
+            en: "Tap screen or press Space to fly",
+            pt: "Toque na tela ou pressione Espaço para voar",
+          },
+        },
+      ],
     },
     {
-      id: 2,
-      title: "Snake",
-      icon: "🐍",
-      image: "/snake-game.png",
-      component: SnakeGame,
-      instructions: {
-        en: "Control the snake to collect TPF tokens and grow longer. Avoid hitting the walls or your own tail.",
-        pt: "Controle a cobra para coletar tokens TPF e crescer. Evite bater nas paredes ou na sua própria cauda.",
+      id: "puzzle",
+      name: {
+        en: "Puzzle",
+        pt: "Quebra-cabeça",
       },
-      controls: {
-        en: "Swipe to change direction. On desktop, use arrow keys.",
-        pt: "Deslize para mudar de direção. No desktop, use as teclas de seta.",
-      },
-    },
-    {
-      id: 3,
-      title: "Hangman",
-      icon: "📝",
-      image: "/hangman-game.png",
-      component: HangmanGame,
-      instructions: {
-        en: "Guess the crypto-related word before the hangman is complete. Each wrong guess adds a part to the hangman.",
-        pt: "Adivinhe la palabra relacionada a la criptomoneda antes de que el ahorcado esté completo. Cada suposición incorrecta agrega una parte al ahorcado.",
-      },
-      controls: {
-        en: "Tap on letters to make your guess",
-        pt: "Toque nas letras para fazer seu palpite",
-      },
-    },
-    {
-      id: 4,
-      title: "Chess 3D",
-      icon: "♟️",
-      image: "/chess-icon.svg",
-      component: Chess3D,
-      instructions: {
-        en: "Play chess against yourself or a friend in stunning 3D. Click on pieces to select them, then click on valid squares to move.",
-        pt: "Jogue xadrez contra você mesmo ou um amigo em 3D impressionante. Clique nas peças para selecioná-las, depois clique em quadrados válidos para mover.",
-      },
-      controls: {
-        en: "Click on pieces to select and move them. Rotate the camera with mouse/touch.",
-        pt: "Clique nas peças para selecioná-las e movê-las. Gire a câmera com mouse/toque.",
-      },
-    },
-    {
-      id: 5,
-      title: "Flappy Bird",
-      icon: "🐦",
-      image: "/flappy-bird-game.png",
-      component: FlappyBird,
-      instructions: {
-        en: "Tap or press space to make the bird fly. Avoid the pipes and try to get the highest score possible. The game gets faster as you score more points!",
-        pt: "Toque ou pressione espaço para fazer o pássaro voar. Evite os canos e tente conseguir a maior pontuação possível. O jogo fica mais rápido conforme você pontua!",
-      },
-      controls: {
-        en: "Tap screen or press Space to fly",
-        pt: "Toque na tela ou pressione Espaço para voar",
-      },
-    },
-    {
-      id: 6,
-      title: "Tetris",
       icon: "🧩",
-      image: "/tetris-game.png",
-      component: TetrisGame,
-      instructions: {
-        en: "Stack falling blocks to complete horizontal lines. Tap to rotate pieces and drag to move them. Clear lines to score points and level up!",
-        pt: "Empilhe blocos que caem para completar linhas horizontais. Toque para rotacionar peças e arraste para movê-las. Limpe linhas para pontuar e subir de nível!",
+      color: "from-purple-500 to-pink-500",
+      games: [
+        {
+          id: 6,
+          title: "Tetris",
+          icon: "🧩",
+          image: "/tetris-game.png",
+          component: TetrisGame,
+          instructions: {
+            en: "Stack falling blocks to complete horizontal lines. Tap to rotate pieces and drag to move them. Clear lines to score points and level up!",
+            pt: "Empilhe blocos que caem para completar linhas horizontais. Toque para rotacionar peças e arraste para movê-las. Limpe linhas para pontuar e subir de nível!",
+          },
+          controls: {
+            en: "Tap to rotate, drag horizontally to move, drag down to drop faster",
+            pt: "Toque para rotacionar, arraste horizontalmente para mover, arraste para baixo para acelerar",
+          },
+        },
+      ],
+    },
+    {
+      id: "strategy",
+      name: {
+        en: "Strategy",
+        pt: "Estratégia",
       },
-      controls: {
-        en: "Tap to rotate, drag horizontally to move, drag down to drop faster",
-        pt: "Toque para rotacionar, arraste horizontalmente para mover, arraste para baixo para acelerar",
+      icon: "♟️",
+      color: "from-blue-500 to-cyan-500",
+      games: [
+        {
+          id: 4,
+          title: "Chess 3D",
+          icon: "♟️",
+          image: "/chess-icon.svg",
+          component: Chess3D,
+          instructions: {
+            en: "Play chess against yourself or a friend in stunning 3D. Click on pieces to select them, then click on valid squares to move.",
+            pt: "Jogue xadrez contra você mesmo ou um amigo em 3D impressionante. Clique nas peças para selecioná-las, depois clique em quadrados válidos para mover.",
+          },
+          controls: {
+            en: "Click on pieces to select and move them. Rotate the camera with mouse/touch.",
+            pt: "Clique nas peças para selecioná-las e movê-las. Gire a câmera com mouse/toque.",
+          },
+        },
+      ],
+    },
+    {
+      id: "classic",
+      name: {
+        en: "Classic",
+        pt: "Clássicos",
       },
+      icon: "🕹️",
+      color: "from-green-500 to-teal-500",
+      games: [
+        {
+          id: 2,
+          title: "Snake",
+          icon: "🐍",
+          image: "/snake-game.png",
+          component: SnakeGame,
+          instructions: {
+            en: "Control the snake to collect TPF tokens and grow longer. Avoid hitting the walls or your own tail.",
+            pt: "Controle a cobra para coletar tokens TPF e crescer. Evite bater nas paredes ou na sua própria cauda.",
+          },
+          controls: {
+            en: "Swipe to change direction. On desktop, use arrow keys.",
+            pt: "Deslize para mudar de direção. No desktop, use as teclas de seta.",
+          },
+        },
+      ],
+    },
+    {
+      id: "word",
+      name: {
+        en: "Word Games",
+        pt: "Jogos de Palavras",
+      },
+      icon: "📝",
+      color: "from-yellow-500 to-amber-500",
+      games: [
+        {
+          id: 3,
+          title: "Hangman",
+          icon: "📝",
+          image: "/hangman-game.png",
+          component: HangmanGame,
+          instructions: {
+            en: "Guess the crypto-related word before the hangman is complete. Each wrong guess adds a part to the hangman.",
+            pt: "Adivinhe la palabra relacionada a la criptomoneda antes de que el ahorcado esté completo. Cada suposición incorrecta agrega una parte al ahorcado.",
+          },
+          controls: {
+            en: "Tap on letters to make your guess",
+            pt: "Toque nas letras para fazer seu palpite",
+          },
+        },
+      ],
     },
   ]
+
+  // Selecionar uma categoria
+  const handleSelectCategory = (categoryId: string) => {
+    setSelectedCategory(categoryId)
+    setSelectedGame(null)
+    setShowGameInfo(false)
+    setIsPlaying(false)
+  }
+
+  // Voltar para categorias
+  const handleBackToCategories = () => {
+    setSelectedCategory(null)
+    setSelectedGame(null)
+    setShowGameInfo(false)
+    setIsPlaying(false)
+  }
 
   // Selecionar um jogo para ver informações
   const handleSelectGame = (gameId: number) => {
@@ -157,11 +229,17 @@ export default function GamesPage() {
     setSelectedGame(null)
     setShowGameInfo(false)
     setIsPlaying(false)
+    // Não resetar selectedCategory para voltar à lista de jogos da categoria
   }
 
   // Renderizar o jogo selecionado
   const renderSelectedGame = () => {
-    const game = games.find((g) => g.id === selectedGame)
+    if (!selectedCategory || !selectedGame) return null
+
+    const category = gameCategories.find((cat) => cat.id === selectedCategory)
+    if (!category) return null
+
+    const game = category.games.find((g) => g.id === selectedGame)
     if (!game || !game.component) return null
 
     const GameComponent = game.component
@@ -174,31 +252,112 @@ export default function GamesPage() {
 
       <div className="container mx-auto px-4 pt-4 pb-20">
         <AnimatePresence mode="wait">
-          {/* Lista de jogos */}
-          {!selectedGame && (
+          {/* Lista de categorias */}
+          {!selectedCategory && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+              <div className="text-center mb-6">
+                <h1 className="text-2xl font-bold mb-2">{language === "pt" ? "Jogos" : "Games"}</h1>
+                <p className="text-gray-400 text-sm">
+                  {language === "pt" ? "Escolha uma categoria" : "Choose a category"}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                {gameCategories.map((category) => (
+                  <motion.div
+                    key={category.id}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleSelectCategory(category.id)}
+                    className={`relative overflow-hidden rounded-lg p-6 cursor-pointer bg-gradient-to-r ${category.color} bg-opacity-20 border border-gray-800/50`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="text-4xl">{category.icon}</div>
+                        <div>
+                          <h3 className="text-xl font-bold">
+                            {language === "pt" ? category.name.pt : category.name.en}
+                          </h3>
+                          <p className="text-sm text-gray-300">
+                            {category.games.length}{" "}
+                            {category.games.length === 1
+                              ? language === "pt"
+                                ? "jogo"
+                                : "game"
+                              : language === "pt"
+                                ? "jogos"
+                                : "games"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-gray-400">→</div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Lista de jogos da categoria */}
+          {selectedCategory && !selectedGame && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="grid grid-cols-2 gap-4"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-4"
             >
-              {games.map((game) => (
-                <motion.div
-                  key={game.id}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => handleSelectGame(game.id)}
-                  className="flex flex-col items-center justify-center bg-gray-900/50 rounded-lg p-4 cursor-pointer border border-gray-800/50"
-                >
-                  <div className="text-3xl mb-2">{game.icon}</div>
-                  <span className="text-xs text-center">{game.title}</span>
-                </motion.div>
-              ))}
+              {(() => {
+                const category = gameCategories.find((cat) => cat.id === selectedCategory)
+                if (!category) return null
+
+                return (
+                  <>
+                    <div className="flex items-center mb-6">
+                      <button
+                        onClick={handleBackToCategories}
+                        className="mr-4 p-2 rounded-full bg-gray-800 hover:bg-gray-700"
+                      >
+                        ←
+                      </button>
+                      <div>
+                        <h2 className="text-2xl font-bold">
+                          {language === "pt" ? category.name.pt : category.name.en}
+                        </h2>
+                        <p className="text-gray-400 text-sm">
+                          {category.games.length}{" "}
+                          {category.games.length === 1
+                            ? language === "pt"
+                              ? "jogo disponível"
+                              : "game available"
+                            : language === "pt"
+                              ? "jogos disponíveis"
+                              : "games available"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {category.games.map((game) => (
+                        <motion.div
+                          key={game.id}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleSelectGame(game.id)}
+                          className="flex flex-col items-center justify-center bg-gray-900/50 rounded-lg p-4 cursor-pointer border border-gray-800/50"
+                        >
+                          <div className="text-3xl mb-2">{game.icon}</div>
+                          <span className="text-xs text-center">{game.title}</span>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </>
+                )
+              })()}
             </motion.div>
           )}
 
           {/* Informações do jogo */}
-          {selectedGame && showGameInfo && (
+          {selectedCategory && selectedGame && showGameInfo && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -206,7 +365,10 @@ export default function GamesPage() {
               className="bg-gray-900/70 rounded-lg p-4 border border-gray-800/50"
             >
               {(() => {
-                const game = games.find((g) => g.id === selectedGame)
+                const category = gameCategories.find((cat) => cat.id === selectedCategory)
+                if (!category) return null
+
+                const game = category.games.find((g) => g.id === selectedGame)
                 if (!game) return null
 
                 return (
