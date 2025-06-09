@@ -35,6 +35,17 @@ export default function PartnershipsPage() {
     )
   }
 
+  const handleWalletDropClick = () => {
+    window.open(
+      "https://worldcoin.org/mini-app?app_id=app_459cd0d0d3125864ea42bd4c19d1986c&app_mode=mini-app",
+      "_blank",
+    )
+  }
+
+  const handleHumanTapClick = (url: string) => {
+    window.open(url, "_blank")
+  }
+
   const handleAstraCoinClick = (url: string) => {
     window.open(url, "_blank")
   }
@@ -78,6 +89,115 @@ export default function PartnershipsPage() {
           <h2 className="text-xl font-semibold text-white mb-4 text-center">
             {translations.partnerships?.ourPartners || "Our Partners"}
           </h2>
+
+          {/* Wallet Drop Partnership Card */}
+          <motion.div
+            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-6 cursor-pointer group"
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleWalletDropClick}
+          >
+            {/* Background glow effect */}
+            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+            {/* Shine effect */}
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100"
+              initial={{ x: "-100%" }}
+              whileHover={{ x: "100%" }}
+              transition={{ duration: 0.6 }}
+            />
+
+            <div className="relative z-10">
+              {/* Wallet Drop Image */}
+              <div className="flex items-center justify-center mb-4">
+                <div className="relative w-full h-32 rounded-lg overflow-hidden">
+                  <Image src="/HUB.png" alt="Wallet Drop - Up to 10 HUB" fill className="object-cover" />
+                </div>
+              </div>
+
+              {/* Partnership Info */}
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-white mb-2 flex items-center justify-center gap-2">
+                  Drop Wallet
+                  <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                </h3>
+                <p className="text-gray-300 text-sm mb-4">Claim crypto airdrops & earn by swapping - Up to 10 HUB</p>
+
+                {/* Visit Button */}
+                <motion.button
+                  className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 group-hover:from-yellow-500 group-hover:to-orange-500 transition-all duration-300"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Claim Now
+                  <ArrowUpRight className="w-4 h-4" />
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Human Tap Partnership Card */}
+          <motion.div
+            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-6"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+          >
+            {/* Background glow effect */}
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 opacity-100 transition-opacity duration-300" />
+
+            <div className="relative z-10">
+              {/* Human Tap Image */}
+              <div className="flex items-center justify-center mb-4">
+                <div className="relative w-full h-40 rounded-lg overflow-hidden">
+                  <Image
+                    src="/human-tap.jpg"
+                    alt="Human Tap - Invite Friends for Real Humans Only"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              </div>
+
+              {/* Partnership Info */}
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-white mb-2">Human Tap</h3>
+                <p className="text-gray-300 text-sm mb-4">Invite friends - For real humans only</p>
+
+                {/* Two buttons for Human Tap */}
+                <div className="space-y-2">
+                  <motion.button
+                    className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:from-cyan-500 hover:to-blue-500 transition-all duration-300"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() =>
+                      handleHumanTapClick(
+                        "https://worldcoin.org/mini-app?app_id=app_40cf4a75c0ac4d247999bccb1ce8f857&app_mode=mini-app",
+                      )
+                    }
+                  >
+                    Human Tap App
+                    <ArrowUpRight className="w-4 h-4" />
+                  </motion.button>
+
+                  <motion.button
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:from-blue-500 hover:to-purple-500 transition-all duration-300"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() =>
+                      handleHumanTapClick(
+                        "https://worldcoin.org/mini-app?app_id=app_25cf6ee1d9660721e651d43cf126953a&app_mode=mini-app",
+                      )
+                    }
+                  >
+                    Human Fi App
+                    <ArrowUpRight className="w-4 h-4" />
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
 
           {/* HoldStation Partnership Card */}
           <motion.div
