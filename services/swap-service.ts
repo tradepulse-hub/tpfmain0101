@@ -333,7 +333,7 @@ class SwapService {
       console.log(`├─ tokenOut: ${tokenOut.address} (${tokenOut.symbol})`)
       console.log(`├─ amountIn: ${params.amountIn}`)
       console.log(`├─ amountOutMinimum: ${params.amountOutMinimum}`)
-      console.log(`└─ recipient: ${params.recipient}`)
+      console.log(`└─ Recipient: ${params.recipient}`)
 
       // Simular transação bem-sucedida
       const mockTxHash = "0x" + Math.random().toString(16).substring(2, 66)
@@ -380,4 +380,5 @@ class SwapService {
 
 // Exportar instância única
 export const swapService = new SwapService()
+export const holdstationService = swapService // Alias para compatibilidade
 export type { TokenBalance, QuoteParams, SwapParams }
