@@ -1,12 +1,11 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import Image from "next/image"
 import { X, ArrowUpDown, Loader2, Settings, RefreshCw, Info } from "lucide-react"
 import { getCurrentLanguage, getTranslations } from "../lib/i18n"
-import { uniswapService } from "../services/uniswap-service"
+import { swapService } from "../services/swap-service"
 import { toast } from "sonner"
 
 interface SwapModalProps {
@@ -16,8 +15,8 @@ interface SwapModalProps {
 }
 
 export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
-  const [tokenIn, setTokenIn] = useState<"WLD" | "TPF">("WLD")
-  const [tokenOut, setTokenOut] = useState<"WLD" | "TPF">("TPF")
+  const [tokenIn, setTokenIn] = useState<"WLD" | "TPF" | "DNA" | "WDD" | "CASH">("WLD")
+  const [tokenOut, setTokenOut] = useState<"WLD" | "TPF" | "DNA" | "WDD" | "CASH">("TPF")
   const [amountIn, setAmountIn] = useState("")
   const [amountOut, setAmountOut] = useState("")
   const [slippage, setSlippage] = useState("0.5")
@@ -27,28 +26,15 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   const [language, setLanguage] = useState<"en" | "pt">("en")
   const [translations, setTranslations] = useState(getTranslations("en").swap || {})
   const [showSettings, setShowSettings] = useState(false)
-  const [poolFee, setPoolFee] = useState<number | null>(null)
   const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({
     WLD: "0.000000",
     TPF: "0.000000",
+    DNA: "0.000000",
+    WDD: "0.000000",
+    CASH: "0.000000",
   })
-  const [poolDetails, setPoolDetails] = useState<any>(null)
 
-  const tokens = uniswapService.getTokens()
-
-  // Carregar informações do pool
-  const loadPoolInfo = useCallback(async () => {
-    try {
-      const info = await uniswapService.getPoolInfo()
-      if (info) {
-        setPoolDetails(info)
-        setPoolFee(info.fee)
-        console.log("Pool info loaded:", info)
-      }
-    } catch (error) {
-      console.error("Error loading pool info:", error)
-    }
-  }, [])
+  const tokens = swapService.getTokens()
 
   useEffect(() => {
     const updateLanguage = () => {
@@ -61,25 +47,23 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     return () => window.removeEventListener("languageChange", updateLanguage)
   }, [])
 
-  // Carregar saldos e informações do pool quando o modal abrir
+  // Carregar saldos quando o modal abrir
   useEffect(() => {
     if (!isOpen) return
-
-    loadPoolInfo()
 
     if (walletAddress) {
       loadBalances()
     }
-  }, [isOpen, walletAddress, loadPoolInfo])
+  }, [isOpen, walletAddress])
 
-  // Carregar saldos reais
+  // Carregar saldos usando Holdstation
   const loadBalances = async () => {
     if (!walletAddress) return
 
     setIsLoadingBalances(true)
     try {
-      console.log("Loading real token balances...")
-      const balances = await uniswapService.getTokenBalances(walletAddress)
+      console.log("Loading token balances with Holdstation...")
+      const balances = await swapService.getTokenBalances(walletAddress)
 
       const balanceMap: Record<string, string> = {}
       balances.forEach((balance) => {
@@ -106,13 +90,13 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
       setIsQuoting(true)
       try {
-        const quote = await uniswapService.getQuote({
+        const quote = await swapService.getQuote({
           tokenIn,
           tokenOut,
           amountIn,
         })
 
-        setAmountOut(Number.parseFloat(quote).toFixed(6))
+        setAmountOut(quote)
       } catch (error) {
         console.error("Error getting quote:", error)
         setAmountOut("0")
@@ -148,7 +132,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     await loadBalances()
   }
 
-  // Executar swap diretamente via MiniKit (sem janela simulada)
+  // Executar swap usando Holdstation
   const handleSwap = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -171,33 +155,6 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
       return
     }
 
-    // Verificar se MiniKit está disponível
-    if (typeof window === "undefined") {
-      toast.error("Ambiente não suportado")
-      return
-    }
-
-    const MiniKit = (window as any).MiniKit
-    if (!MiniKit) {
-      toast.error("MiniKit não encontrado. Use o World App.")
-      return
-    }
-
-    if (!MiniKit.isInstalled()) {
-      toast.error("MiniKit não instalado. Use o World App.")
-      return
-    }
-
-    if (!MiniKit.user || !MiniKit.user.walletAddress) {
-      toast.error("Usuário não conectado ao MiniKit")
-      return
-    }
-
-    console.log("🚀 Starting swap process...")
-    console.log(`├─ MiniKit user: ${MiniKit.user.walletAddress}`)
-    console.log(`├─ Wallet address: ${walletAddress}`)
-    console.log(`└─ MiniKit installed: ${MiniKit.isInstalled()}`)
-
     setIsLoading(true)
     try {
       // Calcular minimum amount out com slippage
@@ -211,8 +168,8 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
       console.log(`├─ Slippage: ${slippage}%`)
       console.log(`└─ Recipient: ${walletAddress}`)
 
-      // Executar swap via MiniKit
-      const txHash = await uniswapService.executeSwap({
+      // Executar swap via Holdstation
+      const txHash = await swapService.executeSwap({
         tokenIn,
         tokenOut,
         amountIn,
@@ -239,7 +196,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
       // Atualizar saldos após o swap
       setTimeout(() => {
         handleRefreshBalances()
-      }, 5000) // Aguardar mais tempo para a transação ser processada
+      }, 5000)
     } catch (error: any) {
       console.error("❌ Swap failed:", error)
 
@@ -247,8 +204,6 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
       if (error.message.includes("MiniKit")) {
         errorMessage = "Erro do MiniKit. Verifique se está usando o World App."
-      } else if (error.message.includes("approval")) {
-        errorMessage = "Erro na aprovação do token. Tente novamente."
       } else if (error.message.includes("insufficient")) {
         errorMessage = "Saldo insuficiente para o swap."
       }
@@ -286,7 +241,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
           >
             <div className="flex justify-between items-center p-3 border-b border-gray-800">
-              <h2 className="text-lg font-bold text-white">WLD ⇄ TPF Swap</h2>
+              <h2 className="text-lg font-bold text-white">Token Swap</h2>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleRefreshBalances}
@@ -339,21 +294,8 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                       </div>
                     </div>
                     <div className="text-xs text-gray-500">
-                      <div>
-                        Pool: {uniswapService.getContractAddresses().TPF_WLD_POOL.slice(0, 6)}...
-                        {uniswapService.getContractAddresses().TPF_WLD_POOL.slice(-4)}
-                      </div>
-                      {poolDetails && (
-                        <>
-                          <div>
-                            Fee: {poolDetails.fee / 10000}% | Tick: {poolDetails.tick}
-                          </div>
-                          <div>Liquidity: {Number(poolDetails.liquidity).toExponential(2)}</div>
-                          <div className={poolDetails.isValid ? "text-green-400" : "text-red-400"}>
-                            {poolDetails.isValid ? "✅ Pool Verified" : "⚠️ Pool Invalid"}
-                          </div>
-                        </>
-                      )}
+                      <div>Powered by Holdstation SDK</div>
+                      <div className="text-green-400">✅ Optimized with Multicall</div>
                     </div>
                   </div>
                 </motion.div>
@@ -365,18 +307,17 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
               <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs text-gray-400">From</span>
-                  <div className="flex items-center space-x-2 text-white">
-                    <div className="w-5 h-5 rounded-full overflow-hidden">
-                      <Image
-                        src={tokens[tokenIn].icon || "/placeholder.svg"}
-                        alt={tokens[tokenIn].name}
-                        width={20}
-                        height={20}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <span className="text-sm font-medium">{tokens[tokenIn].symbol}</span>
-                  </div>
+                  <select
+                    value={tokenIn}
+                    onChange={(e) => setTokenIn(e.target.value as any)}
+                    className="bg-gray-700 text-white text-sm rounded px-2 py-1 border border-gray-600"
+                  >
+                    {Object.entries(tokens).map(([symbol, token]) => (
+                      <option key={symbol} value={symbol}>
+                        {token.symbol}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex items-center space-x-2">
                   <input
@@ -423,18 +364,17 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
               <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs text-gray-400">To</span>
-                  <div className="flex items-center space-x-2 text-white">
-                    <div className="w-5 h-5 rounded-full overflow-hidden">
-                      <Image
-                        src={tokens[tokenOut].icon || "/placeholder.svg"}
-                        alt={tokens[tokenOut].name}
-                        width={20}
-                        height={20}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <span className="text-sm font-medium">{tokens[tokenOut].symbol}</span>
-                  </div>
+                  <select
+                    value={tokenOut}
+                    onChange={(e) => setTokenOut(e.target.value as any)}
+                    className="bg-gray-700 text-white text-sm rounded px-2 py-1 border border-gray-600"
+                  >
+                    {Object.entries(tokens).map(([symbol, token]) => (
+                      <option key={symbol} value={symbol}>
+                        {token.symbol}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex items-center">
                   <input
@@ -458,11 +398,11 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                 </div>
               </div>
 
-              {/* Informações de taxa */}
+              {/* Informações */}
               <div className="text-xs text-gray-400 flex items-center justify-between px-1">
                 <span className="flex items-center">
                   <Info size={12} className="mr-1" />
-                  Taxa: {poolFee ? poolFee / 10000 : "0.3"}%
+                  Holdstation SDK
                 </span>
                 <span>Slippage: {slippage}%</span>
               </div>
@@ -475,7 +415,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                 {isLoading ? (
                   <div className="flex items-center justify-center">
                     <Loader2 size={16} className="animate-spin mr-2" />
-                    Executando via MiniKit...
+                    Executando Swap...
                   </div>
                 ) : (
                   `Swap ${tokenIn} → ${tokenOut}`
