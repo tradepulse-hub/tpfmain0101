@@ -112,11 +112,15 @@ export default function WalletPage() {
           balanceSyncService.updateTPFBalance(address, tpfBalance)
         }
 
-        // Converter todos os saldos para números
+        // Converter todos os saldos para números (apenas tokens disponíveis)
         const numericBalances: Record<string, number> = {}
-        for (const [symbol, balance] of Object.entries(realBalances)) {
+        const availableTokens = ["TPF", "WLD", "DNA", "WDD"] // Removidos WETH, USDCe, CASH
+
+        for (const symbol of availableTokens) {
+          const balance = realBalances[symbol]
           numericBalances[symbol] = Number(balance || "0")
         }
+
         setTokenBalances(numericBalances)
       } else {
         throw new Error("Services not available")
@@ -134,14 +138,12 @@ export default function WalletPage() {
         balanceSyncService.updateTPFBalance(address, fallbackBalance)
       }
 
+      // Apenas tokens disponíveis (removidos WETH, USDCe, CASH)
       setTokenBalances({
         TPF: fallbackBalance,
         WLD: 42.67,
         DNA: 22765.884,
-        CASH: 5,
         WDD: 78.32,
-        WETH: 0.5,
-        USDCe: 250.0,
       })
     } finally {
       setLoading(false)
@@ -167,21 +169,30 @@ export default function WalletPage() {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
   }
 
-  // Obter informações dos tokens de forma segura
+  // Obter informações dos tokens de forma segura (apenas tokens disponíveis)
   const getTokensInfo = () => {
     try {
       if (walletService && typeof walletService.getTokensInfo === "function") {
-        return walletService.getTokensInfo()
+        const allTokens = walletService.getTokensInfo()
+
+        // Filtrar apenas os tokens disponíveis
+        const availableTokens: Record<string, any> = {}
+        const allowedTokens = ["TPF", "WLD", "DNA", "WDD"]
+
+        for (const symbol of allowedTokens) {
+          if (allTokens[symbol]) {
+            availableTokens[symbol] = allTokens[symbol]
+          }
+        }
+
+        return availableTokens
       }
 
-      // Fallback para tokens conhecidos
+      // Fallback para tokens conhecidos (apenas disponíveis)
       return {
-        WETH: { symbol: "WETH", name: "Wrapped Ether", logo: "/ethereum-abstract.png" },
-        USDCe: { symbol: "USDCe", name: "USD Coin (Bridged)", logo: "/usdc-coins.png" },
         TPF: { symbol: "TPF", name: "TPulseFi", logo: "/logo-tpf.png" },
         WLD: { symbol: "WLD", name: "Worldcoin", logo: "/worldcoin.jpeg" },
         DNA: { symbol: "DNA", name: "DNA Token", logo: "/dna-token.png" },
-        CASH: { symbol: "CASH", name: "Cash Token", logo: "/cash-token.png" },
         WDD: { symbol: "WDD", name: "Drachma Token", logo: "/drachma-token.png" },
       }
     } catch (error) {
@@ -313,7 +324,7 @@ export default function WalletPage() {
             <CardContent className="pb-4">
               {loading ? (
                 <div className="space-y-3">
-                  {[1, 2, 3, 4].map((i) => (
+                  {[1, 2, 3].map((i) => (
                     <div key={i} className="h-16 bg-gray-800 animate-pulse rounded-lg"></div>
                   ))}
                 </div>
