@@ -2,355 +2,258 @@
 
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { walletService } from "@/services/wallet-service"
-import { ArrowUpRight, ArrowDownLeft, Clock, ExternalLink, Filter, RefreshCw, Calendar } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
+import { ArrowUpRight, ArrowDownLeft, RefreshCw, ExternalLink, ArrowUpDown } from "lucide-react"
+import { holdstationHistoryService, type Transaction } from "@/services/holdstation-history-service"
 
-// Adicionar o parâmetro daysToShow às props
 interface TransactionHistoryProps {
   walletAddress: string
-  className?: string
   daysToShow?: number
-  tokenSymbol?: string
+  tokenFilter?: string // Filtrar por token específico
 }
 
-export function TransactionHistory({
-  walletAddress,
-  className = "",
-  daysToShow = 7,
-  tokenSymbol = "TPF",
-}: TransactionHistoryProps) {
-  const [transactions, setTransactions] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [filter, setFilter] = useState<"all" | string>("all") // Filtro padrão para mostrar todos os tokens
-  const [tokensInfo, setTokensInfo] = useState<any>({})
-  const [transactionDates, setTransactionDates] = useState<string[]>([])
-  const [currentLanguage, setCurrentLanguage] = useState(getCurrentLanguage())
-  const [translations, setTranslations] = useState(getTranslations(currentLanguage).history || {})
+export function TransactionHistory({ walletAddress, daysToShow = 7, tokenFilter }: TransactionHistoryProps) {
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Carregar informações dos tokens
   useEffect(() => {
-    const tokenInfo = walletService.getTokensInfo()
-    setTokensInfo(tokenInfo)
-  }, [])
-
-  // Atualizar traduções quando o idioma mudar
-  useEffect(() => {
-    const handleLanguageChange = () => {
-      const newLanguage = getCurrentLanguage()
-      setCurrentLanguage(newLanguage)
-      setTranslations(getTranslations(newLanguage).history || {})
+    if (walletAddress) {
+      loadTransactions()
+      setupWatcher()
     }
-
-    // Carregar idioma atual
-    handleLanguageChange()
-
-    // Adicionar listener para mudanças de idioma
-    window.addEventListener("languageChange", handleLanguageChange)
 
     return () => {
-      window.removeEventListener("languageChange", handleLanguageChange)
+      // Cleanup será feito automaticamente pelo serviço
     }
-  }, [])
+  }, [walletAddress, tokenFilter])
 
-  const fetchAllTokensTransactions = async () => {
-    if (!walletAddress) {
-      console.error("No wallet address available")
-      return
-    }
-
+  const loadTransactions = async () => {
     setIsLoading(true)
+    setError(null)
 
     try {
-      console.log("Fetching all token transactions for address:", walletAddress)
+      console.log("Loading transactions from Holdstation...")
 
-      // Lista de todos os tokens suportados
-      const tokenSymbols = Object.keys(tokensInfo)
-      let allTransactions: any[] = []
+      let fetchedTransactions: Transaction[]
 
-      // Buscar transações para cada token
-      for (const symbol of tokenSymbols) {
-        try {
-          console.log(`Fetching transactions for ${symbol}...`)
-          const tokenTransactions = await walletService.getTokenTransactions(walletAddress, symbol)
-          console.log(`Found ${tokenTransactions.length} ${symbol} transactions`)
-          allTransactions = [...allTransactions, ...tokenTransactions]
-        } catch (error) {
-          console.error(`Error fetching ${symbol} transactions:`, error)
-        }
+      if (tokenFilter) {
+        // Obter transações de um token específico
+        fetchedTransactions = await holdstationHistoryService.getTokenTransactions(walletAddress, tokenFilter, 50)
+      } else {
+        // Obter todas as transações dos tokens da wallet
+        fetchedTransactions = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, 50)
       }
 
-      // Ordenar transações por data (mais recente primeiro)
-      allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      // Filtrar por período se especificado
+      if (daysToShow > 0) {
+        const cutoffDate = new Date()
+        cutoffDate.setDate(cutoffDate.getDate() - daysToShow)
 
-      // Extrair datas únicas para agrupamento
-      const dates = [
-        ...new Set(
-          allTransactions.map((tx) => {
-            const date = new Date(tx.date)
-            return date.toISOString().split("T")[0]
-          }),
-        ),
-      ]
-        .sort()
-        .reverse()
+        fetchedTransactions = fetchedTransactions.filter((tx) => tx.timestamp >= cutoffDate)
+      }
 
-      setTransactionDates(dates)
-      setTransactions(allTransactions)
+      setTransactions(fetchedTransactions)
+      console.log(`Loaded ${fetchedTransactions.length} transactions`)
     } catch (error) {
-      console.error("Error fetching token transactions:", error)
+      console.error("Error loading transactions:", error)
+      setError("Erro ao carregar histórico de transações")
+
+      // Fallback para transações mock apenas dos tokens da wallet
+      setTransactions(getMockTransactions())
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Carregar dados iniciais quando o componente montar ou o endereço mudar
-  useEffect(() => {
-    if (walletAddress) {
-      fetchAllTokensTransactions()
-    }
-  }, [walletAddress])
-
-  const handleRefresh = async () => {
-    if (isRefreshing) return
-
-    setIsRefreshing(true)
+  const setupWatcher = async () => {
     try {
-      await fetchAllTokensTransactions()
-    } catch (error) {
-      console.error("Error refreshing transaction history:", error)
-    } finally {
-      setIsRefreshing(false)
-    }
-  }
+      console.log("Setting up transaction watcher...")
 
-  // Filtrar transações com base no filtro selecionado
-  const filteredTransactions = transactions.filter((tx) => {
-    if (filter === "all") return true
-    // Filtrar por token específico
-    return tx.token === filter
-  })
-
-  // Agrupar transações por data
-  const groupedTransactions = filteredTransactions.reduce(
-    (groups, transaction) => {
-      const date = new Date(transaction.date).toISOString().split("T")[0]
-      if (!groups[date]) {
-        groups[date] = []
-      }
-      groups[date].push(transaction)
-      return groups
-    },
-    {} as Record<string, any[]>,
-  )
-
-  // Formatar data para exibição
-  const formatDateHeader = (dateStr: string) => {
-    const date = new Date(dateStr)
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-
-    if (dateStr === today.toISOString().split("T")[0]) {
-      return translations.today || "Today"
-    } else if (dateStr === yesterday.toISOString().split("T")[0]) {
-      return translations.yesterday || "Yesterday"
-    } else {
-      return date.toLocaleDateString(currentLanguage === "pt" ? "pt-BR" : "en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
+      const watcher = await holdstationHistoryService.watchTransactions(walletAddress, () => {
+        console.log("New transaction detected, refreshing...")
+        loadTransactions()
       })
+
+      if (watcher) {
+        await watcher.start()
+      }
+    } catch (error) {
+      console.error("Error setting up transaction watcher:", error)
     }
   }
 
-  // Formatação de endereço para exibição
-  const formatAddress = (address: string) => {
-    if (!address) return ""
-    if (address.length < 10) return address
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
+  const getMockTransactions = (): Transaction[] => {
+    const mockTransactions: Transaction[] = [
+      {
+        id: "1",
+        hash: "0x123...abc",
+        type: "receive",
+        amount: "1000",
+        tokenSymbol: "TPF",
+        tokenAddress: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
+        from: "0x456...def",
+        to: walletAddress,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
+        status: "completed",
+      },
+      {
+        id: "2",
+        hash: "0x456...def",
+        type: "send",
+        amount: "500",
+        tokenSymbol: "TPF",
+        tokenAddress: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
+        from: walletAddress,
+        to: "0x789...ghi",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
+        status: "completed",
+      },
+      {
+        id: "3",
+        hash: "0x789...ghi",
+        type: "swap",
+        amount: "100",
+        tokenSymbol: "WLD",
+        tokenAddress: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+        from: walletAddress,
+        to: "0xabc...123",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48),
+        status: "completed",
+      },
+      {
+        id: "4",
+        hash: "0xabc...123",
+        type: "receive",
+        amount: "50",
+        tokenSymbol: "DNA",
+        tokenAddress: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113",
+        from: "0xdef...456",
+        to: walletAddress,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 72),
+        status: "completed",
+      },
+    ]
+
+    // Filtrar por token se especificado
+    if (tokenFilter) {
+      return mockTransactions.filter((tx) => tx.tokenSymbol === tokenFilter)
+    }
+
+    return mockTransactions
   }
 
-  // Formatação de data para exibição
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString(currentLanguage === "pt" ? "pt-BR" : "en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    })
+  const getTransactionIcon = (type: string) => {
+    switch (type) {
+      case "send":
+        return <ArrowUpRight className="w-4 h-4 text-red-400" />
+      case "receive":
+        return <ArrowDownLeft className="w-4 h-4 text-green-400" />
+      case "swap":
+        return <ArrowUpDown className="w-4 h-4 text-blue-400" />
+      default:
+        return <ArrowUpRight className="w-4 h-4 text-gray-400" />
+    }
   }
 
-  // Função para formatar o hash da transação
-  function formatTxHash(hash: string): string {
-    if (!hash) return ""
-    return hash.length > 16 ? `${hash.slice(0, 6)}...${hash.slice(-4)}` : hash
+  const formatTime = (date: Date) => {
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+
+    if (hours < 1) return "Agora"
+    if (hours < 24) return `${hours}h atrás`
+    return `${Math.floor(hours / 24)}d atrás`
+  }
+
+  const getTransactionTypeText = (type: string) => {
+    switch (type) {
+      case "send":
+        return "Enviado"
+      case "receive":
+        return "Recebido"
+      case "swap":
+        return "Swap"
+      default:
+        return "Transação"
+    }
   }
 
   return (
-    <div className={`w-full ${className}`}>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-medium text-white">{translations.title || "Transaction History"}</h2>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="text-gray-400 hover:text-white"
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gray-900/50 rounded-lg border border-gray-800 p-4"
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-white font-medium">{tokenFilter ? `Histórico ${tokenFilter}` : "Atividade Recente"}</h3>
+        <button
+          onClick={loadTransactions}
+          disabled={isLoading}
+          className="text-gray-400 hover:text-white transition-colors"
         >
-          <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
-        </Button>
+          <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+        </button>
       </div>
 
-      {/* Filtros de token */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <Button
-          variant={filter === "all" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setFilter("all")}
-          className="text-xs"
-        >
-          {translations.all || "All"}
-        </Button>
-        {Object.keys(tokensInfo).map((symbol) => (
-          <Button
-            key={symbol}
-            variant={filter === symbol ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFilter(symbol)}
-            className="text-xs flex items-center"
-          >
-            {tokensInfo[symbol]?.logo && (
-              <img
-                src={tokensInfo[symbol].logo || "/placeholder.svg"}
-                alt={symbol}
-                className="w-4 h-4 mr-1 rounded-full"
-              />
-            )}
-            {symbol}
-          </Button>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 bg-gray-800 animate-pulse rounded-lg"></div>
-          ))}
-        </div>
-      ) : Object.keys(groupedTransactions).length > 0 ? (
-        <div className="space-y-6">
-          {transactionDates.map((dateStr) => {
-            if (!groupedTransactions[dateStr] || groupedTransactions[dateStr].length === 0) return null
-
-            return (
-              <div key={dateStr} className="space-y-3">
-                <div className="flex items-center mb-2">
-                  <Calendar size={16} className="text-gray-500 mr-2" />
-                  <h3 className="text-sm font-medium text-gray-400">{formatDateHeader(dateStr)}</h3>
-                </div>
-
-                {groupedTransactions[dateStr].map((tx) => {
-                  const tokenInfo = tokensInfo[tx.token] || { symbol: tx.token, logo: "/placeholder.svg" }
-
-                  return (
-                    <motion.div
-                      key={tx.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="bg-gray-800/80 border border-gray-700 rounded-lg p-3"
-                    >
-                      <div className="flex items-center">
-                        <div
-                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            tx.type === "receive" ? "bg-green-500/20" : "bg-red-500/20"
-                          }`}
-                        >
-                          {tx.type === "receive" ? (
-                            <ArrowDownLeft className={`w-5 h-5 text-green-400`} />
-                          ) : (
-                            <ArrowUpRight className={`w-5 h-5 text-red-400`} />
-                          )}
-                        </div>
-                        <div className="ml-3 flex-1">
-                          <div className="flex justify-between">
-                            <div className="font-medium">
-                              {tx.type === "receive"
-                                ? translations.received || "Received"
-                                : translations.sent || "Sent"}
-                            </div>
-                            <div className={`font-medium ${tx.type === "receive" ? "text-green-400" : "text-red-400"}`}>
-                              {tx.type === "receive" ? "+" : "-"}
-                              {Number(tx.amount).toLocaleString(currentLanguage === "pt" ? "pt-BR" : "en-US")}{" "}
-                              {tokenInfo.symbol}
-                            </div>
-                          </div>
-                          <div className="flex justify-between text-xs text-gray-400 mt-1">
-                            <div className="flex items-center">
-                              <Clock className="w-3 h-3 mr-1" />
-                              {formatTime(tx.date)}
-                            </div>
-                            <div className="flex items-center">
-                              {tx.hash && (
-                                <a
-                                  href={`https://worldscan.org/tx/${tx.transactionHash}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center text-blue-400 hover:text-blue-300"
-                                >
-                                  <span className="mr-1">{currentLanguage === "pt" ? "Ver" : "View"}</span>
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Detalhes adicionais da transação */}
-                      <div className="mt-2 pt-2 border-t border-gray-700/50 text-xs text-gray-400">
-                        <div className="flex justify-between">
-                          <span>{translations.from || "From"}:</span>
-                          <span className="font-mono">{formatAddress(tx.from || "")}</span>
-                        </div>
-                        <div className="flex justify-between mt-1">
-                          <span>{translations.to || "To"}:</span>
-                          <span className="font-mono">{formatAddress(tx.to || "")}</span>
-                        </div>
-                        {tx.transactionHash && (
-                          <div className="flex justify-between mt-1">
-                            <span>{translations.txHash || "Transaction Hash"}:</span>
-                            <div className="flex items-center">
-                              <span className="font-mono mr-1">{formatTxHash(tx.transactionHash)}</span>
-                              <a
-                                href={`https://worldscan.org/tx/${tx.transactionHash}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-400 hover:text-blue-300"
-                                title={currentLanguage === "pt" ? "Ver na blockchain" : "View on blockchain"}
-                              >
-                                <ExternalLink size={12} />
-                              </a>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )
-                })}
-              </div>
-            )
-          })}
-        </div>
-      ) : (
-        <div className="bg-gray-800/50 rounded-lg p-4 text-center">
-          <Filter size={40} className="text-gray-700 mx-auto mb-3" />
-          <p className="text-gray-400">{translations.noTransactions || "No transactions found"}</p>
+      {error && (
+        <div className="mb-4 p-3 bg-red-900/20 border border-red-800/30 rounded-lg">
+          <p className="text-red-300 text-sm">{error}</p>
         </div>
       )}
-    </div>
+
+      <div className="space-y-3">
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-12 bg-gray-800 animate-pulse rounded-lg" />
+            ))}
+          </div>
+        ) : transactions.length > 0 ? (
+          transactions.map((tx) => (
+            <motion.div
+              key={tx.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center justify-between p-2 rounded-lg bg-gray-800/30 hover:bg-gray-800/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
+                  {getTransactionIcon(tx.type)}
+                </div>
+                <div>
+                  <div className="text-sm text-white">{getTransactionTypeText(tx.type)}</div>
+                  <div className="text-xs text-gray-400">{formatTime(tx.timestamp)}</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div
+                  className={`text-sm font-medium ${
+                    tx.type === "receive" ? "text-green-400" : tx.type === "send" ? "text-red-400" : "text-blue-400"
+                  }`}
+                >
+                  {tx.type === "send" ? "-" : "+"}
+                  {Number.parseFloat(tx.amount).toLocaleString()} {tx.tokenSymbol}
+                </div>
+                {tx.hash && (
+                  <button
+                    onClick={() => window.open(`https://worldscan.org/tx/${tx.hash}`, "_blank")}
+                    className="text-xs text-gray-500 hover:text-gray-400 flex items-center gap-1"
+                  >
+                    <ExternalLink size={10} />
+                    Ver
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          ))
+        ) : (
+          <div className="text-center py-6 text-gray-400">
+            <div className="text-sm">
+              {tokenFilter ? `Nenhuma transação ${tokenFilter} encontrada` : "Nenhuma transação recente"}
+            </div>
+          </div>
+        )}
+      </div>
+    </motion.div>
   )
 }
