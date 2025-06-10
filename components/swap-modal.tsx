@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import { X, ArrowUpDown, Loader2, Settings, RefreshCw, Zap, Info } from "lucide-react"
 import { toast } from "sonner"
-import { swapService } from "../services/swap-service"
+import { swapService } from "../services/holdstation-service"
 
 interface SwapModalProps {
   isOpen: boolean
