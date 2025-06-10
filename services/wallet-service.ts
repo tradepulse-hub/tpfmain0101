@@ -10,22 +10,8 @@ const WORLDCHAIN_CONFIG = {
   blockExplorer: "https://worldscan.org",
 }
 
-// Tokens conhecidos - definir aqui para evitar dependências circulares
+// Tokens conhecidos - apenas os da wallet (removidos WETH, USDCe, CASH)
 const KNOWN_TOKENS_INFO = {
-  WETH: {
-    symbol: "WETH",
-    name: "Wrapped Ether",
-    address: "0x4200000000000000000000000000000000000006",
-    logo: "/ethereum-abstract.png",
-    decimals: 18,
-  },
-  USDCe: {
-    symbol: "USDCe",
-    name: "USD Coin (Bridged)",
-    address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
-    logo: "/usdc-coins.png",
-    decimals: 6,
-  },
   TPF: {
     symbol: "TPF",
     name: "TPulseFi",
@@ -45,13 +31,6 @@ const KNOWN_TOKENS_INFO = {
     name: "DNA Token",
     address: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113",
     logo: "/dna-token.png",
-    decimals: 18,
-  },
-  CASH: {
-    symbol: "CASH",
-    name: "Cash Token",
-    address: "0xbfdA4F50a2d5B9b864511579D7dfa1C72f118575",
-    logo: "/cash-token.png",
     decimals: 18,
   },
   WDD: {
@@ -159,14 +138,14 @@ class WalletService {
     try {
       console.log(`📜 Getting ${tokenSymbol} transactions for: ${walletAddress}`)
 
-      const allTransactions = await this.getTransactionHistory(walletAddress, 100)
+      if (holdstationHistoryService && typeof holdstationHistoryService.getTokenTransactions === "function") {
+        const transactions = await holdstationHistoryService.getTokenTransactions(walletAddress, tokenSymbol)
+        console.log(`Found ${transactions.length} ${tokenSymbol} transactions`)
+        return transactions
+      }
 
-      const tokenTransactions = allTransactions.filter(
-        (tx) => tx.tokenSymbol === tokenSymbol || (tokenSymbol === "TPF" && !tx.tokenSymbol),
-      )
-
-      console.log(`Found ${tokenTransactions.length} ${tokenSymbol} transactions`)
-      return tokenTransactions
+      console.log("History service not available, returning empty array")
+      return []
     } catch (error) {
       console.error(`Error getting ${tokenSymbol} transactions:`, error)
       return []
