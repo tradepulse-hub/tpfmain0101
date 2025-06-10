@@ -14,7 +14,7 @@ interface SwapModalProps {
   walletAddress?: string
 }
 
-// Tokens disponíveis para swap (removidos WETH e USDCe)
+// Tokens disponíveis para swap (removidos WETH, USDCe, CASH)
 const AVAILABLE_TOKENS = {
   WLD: {
     symbol: "WLD",
@@ -44,13 +44,6 @@ const AVAILABLE_TOKENS = {
     decimals: 18,
     address: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B",
   },
-  CASH: {
-    symbol: "CASH",
-    name: "Cash Token",
-    icon: "/cash-token.png",
-    decimals: 18,
-    address: "0xbfdA4F50a2d5B9b864511579D7dfa1C72f118575",
-  },
 } as const
 
 type TokenSymbol = keyof typeof AVAILABLE_TOKENS
@@ -71,7 +64,6 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     TPF: "108567827.002",
     DNA: "22765.884",
     WDD: "78.32",
-    CASH: "5.0",
   })
 
   // Carregar saldos quando o modal abrir
@@ -169,6 +161,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
             setAmountOut(quote.amountOut)
             setQuoteData(quote)
             console.log(`Real quote from Holdstation: ${quote.amountOut} ${tokenOut}`)
+            console.log("Quote details:", quote.addons)
           } else {
             console.warn("No quote returned from Holdstation service")
             setAmountOut("0")
@@ -450,7 +443,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                       Loading...
                     </span>
                   ) : (
-                    `Balance: ${tokenBalances[tokenIn]} ${tokenIn}`
+                    `Balance: ${tokenBalances[tokenIn] || "0"} ${tokenIn}`
                   )}
                 </div>
               </div>
@@ -508,20 +501,30 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                       Loading...
                     </span>
                   ) : (
-                    `Balance: ${tokenBalances[tokenOut]} ${tokenOut}`
+                    `Balance: ${tokenBalances[tokenOut] || "0"} ${tokenOut}`
                   )}
                 </div>
               </div>
 
               {/* Informações da taxa */}
-              {amountIn && amountOut && tokenIn !== tokenOut && !isQuoting && (
-                <div className="text-xs text-gray-400 flex items-center justify-between px-1">
-                  <span className="flex items-center text-blue-400">
-                    <Info size={12} className="mr-1" />
-                    Rate: 1 {tokenIn} = {(Number.parseFloat(amountOut) / Number.parseFloat(amountIn)).toFixed(6)}{" "}
-                    {tokenOut}
-                  </span>
-                  <span>Slippage: {slippage}%</span>
+              {amountIn && amountOut && tokenIn !== tokenOut && !isQuoting && quoteData?.addons && (
+                <div className="text-xs text-gray-400 space-y-1 px-1">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center text-blue-400">
+                      <Info size={12} className="mr-1" />
+                      Rate: 1 {tokenIn} = {(Number.parseFloat(amountOut) / Number.parseFloat(amountIn)).toFixed(6)}{" "}
+                      {tokenOut}
+                    </span>
+                    <span>Slippage: {slippage}%</span>
+                  </div>
+                  {quoteData.addons.minReceived && (
+                    <div className="flex justify-between">
+                      <span>Min Received:</span>
+                      <span>
+                        {Number.parseFloat(quoteData.addons.minReceived).toFixed(6)} {tokenOut}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
