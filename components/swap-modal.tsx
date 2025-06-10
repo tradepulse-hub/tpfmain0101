@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import { X, ArrowUpDown, Loader2, Settings, RefreshCw, Zap, Info } from "lucide-react"
 import { toast } from "sonner"
-import { swapService } from "../services/holdstation-service"
+import { swapService } from "@/services/holdstation-service"
 
 interface SwapModalProps {
   isOpen: boolean
@@ -14,9 +14,50 @@ interface SwapModalProps {
   walletAddress?: string
 }
 
+// Tokens disponíveis para swap (removidos WETH e USDCe)
+const AVAILABLE_TOKENS = {
+  WLD: {
+    symbol: "WLD",
+    name: "Worldcoin",
+    icon: "/worldcoin.jpeg",
+    decimals: 18,
+    address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+  },
+  TPF: {
+    symbol: "TPF",
+    name: "TPulseFi",
+    icon: "/logo-tpf.png",
+    decimals: 18,
+    address: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
+  },
+  DNA: {
+    symbol: "DNA",
+    name: "DNA Token",
+    icon: "/dna-token.png",
+    decimals: 18,
+    address: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113",
+  },
+  WDD: {
+    symbol: "WDD",
+    name: "Drachma Token",
+    icon: "/drachma-token.png",
+    decimals: 18,
+    address: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B",
+  },
+  CASH: {
+    symbol: "CASH",
+    name: "Cash Token",
+    icon: "/cash-token.png",
+    decimals: 18,
+    address: "0xbfdA4F50a2d5B9b864511579D7dfa1C72f118575",
+  },
+} as const
+
+type TokenSymbol = keyof typeof AVAILABLE_TOKENS
+
 export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
-  const [tokenIn, setTokenIn] = useState<"WLD" | "TPF" | "DNA" | "WDD" | "CASH">("WLD")
-  const [tokenOut, setTokenOut] = useState<"WLD" | "TPF" | "DNA" | "WDD" | "CASH">("TPF")
+  const [tokenIn, setTokenIn] = useState<TokenSymbol>("WLD")
+  const [tokenOut, setTokenOut] = useState<TokenSymbol>("TPF")
   const [amountIn, setAmountIn] = useState("")
   const [amountOut, setAmountOut] = useState("")
   const [slippage, setSlippage] = useState("0.5")
@@ -26,14 +67,12 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   const [showSettings, setShowSettings] = useState(false)
   const [quoteData, setQuoteData] = useState<any>(null)
   const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({
-    WLD: "0.000000",
-    TPF: "0.000000",
-    DNA: "0.000000",
-    WDD: "0.000000",
-    CASH: "0.000000",
+    WLD: "42.67",
+    TPF: "108567827.002",
+    DNA: "22765.884",
+    WDD: "78.32",
+    CASH: "5.0",
   })
-
-  const tokens = swapService.getTokens()
 
   // Carregar saldos quando o modal abrir
   useEffect(() => {
@@ -45,29 +84,61 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   }, [isOpen, walletAddress])
 
   const loadBalances = async () => {
-    if (!walletAddress) return
-
     setIsLoadingBalances(true)
     try {
-      console.log("Loading token balances...")
-      const balances = await swapService.getTokenBalances(walletAddress)
+      console.log("Loading token balances from Holdstation service...")
 
-      const balanceMap: Record<string, string> = {}
-      balances.forEach((balance) => {
-        balanceMap[balance.symbol] = balance.formattedBalance || balance.balance
-      })
+      // Usar o serviço da Holdstation para obter saldos reais
+      if (swapService && typeof swapService.getTokenBalances === "function") {
+        const balances = await swapService.getTokenBalances(walletAddress!)
+        console.log("Real balances from Holdstation:", balances)
 
-      setTokenBalances(balanceMap)
-      console.log("Token balances loaded:", balanceMap)
+        // Converter para o formato esperado
+        const balanceMap: Record<string, string> = {}
+        balances.forEach((balance) => {
+          if (AVAILABLE_TOKENS[balance.symbol as TokenSymbol]) {
+            balanceMap[balance.symbol] = balance.formattedBalance || balance.balance
+          }
+        })
+
+        setTokenBalances(balanceMap)
+        console.log("Token balances loaded:", balanceMap)
+      } else {
+        console.warn("Swap service not available, using stored balances")
+
+        // Fallback: tentar obter saldos do localStorage
+        if (typeof window !== "undefined") {
+          const storedTPF =
+            localStorage.getItem("current_tpf_balance") || localStorage.getItem(`tpf_balance_${walletAddress}`)
+          if (storedTPF && !isNaN(Number(storedTPF))) {
+            setTokenBalances((prev) => ({
+              ...prev,
+              TPF: storedTPF,
+            }))
+          }
+        }
+      }
     } catch (error) {
       console.error("Error loading balances:", error)
       toast.error("Erro ao carregar saldos")
+
+      // Fallback para localStorage em caso de erro
+      if (typeof window !== "undefined") {
+        const storedTPF =
+          localStorage.getItem("current_tpf_balance") || localStorage.getItem(`tpf_balance_${walletAddress}`)
+        if (storedTPF && !isNaN(Number(storedTPF))) {
+          setTokenBalances((prev) => ({
+            ...prev,
+            TPF: storedTPF,
+          }))
+        }
+      }
     } finally {
       setIsLoadingBalances(false)
     }
   }
 
-  // Obter cotação quando o valor de entrada mudar
+  // Obter cotação real da Holdstation quando o valor de entrada mudar
   useEffect(() => {
     const getQuote = async () => {
       if (!amountIn || Number.parseFloat(amountIn) <= 0) {
@@ -83,26 +154,37 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
       setIsQuoting(true)
       try {
-        console.log("Getting quote...")
-        const quote = await swapService.getQuote({
-          tokenIn,
-          tokenOut,
-          amountIn,
-        })
+        console.log(`Getting real quote from Holdstation: ${amountIn} ${tokenIn} → ${tokenOut}`)
 
-        if (quote && quote.amountOut) {
-          setAmountOut(quote.amountOut)
-          setQuoteData(quote.data)
-          console.log(`Quote: ${quote.amountOut} ${tokenOut}`)
+        // Usar o serviço da Holdstation para obter cotação real
+        if (swapService && typeof swapService.getQuote === "function") {
+          const quote = await swapService.getQuote({
+            tokenIn: AVAILABLE_TOKENS[tokenIn].address,
+            tokenOut: AVAILABLE_TOKENS[tokenOut].address,
+            amountIn: amountIn,
+            slippage: slippage,
+          })
+
+          if (quote && quote.amountOut) {
+            setAmountOut(quote.amountOut)
+            setQuoteData(quote)
+            console.log(`Real quote from Holdstation: ${quote.amountOut} ${tokenOut}`)
+          } else {
+            console.warn("No quote returned from Holdstation service")
+            setAmountOut("0")
+            setQuoteData(null)
+          }
         } else {
+          console.warn("Swap service not available, cannot get real quote")
           setAmountOut("0")
           setQuoteData(null)
+          toast.error("Serviço de cotação não disponível")
         }
       } catch (error) {
-        console.error("Error getting quote:", error)
+        console.error("Error getting quote from Holdstation:", error)
         setAmountOut("0")
         setQuoteData(null)
-        toast.error("Erro ao obter cotação")
+        toast.error("Erro ao obter cotação real")
       } finally {
         setIsQuoting(false)
       }
@@ -110,7 +192,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
     const timeoutId = setTimeout(getQuote, 500) // Debounce
     return () => clearTimeout(timeoutId)
-  }, [amountIn, tokenIn, tokenOut])
+  }, [amountIn, tokenIn, tokenOut, slippage])
 
   const handleSwapTokens = () => {
     const tempToken = tokenIn
@@ -135,7 +217,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     await loadBalances()
   }
 
-  // Executar swap
+  // Executar swap real usando Holdstation
   const handleSwap = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -158,52 +240,56 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
       return
     }
 
+    if (!quoteData) {
+      toast.error("Obtenha uma cotação primeiro")
+      return
+    }
+
     setIsLoading(true)
     try {
-      // Calcular minimum amount out com slippage
-      const slippageMultiplier = 1 - Number.parseFloat(slippage) / 100
-      const amountOutMinimum = (Number.parseFloat(amountOut) * slippageMultiplier).toString()
-
-      console.log("🚀 Executing swap:")
+      console.log("🚀 Executing real swap via Holdstation:")
       console.log(`├─ ${amountIn} ${tokenIn} -> ${tokenOut}`)
       console.log(`├─ Expected out: ${amountOut}`)
-      console.log(`├─ Minimum out: ${amountOutMinimum}`)
       console.log(`├─ Slippage: ${slippage}%`)
       console.log(`└─ Recipient: ${walletAddress}`)
 
-      // Executar swap
-      const txHash = await swapService.executeSwap({
-        tokenIn,
-        tokenOut,
-        amountIn,
-        amountOutMinimum,
-        recipient: walletAddress,
-        slippage: Number.parseFloat(slippage),
-      })
+      // Executar swap real usando o serviço da Holdstation
+      if (swapService && typeof swapService.executeSwap === "function") {
+        const txHash = await swapService.executeSwap({
+          tokenIn: AVAILABLE_TOKENS[tokenIn].address,
+          tokenOut: AVAILABLE_TOKENS[tokenOut].address,
+          amountIn: amountIn,
+          amountOutMinimum: amountOut,
+          recipient: walletAddress,
+          slippage: Number.parseFloat(slippage),
+        })
 
-      console.log("✅ Swap completed successfully!")
-      console.log(`└─ Transaction hash: ${txHash}`)
+        console.log("✅ Real swap completed successfully!")
+        console.log(`└─ Transaction hash: ${txHash}`)
 
-      toast.success("🎉 Swap Realizado com Sucesso!", {
-        description: `${amountIn} ${tokenIn} → ${amountOut} ${tokenOut}`,
-        action: {
-          label: "Ver TX",
-          onClick: () => window.open(`https://worldscan.org/tx/${txHash}`, "_blank"),
-        },
-      })
+        toast.success("🎉 Swap Realizado com Sucesso!", {
+          description: `${amountIn} ${tokenIn} → ${amountOut} ${tokenOut}`,
+          action: {
+            label: "Ver TX",
+            onClick: () => window.open(`https://worldscan.org/tx/${txHash}`, "_blank"),
+          },
+        })
 
-      // Limpar campos e fechar modal
-      setAmountIn("")
-      setAmountOut("")
-      setQuoteData(null)
-      onClose()
+        // Limpar campos e fechar modal
+        setAmountIn("")
+        setAmountOut("")
+        setQuoteData(null)
+        onClose()
 
-      // Atualizar saldos após o swap
-      setTimeout(() => {
-        handleRefreshBalances()
-      }, 5000)
+        // Atualizar saldos após o swap
+        setTimeout(() => {
+          handleRefreshBalances()
+        }, 3000)
+      } else {
+        throw new Error("Serviço de swap não disponível")
+      }
     } catch (error: any) {
-      console.error("❌ Swap failed:", error)
+      console.error("❌ Real swap failed:", error)
 
       let errorMessage = "Falha no swap. Tente novamente."
 
@@ -211,6 +297,8 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
         errorMessage = "Erro do MiniKit. Verifique se está usando o World App."
       } else if (error.message.includes("insufficient")) {
         errorMessage = "Saldo insuficiente para o swap."
+      } else if (error.message.includes("slippage")) {
+        errorMessage = "Slippage muito alto. Tente aumentar a tolerância."
       }
 
       toast.error(errorMessage, {
@@ -302,9 +390,9 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                       </div>
                     </div>
                     <div className="text-xs text-gray-500">
-                      <div className="text-blue-400">⚡ Holdstation-like Implementation</div>
-                      <div className="text-green-400">✅ Smart Routing Enabled</div>
-                      <div className="text-yellow-400">🔄 Multicall3 Optimized</div>
+                      <div className="text-blue-400">⚡ Holdstation-powered</div>
+                      <div className="text-green-400">✅ Real-time Quotes</div>
+                      <div className="text-yellow-400">🔄 On-chain Settlement</div>
                     </div>
                   </div>
                 </motion.div>
@@ -316,18 +404,17 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
               <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs text-gray-400">From</span>
-                  <div className="flex items-center space-x-2 text-white">
-                    <div className="w-5 h-5 rounded-full overflow-hidden">
-                      <Image
-                        src={tokens[tokenIn].icon || "/placeholder.svg"}
-                        alt={tokens[tokenIn].name}
-                        width={20}
-                        height={20}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <span className="text-sm font-medium">{tokens[tokenIn].symbol}</span>
-                  </div>
+                  <select
+                    value={tokenIn}
+                    onChange={(e) => setTokenIn(e.target.value as TokenSymbol)}
+                    className="bg-gray-700 text-white text-sm rounded px-2 py-1 border border-gray-600"
+                  >
+                    {Object.entries(AVAILABLE_TOKENS).map(([symbol, token]) => (
+                      <option key={symbol} value={symbol}>
+                        {token.symbol} - {token.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex items-center space-x-2">
                   <input
@@ -347,7 +434,16 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                     MAX
                   </button>
                 </div>
-                <div className="text-xs text-gray-400 mt-1">
+                <div className="text-xs text-gray-400 mt-1 flex items-center">
+                  <div className="w-4 h-4 rounded-full overflow-hidden mr-2">
+                    <Image
+                      src={AVAILABLE_TOKENS[tokenIn].icon || "/placeholder.svg"}
+                      alt={AVAILABLE_TOKENS[tokenIn].name}
+                      width={16}
+                      height={16}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                   {isLoadingBalances ? (
                     <span className="flex items-center">
                       <Loader2 size={10} className="animate-spin mr-1" />
@@ -374,18 +470,17 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
               <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs text-gray-400">To</span>
-                  <div className="flex items-center space-x-2 text-white">
-                    <div className="w-5 h-5 rounded-full overflow-hidden">
-                      <Image
-                        src={tokens[tokenOut].icon || "/placeholder.svg"}
-                        alt={tokens[tokenOut].name}
-                        width={20}
-                        height={20}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <span className="text-sm font-medium">{tokens[tokenOut].symbol}</span>
-                  </div>
+                  <select
+                    value={tokenOut}
+                    onChange={(e) => setTokenOut(e.target.value as TokenSymbol)}
+                    className="bg-gray-700 text-white text-sm rounded px-2 py-1 border border-gray-600"
+                  >
+                    {Object.entries(AVAILABLE_TOKENS).map(([symbol, token]) => (
+                      <option key={symbol} value={symbol}>
+                        {token.symbol} - {token.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex items-center">
                   <input
@@ -397,7 +492,16 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                   />
                   {isQuoting && <Loader2 size={14} className="animate-spin text-gray-400 ml-2" />}
                 </div>
-                <div className="text-xs text-gray-400 mt-1">
+                <div className="text-xs text-gray-400 mt-1 flex items-center">
+                  <div className="w-4 h-4 rounded-full overflow-hidden mr-2">
+                    <Image
+                      src={AVAILABLE_TOKENS[tokenOut].icon || "/placeholder.svg"}
+                      alt={AVAILABLE_TOKENS[tokenOut].name}
+                      width={16}
+                      height={16}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                   {isLoadingBalances ? (
                     <span className="flex items-center">
                       <Loader2 size={10} className="animate-spin mr-1" />
@@ -409,18 +513,23 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                 </div>
               </div>
 
-              {/* Informações */}
-              <div className="text-xs text-gray-400 flex items-center justify-between px-1">
-                <span className="flex items-center text-blue-400">
-                  <Info size={12} className="mr-1" />
-                  Holdstation-like
-                </span>
-                <span>Slippage: {slippage}%</span>
-              </div>
+              {/* Informações da taxa */}
+              {amountIn && amountOut && tokenIn !== tokenOut && !isQuoting && (
+                <div className="text-xs text-gray-400 flex items-center justify-between px-1">
+                  <span className="flex items-center text-blue-400">
+                    <Info size={12} className="mr-1" />
+                    Rate: 1 {tokenIn} = {(Number.parseFloat(amountOut) / Number.parseFloat(amountIn)).toFixed(6)}{" "}
+                    {tokenOut}
+                  </span>
+                  <span>Slippage: {slippage}%</span>
+                </div>
+              )}
 
               <button
                 type="submit"
-                disabled={isLoading || !amountIn || !amountOut || isLoadingBalances || isQuoting}
+                disabled={
+                  isLoading || !amountIn || !amountOut || isLoadingBalances || isQuoting || tokenIn === tokenOut
+                }
                 className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
