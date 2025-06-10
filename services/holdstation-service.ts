@@ -32,6 +32,7 @@ interface TokenBalance {
   balance: string
   decimals: number
   icon?: string
+  formattedBalance?: string
 }
 
 interface SwapQuote {
@@ -63,7 +64,6 @@ class HoldstationService {
     try {
       console.log("🚀 Initializing Holdstation Service...")
 
-      // Configurar provider conforme documentação
       this.provider = new ethers.JsonRpcProvider(
         RPC_URL,
         {
@@ -75,30 +75,24 @@ class HoldstationService {
         },
       )
 
-      // Configurar client e multicall3
       this.client = new Client(this.provider)
       config.client = this.client
       config.multicall3 = new Multicall3(this.provider)
 
-      // Inicializar TokenProvider
       this.tokenProvider = new TokenProvider({
         client: this.client,
         multicall3: config.multicall3,
       })
 
-      // Inicializar Sender
       this.sender = new Sender(this.provider)
 
-      // Inicializar SwapHelper
       this.swapHelper = new SwapHelper(this.client, {
         tokenStorage: inmemoryTokenStorage,
       })
 
-      // Inicializar ZeroX
       this.zeroX = new ZeroX(this.tokenProvider, inmemoryTokenStorage)
       this.swapHelper.load(this.zeroX)
 
-      // Testar conexão
       const network = await this.provider.getNetwork()
       console.log(`✅ Connected to ${network.name} (${network.chainId})`)
 
@@ -108,8 +102,6 @@ class HoldstationService {
       console.error("❌ Failed to initialize Holdstation Service:", error)
     }
   }
-
-  // ==================== TOKEN BALANCES ====================
 
   async getTokenBalances(walletAddress: string): Promise<TokenBalance[]> {
     try {
@@ -123,12 +115,10 @@ class HoldstationService {
 
       console.log(`💰 Getting token balances for: ${walletAddress}`)
 
-      // Obter todos os tokens da carteira
       const walletTokens = await this.tokenProvider.tokenOf(walletAddress)
       console.log(`Found ${walletTokens.length} tokens in wallet`)
 
       if (walletTokens.length === 0) {
-        // Se não encontrou tokens, usar tokens conhecidos
         const tokenAddresses = Object.values(KNOWN_TOKENS)
         return this.getBalancesForTokens(walletAddress, tokenAddresses)
       }
@@ -136,7 +126,6 @@ class HoldstationService {
       return this.getBalancesForTokens(walletAddress, walletTokens)
     } catch (error) {
       console.error("Error getting token balances:", error)
-      // Fallback para tokens conhecidos
       const tokenAddresses = Object.values(KNOWN_TOKENS)
       return this.getBalancesForTokens(walletAddress, tokenAddresses)
     }
@@ -144,18 +133,12 @@ class HoldstationService {
 
   private async getBalancesForTokens(walletAddress: string, tokenAddresses: string[]): Promise<TokenBalance[]> {
     try {
-      // Obter detalhes dos tokens
       const tokenDetails = await this.tokenProvider!.details(...tokenAddresses)
-      console.log("Token details:", tokenDetails)
-
-      // Obter saldos
       const balances = await this.tokenProvider!.balanceOf({
         wallet: walletAddress,
         tokens: tokenAddresses,
       })
-      console.log("Token balances:", balances)
 
-      // Processar resultados
       const tokenBalances: TokenBalance[] = []
 
       for (const address of tokenAddresses) {
@@ -172,19 +155,17 @@ class HoldstationService {
             balance: formattedBalance,
             decimals: details.decimals,
             icon: this.getTokenIcon(details.symbol),
+            formattedBalance: formattedBalance,
           })
         }
       }
 
-      // Filtrar tokens com saldo > 0
       return tokenBalances.filter((token) => Number.parseFloat(token.balance) > 0)
     } catch (error) {
       console.error("Error processing token balances:", error)
       return []
     }
   }
-
-  // ==================== SWAP FUNCTIONALITY ====================
 
   async getSwapQuote(params: {
     tokenIn: string
@@ -214,7 +195,6 @@ class HoldstationService {
       }
 
       const result = await this.swapHelper.estimate.quote(quoteParams)
-      console.log("Swap quote result:", result)
 
       return {
         amountOut: result.amountOut || "0",
@@ -246,12 +226,8 @@ class HoldstationService {
         throw new Error("SwapHelper not initialized")
       }
 
-      console.log("🚀 Executing swap...")
-
-      // Primeiro obter a cotação
       const quote = await this.getSwapQuote(params)
 
-      // Preparar parâmetros do swap
       const swapParams: SwapParams["input"] = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
@@ -267,8 +243,6 @@ class HoldstationService {
       }
 
       const result = await this.swapHelper.swap(swapParams)
-      console.log("✅ Swap executed successfully:", result)
-
       return result.hash || result.transactionHash || "0x"
     } catch (error) {
       console.error("❌ Error executing swap:", error)
@@ -276,12 +250,10 @@ class HoldstationService {
     }
   }
 
-  // ==================== SEND FUNCTIONALITY ====================
-
   async sendToken(params: {
     to: string
     amount: number
-    token?: string // Se omitido, envia ETH nativo
+    token?: string
   }): Promise<string> {
     try {
       if (!this.initialized) {
@@ -292,8 +264,6 @@ class HoldstationService {
         throw new Error("Sender not initialized")
       }
 
-      console.log(`📤 Sending ${params.amount} ${params.token || "ETH"} to ${params.to}`)
-
       const sendParams = {
         to: params.to,
         amount: params.amount,
@@ -301,16 +271,12 @@ class HoldstationService {
       }
 
       const result = await this.sender.send(sendParams)
-      console.log("✅ Token sent successfully:", result)
-
       return result.hash || result.transactionHash || "0x"
     } catch (error) {
       console.error("❌ Error sending token:", error)
       throw error
     }
   }
-
-  // ==================== UTILITY METHODS ====================
 
   async getTokenDetails(tokenAddresses: string[]): Promise<Record<string, any>> {
     try {
@@ -360,6 +326,195 @@ class HoldstationService {
   }
 }
 
-// Exportar instância única
+// Enhanced Token Service
+class EnhancedTokenService {
+  private holdstationService: HoldstationService
+
+  constructor(holdstationService: HoldstationService) {
+    this.holdstationService = holdstationService
+  }
+
+  async getTokensInfo(tokenAddresses: string[]): Promise<Record<string, any>> {
+    try {
+      return await this.holdstationService.getTokenDetails(tokenAddresses)
+    } catch (error) {
+      console.error("Error getting token info:", error)
+      return {}
+    }
+  }
+
+  async getAllTokenBalances(walletAddress: string): Promise<Record<string, string>> {
+    try {
+      const balances = await this.holdstationService.getTokenBalances(walletAddress)
+      return balances.reduce((acc: Record<string, string>, token: TokenBalance) => {
+        acc[token.symbol] = token.balance
+        return acc
+      }, {})
+    } catch (error) {
+      console.error("Error getting all token balances:", error)
+      return {}
+    }
+  }
+
+  async getTokenBalance(walletAddress: string, tokenSymbol: string): Promise<string> {
+    try {
+      const balances = await this.getAllTokenBalances(walletAddress)
+      return balances[tokenSymbol] || "0"
+    } catch (error) {
+      console.error(`Error getting ${tokenSymbol} balance:`, error)
+      return "0"
+    }
+  }
+
+  getTokenInfo(tokenSymbol: string): any {
+    const tokenAddresses = this.holdstationService.getKnownTokens()
+    const tokenAddress = Object.entries(tokenAddresses).find(([key]) => key === tokenSymbol)?.[1]
+
+    if (!tokenAddress) return null
+
+    return {
+      symbol: tokenSymbol,
+      address: tokenAddress,
+      name: this.getTokenName(tokenSymbol),
+      decimals: 18,
+      logo: this.getTokenIcon(tokenSymbol),
+    }
+  }
+
+  private getTokenName(symbol: string): string {
+    const names: Record<string, string> = {
+      WETH: "Wrapped Ether",
+      USDCe: "USD Coin (Bridged)",
+      TPF: "TPulseFi",
+      WLD: "Worldcoin",
+      DNA: "DNA Token",
+      CASH: "Cash Token",
+      WDD: "Drachma Token",
+    }
+    return names[symbol] || symbol
+  }
+
+  private getTokenIcon(symbol: string): string {
+    const icons: Record<string, string> = {
+      WETH: "/ethereum-abstract.png",
+      USDCe: "/usdc-coins.png",
+      TPF: "/logo-tpf.png",
+      WLD: "/worldcoin.jpeg",
+      DNA: "/dna-token.png",
+      CASH: "/cash-token.png",
+      WDD: "/drachma-token.png",
+    }
+    return icons[symbol] || "/placeholder.svg?height=32&width=32"
+  }
+
+  isInitialized(): boolean {
+    return this.holdstationService.isInitialized()
+  }
+}
+
+// Swap Service
+class SwapService {
+  private holdstationService: HoldstationService
+
+  constructor(holdstationService: HoldstationService) {
+    this.holdstationService = holdstationService
+  }
+
+  async getQuote(params: {
+    tokenIn: string
+    tokenOut: string
+    amountIn: string
+    slippage?: string
+  }): Promise<SwapQuote> {
+    try {
+      return await this.holdstationService.getSwapQuote(params)
+    } catch (error) {
+      console.error("Error getting swap quote:", error)
+      throw error
+    }
+  }
+
+  async executeSwap(params: {
+    tokenIn: string
+    tokenOut: string
+    amountIn: string
+    amountOutMinimum?: string
+    recipient?: string
+    slippage?: number
+  }): Promise<string> {
+    try {
+      return await this.holdstationService.executeSwap({
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: params.amountIn,
+        slippage: params.slippage?.toString() || "0.5",
+      })
+    } catch (error) {
+      console.error("Error executing swap:", error)
+      throw error
+    }
+  }
+
+  async getTokenBalances(walletAddress: string): Promise<TokenBalance[]> {
+    try {
+      return await this.holdstationService.getTokenBalances(walletAddress)
+    } catch (error) {
+      console.error("Error getting token balances:", error)
+      return []
+    }
+  }
+
+  getTokens() {
+    const knownTokens = this.holdstationService.getKnownTokens()
+    const tokens: Record<string, any> = {}
+
+    for (const [symbol, address] of Object.entries(knownTokens)) {
+      tokens[symbol] = {
+        symbol,
+        address,
+        name: this.getTokenName(symbol),
+        icon: this.getTokenIcon(symbol),
+      }
+    }
+
+    return tokens
+  }
+
+  private getTokenName(symbol: string): string {
+    const names: Record<string, string> = {
+      WETH: "Wrapped Ether",
+      USDCe: "USD Coin (Bridged)",
+      TPF: "TPulseFi",
+      WLD: "Worldcoin",
+      DNA: "DNA Token",
+      CASH: "Cash Token",
+      WDD: "Drachma Token",
+    }
+    return names[symbol] || symbol
+  }
+
+  private getTokenIcon(symbol: string): string {
+    const icons: Record<string, string> = {
+      WETH: "/ethereum-abstract.png",
+      USDCe: "/usdc-coins.png",
+      TPF: "/logo-tpf.png",
+      WLD: "/worldcoin.jpeg",
+      DNA: "/dna-token.png",
+      CASH: "/cash-token.png",
+      WDD: "/drachma-token.png",
+    }
+    return icons[symbol] || "/placeholder.svg?height=32&width=32"
+  }
+
+  isInitialized(): boolean {
+    return this.holdstationService.isInitialized()
+  }
+}
+
+// Criar instâncias
 export const holdstationService = new HoldstationService()
+export const enhancedTokenService = new EnhancedTokenService(holdstationService)
+export const swapService = new SwapService(holdstationService)
+
+// Exportar tipos
 export type { TokenBalance, SwapQuote }
