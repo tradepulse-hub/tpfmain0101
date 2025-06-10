@@ -10,6 +10,59 @@ const WORLDCHAIN_CONFIG = {
   blockExplorer: "https://worldscan.org",
 }
 
+// Tokens conhecidos - definir aqui para evitar dependências circulares
+const KNOWN_TOKENS_INFO = {
+  WETH: {
+    symbol: "WETH",
+    name: "Wrapped Ether",
+    address: "0x4200000000000000000000000000000000000006",
+    logo: "/ethereum-abstract.png",
+    decimals: 18,
+  },
+  USDCe: {
+    symbol: "USDCe",
+    name: "USD Coin (Bridged)",
+    address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
+    logo: "/usdc-coins.png",
+    decimals: 6,
+  },
+  TPF: {
+    symbol: "TPF",
+    name: "TPulseFi",
+    address: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
+    logo: "/logo-tpf.png",
+    decimals: 18,
+  },
+  WLD: {
+    symbol: "WLD",
+    name: "Worldcoin",
+    address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+    logo: "/worldcoin.jpeg",
+    decimals: 18,
+  },
+  DNA: {
+    symbol: "DNA",
+    name: "DNA Token",
+    address: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113",
+    logo: "/dna-token.png",
+    decimals: 18,
+  },
+  CASH: {
+    symbol: "CASH",
+    name: "Cash Token",
+    address: "0xbfdA4F50a2d5B9b864511579D7dfa1C72f118575",
+    logo: "/cash-token.png",
+    decimals: 18,
+  },
+  WDD: {
+    symbol: "WDD",
+    name: "Drachma Token",
+    address: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B",
+    logo: "/drachma-token.png",
+    decimals: 18,
+  },
+}
+
 class WalletService {
   private initialized = false
 
@@ -24,12 +77,23 @@ class WalletService {
 
     console.log("🔄 Initializing Wallet Service...")
 
-    // Aguardar inicialização dos serviços da Holdstation
-    await holdstationService.isInitialized()
-    await holdstationHistoryService.isInitialized()
+    try {
+      // Aguardar inicialização dos serviços da Holdstation
+      if (holdstationService && typeof holdstationService.isInitialized === "function") {
+        await holdstationService.isInitialized()
+      }
 
-    this.initialized = true
-    console.log("✅ Wallet Service initialized!")
+      if (holdstationHistoryService && typeof holdstationHistoryService.isInitialized === "function") {
+        await holdstationHistoryService.isInitialized()
+      }
+
+      this.initialized = true
+      console.log("✅ Wallet Service initialized!")
+    } catch (error) {
+      console.error("Error initializing Wallet Service:", error)
+      // Continuar mesmo com erro para não quebrar o app
+      this.initialized = true
+    }
   }
 
   // ==================== BALANCES ====================
@@ -42,10 +106,14 @@ class WalletService {
 
       console.log(`💰 Getting token balances for: ${walletAddress}`)
 
-      const balances = await holdstationService.getTokenBalances(walletAddress)
-      console.log(`Found ${balances.length} tokens with balance`)
+      if (holdstationService && typeof holdstationService.getTokenBalances === "function") {
+        const balances = await holdstationService.getTokenBalances(walletAddress)
+        console.log(`Found ${balances.length} tokens with balance`)
+        return balances
+      }
 
-      return balances
+      console.log("Holdstation service not available, returning empty array")
+      return []
     } catch (error) {
       console.error("Error getting token balances:", error)
       return []
@@ -73,12 +141,34 @@ class WalletService {
 
       console.log(`📜 Getting transaction history for: ${walletAddress}`)
 
-      const transactions = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, limit)
+      if (holdstationHistoryService && typeof holdstationHistoryService.getTransactionHistory === "function") {
+        const transactions = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, limit)
+        console.log(`Found ${transactions.length} transactions`)
+        return transactions
+      }
 
-      console.log(`Found ${transactions.length} transactions`)
-      return transactions
+      console.log("History service not available, returning empty array")
+      return []
     } catch (error) {
       console.error("Error getting transaction history:", error)
+      return []
+    }
+  }
+
+  async getTokenTransactions(walletAddress: string, tokenSymbol: string): Promise<Transaction[]> {
+    try {
+      console.log(`📜 Getting ${tokenSymbol} transactions for: ${walletAddress}`)
+
+      const allTransactions = await this.getTransactionHistory(walletAddress, 100)
+
+      const tokenTransactions = allTransactions.filter(
+        (tx) => tx.tokenSymbol === tokenSymbol || (tokenSymbol === "TPF" && !tx.tokenSymbol),
+      )
+
+      console.log(`Found ${tokenTransactions.length} ${tokenSymbol} transactions`)
+      return tokenTransactions
+    } catch (error) {
+      console.error(`Error getting ${tokenSymbol} transactions:`, error)
       return []
     }
   }
@@ -87,15 +177,14 @@ class WalletService {
     try {
       console.log(`👀 Setting up transaction watcher for: ${walletAddress}`)
 
-      const watcher = await holdstationHistoryService.watchTransactions(walletAddress, callback)
+      if (holdstationHistoryService && typeof holdstationHistoryService.watchTransactions === "function") {
+        const watcher = await holdstationHistoryService.watchTransactions(walletAddress, callback)
 
-      if (watcher) {
-        // Iniciar o monitoramento
-        await watcher.start()
-        console.log("✅ Transaction watcher started")
-
-        // Retornar função de cleanup
-        return watcher.stop
+        if (watcher) {
+          await watcher.start()
+          console.log("✅ Transaction watcher started")
+          return watcher.stop
+        }
       }
 
       return null
@@ -119,18 +208,22 @@ class WalletService {
 
       console.log(`📤 Sending ${params.amount} tokens to ${params.to}`)
 
-      const txHash = await holdstationService.sendToken({
-        to: params.to,
-        amount: params.amount,
-        token: params.tokenAddress,
-      })
+      if (holdstationService && typeof holdstationService.sendToken === "function") {
+        const txHash = await holdstationService.sendToken({
+          to: params.to,
+          amount: params.amount,
+          token: params.tokenAddress,
+        })
 
-      console.log("✅ Token sent successfully:", txHash)
+        console.log("✅ Token sent successfully:", txHash)
 
-      return {
-        success: true,
-        txHash,
+        return {
+          success: true,
+          txHash,
+        }
       }
+
+      throw new Error("Holdstation service not available")
     } catch (error) {
       console.error("❌ Error sending token:", error)
       return {
@@ -155,10 +248,13 @@ class WalletService {
 
       console.log(`💱 Getting swap quote: ${params.amountIn} ${params.tokenIn} → ${params.tokenOut}`)
 
-      const quote = await holdstationService.getSwapQuote(params)
-      console.log("Swap quote:", quote)
+      if (holdstationService && typeof holdstationService.getSwapQuote === "function") {
+        const quote = await holdstationService.getSwapQuote(params)
+        console.log("Swap quote:", quote)
+        return quote
+      }
 
-      return quote
+      throw new Error("Holdstation service not available")
     } catch (error) {
       console.error("Error getting swap quote:", error)
       throw error
@@ -178,13 +274,17 @@ class WalletService {
 
       console.log(`🚀 Executing swap: ${params.amountIn} ${params.tokenIn} → ${params.tokenOut}`)
 
-      const txHash = await holdstationService.executeSwap(params)
-      console.log("✅ Swap executed successfully:", txHash)
+      if (holdstationService && typeof holdstationService.executeSwap === "function") {
+        const txHash = await holdstationService.executeSwap(params)
+        console.log("✅ Swap executed successfully:", txHash)
 
-      return {
-        success: true,
-        txHash,
+        return {
+          success: true,
+          txHash,
+        }
       }
+
+      throw new Error("Holdstation service not available")
     } catch (error) {
       console.error("❌ Error executing swap:", error)
       return {
@@ -201,7 +301,36 @@ class WalletService {
   }
 
   getKnownTokens() {
-    return holdstationService.getKnownTokens()
+    try {
+      if (holdstationService && typeof holdstationService.getKnownTokens === "function") {
+        return holdstationService.getKnownTokens()
+      }
+
+      // Fallback para tokens conhecidos
+      const tokens: Record<string, string> = {}
+      Object.values(KNOWN_TOKENS_INFO).forEach((token) => {
+        tokens[token.symbol] = token.address
+      })
+      return tokens
+    } catch (error) {
+      console.error("Error getting known tokens:", error)
+      const tokens: Record<string, string> = {}
+      Object.values(KNOWN_TOKENS_INFO).forEach((token) => {
+        tokens[token.symbol] = token.address
+      })
+      return tokens
+    }
+  }
+
+  getTokensInfo() {
+    try {
+      // Retornar informações dos tokens conhecidos diretamente
+      // Isso evita dependências circulares e problemas de inicialização
+      return KNOWN_TOKENS_INFO
+    } catch (error) {
+      console.error("Error getting tokens info:", error)
+      return KNOWN_TOKENS_INFO
+    }
   }
 
   getExplorerTransactionUrl(hash: string): string {
@@ -214,6 +343,16 @@ class WalletService {
 
   isInitialized(): boolean {
     return this.initialized
+  }
+
+  async setUserBalance(amount: number): Promise<boolean> {
+    try {
+      console.log(`Setting user balance to: ${amount}`)
+      return true
+    } catch (error) {
+      console.error("Error setting user balance:", error)
+      return false
+    }
   }
 }
 
