@@ -7,6 +7,7 @@ import {
   SwapHelper,
   type SwapParams,
   ZeroX,
+  HoldSo,
 } from "@holdstation/worldchain-sdk"
 import { Client, Multicall3 } from "@holdstation/worldchain-ethers-v6"
 
@@ -14,14 +15,11 @@ import { Client, Multicall3 } from "@holdstation/worldchain-ethers-v6"
 const RPC_URL = "https://worldchain-mainnet.g.alchemy.com/public"
 const CHAIN_ID = 480
 
-// Tokens conhecidos na Worldchain
+// Tokens conhecidos na Worldchain (removidos WETH, USDCe, CASH)
 const KNOWN_TOKENS = {
-  WETH: "0x4200000000000000000000000000000000000006",
-  USDCe: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
-  TPF: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
   WLD: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+  TPF: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
   DNA: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113",
-  CASH: "0xbfdA4F50a2d5B9b864511579D7dfa1C72f118575",
   WDD: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B",
 }
 
@@ -41,6 +39,13 @@ interface SwapQuote {
   to: string
   value: string
   feeAmountOut?: string
+  addons?: {
+    outAmount: string
+    rateSwap: string
+    amountOutUsd: string
+    minReceived: string
+    feeAmountOut: string
+  }
 }
 
 class HoldstationService {
@@ -50,6 +55,7 @@ class HoldstationService {
   private sender: Sender | null = null
   private swapHelper: SwapHelper | null = null
   private zeroX: ZeroX | null = null
+  private holdSo: HoldSo | null = null
   private initialized = false
 
   constructor() {
@@ -90,8 +96,13 @@ class HoldstationService {
         tokenStorage: inmemoryTokenStorage,
       })
 
+      // Inicializar provedores de swap
       this.zeroX = new ZeroX(this.tokenProvider, inmemoryTokenStorage)
+      this.holdSo = new HoldSo(this.tokenProvider, inmemoryTokenStorage)
+
+      // Carregar os provedores no SwapHelper
       this.swapHelper.load(this.zeroX)
+      this.swapHelper.load(this.holdSo)
 
       const network = await this.provider.getNetwork()
       console.log(`✅ Connected to ${network.name} (${network.chainId})`)
@@ -115,15 +126,8 @@ class HoldstationService {
 
       console.log(`💰 Getting token balances for: ${walletAddress}`)
 
-      const walletTokens = await this.tokenProvider.tokenOf(walletAddress)
-      console.log(`Found ${walletTokens.length} tokens in wallet`)
-
-      if (walletTokens.length === 0) {
-        const tokenAddresses = Object.values(KNOWN_TOKENS)
-        return this.getBalancesForTokens(walletAddress, tokenAddresses)
-      }
-
-      return this.getBalancesForTokens(walletAddress, walletTokens)
+      const tokenAddresses = Object.values(KNOWN_TOKENS)
+      return this.getBalancesForTokens(walletAddress, tokenAddresses)
     } catch (error) {
       console.error("Error getting token balances:", error)
       const tokenAddresses = Object.values(KNOWN_TOKENS)
@@ -160,7 +164,7 @@ class HoldstationService {
         }
       }
 
-      return tokenBalances.filter((token) => Number.parseFloat(token.balance) > 0)
+      return tokenBalances.filter((token) => Number.parseFloat(token.balance) >= 0)
     } catch (error) {
       console.error("Error processing token balances:", error)
       return []
@@ -191,17 +195,23 @@ class HoldstationService {
         amountIn: params.amountIn,
         slippage: params.slippage || "0.3",
         fee: params.fee || "0.2",
-        preferRouters: ["0x"],
+        preferRouters: ["0x", "hold-so"], // Usar ambos os roteadores
       }
 
       const result = await this.swapHelper.estimate.quote(quoteParams)
 
+      console.log("Raw quote result:", result)
+
+      // Extrair dados da resposta conforme a estrutura da API
+      const amountOut = result.addons?.outAmount || "0"
+
       return {
-        amountOut: result.amountOut || "0",
+        amountOut: amountOut,
         data: result.data,
         to: result.to,
-        value: result.value,
+        value: result.value || "0",
         feeAmountOut: result.addons?.feeAmountOut,
+        addons: result.addons,
       }
     } catch (error) {
       console.error("Error getting swap quote:", error)
@@ -226,6 +236,7 @@ class HoldstationService {
         throw new Error("SwapHelper not initialized")
       }
 
+      // Primeiro obter a cotação
       const quote = await this.getSwapQuote(params)
 
       const swapParams: SwapParams["input"] = {
@@ -294,12 +305,9 @@ class HoldstationService {
 
   private getTokenIcon(symbol: string): string {
     const icons: Record<string, string> = {
-      WETH: "/ethereum-abstract.png",
-      USDCe: "/usdc-coins.png",
       TPF: "/logo-tpf.png",
       WLD: "/worldcoin.jpeg",
       DNA: "/dna-token.png",
-      CASH: "/cash-token.png",
       WDD: "/drachma-token.png",
     }
     return icons[symbol] || "/placeholder.svg?height=32&width=32"
@@ -383,12 +391,9 @@ class EnhancedTokenService {
 
   private getTokenName(symbol: string): string {
     const names: Record<string, string> = {
-      WETH: "Wrapped Ether",
-      USDCe: "USD Coin (Bridged)",
       TPF: "TPulseFi",
       WLD: "Worldcoin",
       DNA: "DNA Token",
-      CASH: "Cash Token",
       WDD: "Drachma Token",
     }
     return names[symbol] || symbol
@@ -396,12 +401,9 @@ class EnhancedTokenService {
 
   private getTokenIcon(symbol: string): string {
     const icons: Record<string, string> = {
-      WETH: "/ethereum-abstract.png",
-      USDCe: "/usdc-coins.png",
       TPF: "/logo-tpf.png",
       WLD: "/worldcoin.jpeg",
       DNA: "/dna-token.png",
-      CASH: "/cash-token.png",
       WDD: "/drachma-token.png",
     }
     return icons[symbol] || "/placeholder.svg?height=32&width=32"
@@ -482,12 +484,9 @@ class SwapService {
 
   private getTokenName(symbol: string): string {
     const names: Record<string, string> = {
-      WETH: "Wrapped Ether",
-      USDCe: "USD Coin (Bridged)",
       TPF: "TPulseFi",
       WLD: "Worldcoin",
       DNA: "DNA Token",
-      CASH: "Cash Token",
       WDD: "Drachma Token",
     }
     return names[symbol] || symbol
@@ -495,12 +494,9 @@ class SwapService {
 
   private getTokenIcon(symbol: string): string {
     const icons: Record<string, string> = {
-      WETH: "/ethereum-abstract.png",
-      USDCe: "/usdc-coins.png",
       TPF: "/logo-tpf.png",
       WLD: "/worldcoin.jpeg",
       DNA: "/dna-token.png",
-      CASH: "/cash-token.png",
       WDD: "/drachma-token.png",
     }
     return icons[symbol] || "/placeholder.svg?height=32&width=32"
