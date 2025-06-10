@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import { X, ExternalLink, Copy, Check } from "lucide-react"
 import { getCurrentLanguage, getTranslations } from "../lib/i18n"
-import { enhancedTokenService } from "../services/holdstation-services"
+import { enhancedTokenService } from "../services/holdstation-service"
 
 interface TokenDetailsModalProps {
   isOpen: boolean
