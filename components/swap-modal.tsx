@@ -54,7 +54,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
       const balanceMap: Record<string, string> = {}
       balances.forEach((balance) => {
-        balanceMap[balance.symbol] = balance.formattedBalance
+        balanceMap[balance.symbol] = balance.formattedBalance || balance.balance
       })
 
       setTokenBalances(balanceMap)
