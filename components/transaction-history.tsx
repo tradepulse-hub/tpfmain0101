@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { ArrowUpRight, ArrowDownLeft, RefreshCw, ExternalLink, ArrowUpDown } from "lucide-react"
 import { holdstationHistoryService, type Transaction } from "@/services/holdstation-history-service"
@@ -15,73 +15,121 @@ export function TransactionHistory({ walletAddress, daysToShow = 7, tokenFilter 
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [refetch, setRefetch] = useState(false)
+  const stopWatcherRef = useRef<(() => void) | null>(null)
 
+  // Efeito para carregar transações e configurar watcher
   useEffect(() => {
-    if (walletAddress) {
-      loadTransactions()
-      setupWatcher()
+    if (!walletAddress) return
+
+    // Função para carregar transações
+    const loadTransactions = async () => {
+      setIsLoading(true)
+      setError(null)
+
+      try {
+        console.log("Loading transactions from Holdstation...")
+
+        let fetchedTransactions: Transaction[]
+
+        if (tokenFilter) {
+          // Obter transações de um token específico
+          fetchedTransactions = await holdstationHistoryService.getTokenTransactions(walletAddress, tokenFilter, 50)
+        } else {
+          // Obter todas as transações
+          fetchedTransactions = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, 50)
+        }
+
+        // Filtrar por período se especificado
+        if (daysToShow > 0) {
+          const cutoffDate = new Date()
+          cutoffDate.setDate(cutoffDate.getDate() - daysToShow)
+
+          fetchedTransactions = fetchedTransactions.filter((tx) => tx.timestamp >= cutoffDate)
+        }
+
+        setTransactions(fetchedTransactions)
+        console.log(`Loaded ${fetchedTransactions.length} transactions`)
+      } catch (error) {
+        console.error("Error loading transactions:", error)
+        setError("Erro ao carregar histórico de transações")
+
+        // Fallback para transações mock
+        setTransactions(getMockTransactions())
+      } finally {
+        setIsLoading(false)
+      }
     }
 
+    // Função para configurar watcher
+    const setupWatcher = async () => {
+      try {
+        console.log("Setting up transaction watcher...")
+
+        // Configurar watcher seguindo a documentação
+        const watcher = await holdstationHistoryService.watchTransactions(walletAddress, () => {
+          console.log("New transaction detected, refreshing...")
+          setRefetch((prev) => !prev) // Trigger refetch
+        })
+
+        if (watcher) {
+          // Iniciar o watcher e salvar a função de parada
+          await watcher.start()
+          stopWatcherRef.current = watcher.stop
+        }
+      } catch (error) {
+        console.error("Error setting up transaction watcher:", error)
+      }
+    }
+
+    // Carregar transações e configurar watcher
+    loadTransactions()
+    setupWatcher()
+
+    // Cleanup
     return () => {
-      // Cleanup será feito automaticamente pelo serviço
+      if (stopWatcherRef.current) {
+        stopWatcherRef.current()
+        stopWatcherRef.current = null
+      }
     }
-  }, [walletAddress, tokenFilter])
+  }, [walletAddress, tokenFilter, daysToShow])
 
-  const loadTransactions = async () => {
+  // Efeito para recarregar quando refetch mudar
+  useEffect(() => {
+    if (refetch && walletAddress) {
+      const loadTransactions = async () => {
+        try {
+          console.log("Reloading transactions due to refetch trigger...")
+          const fetchedTransactions = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, 50)
+          setTransactions(fetchedTransactions)
+        } catch (error) {
+          console.error("Error reloading transactions:", error)
+        }
+      }
+
+      loadTransactions()
+    }
+  }, [refetch, walletAddress])
+
+  // Função para recarregar manualmente
+  const handleRefresh = async () => {
+    if (isLoading || !walletAddress) return
+
     setIsLoading(true)
-    setError(null)
-
     try {
-      console.log("Loading transactions from Holdstation...")
-
-      let fetchedTransactions: Transaction[]
-
-      if (tokenFilter) {
-        // Obter transações de um token específico
-        fetchedTransactions = await holdstationHistoryService.getTokenTransactions(walletAddress, tokenFilter, 50)
-      } else {
-        // Obter todas as transações dos tokens da wallet
-        fetchedTransactions = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, 50)
-      }
-
-      // Filtrar por período se especificado
-      if (daysToShow > 0) {
-        const cutoffDate = new Date()
-        cutoffDate.setDate(cutoffDate.getDate() - daysToShow)
-
-        fetchedTransactions = fetchedTransactions.filter((tx) => tx.timestamp >= cutoffDate)
-      }
-
+      const fetchedTransactions = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, 50)
       setTransactions(fetchedTransactions)
-      console.log(`Loaded ${fetchedTransactions.length} transactions`)
+      setError(null)
     } catch (error) {
-      console.error("Error loading transactions:", error)
-      setError("Erro ao carregar histórico de transações")
-
-      // Fallback para transações mock apenas dos tokens da wallet
-      setTransactions(getMockTransactions())
+      console.error("Error refreshing transactions:", error)
+      setError("Erro ao atualizar histórico")
     } finally {
       setIsLoading(false)
     }
   }
 
-  const setupWatcher = async () => {
-    try {
-      console.log("Setting up transaction watcher...")
-
-      const watcher = await holdstationHistoryService.watchTransactions(walletAddress, () => {
-        console.log("New transaction detected, refreshing...")
-        loadTransactions()
-      })
-
-      if (watcher) {
-        await watcher.start()
-      }
-    } catch (error) {
-      console.error("Error setting up transaction watcher:", error)
-    }
-  }
-
+  // Transações mock para fallback
   const getMockTransactions = (): Transaction[] => {
     const mockTransactions: Transaction[] = [
       {
@@ -118,18 +166,6 @@ export function TransactionHistory({ walletAddress, daysToShow = 7, tokenFilter 
         from: walletAddress,
         to: "0xabc...123",
         timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48),
-        status: "completed",
-      },
-      {
-        id: "4",
-        hash: "0xabc...123",
-        type: "receive",
-        amount: "50",
-        tokenSymbol: "DNA",
-        tokenAddress: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113",
-        from: "0xdef...456",
-        to: walletAddress,
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 72),
         status: "completed",
       },
     ]
@@ -187,7 +223,7 @@ export function TransactionHistory({ walletAddress, daysToShow = 7, tokenFilter 
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-white font-medium">{tokenFilter ? `Histórico ${tokenFilter}` : "Atividade Recente"}</h3>
         <button
-          onClick={loadTransactions}
+          onClick={handleRefresh}
           disabled={isLoading}
           className="text-gray-400 hover:text-white transition-colors"
         >
