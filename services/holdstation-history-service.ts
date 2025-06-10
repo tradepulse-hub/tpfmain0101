@@ -33,7 +33,7 @@ export interface Transaction {
 class HoldstationHistoryService {
   private provider: ethers.JsonRpcProvider | null = null
   private managerHistory: sdk.Manager | null = null
-  private walletHistory: any = null
+  private walletHistories: Map<string, any> = new Map()
   private initialized = false
   private watcherRefs: Map<string, any> = new Map()
 
@@ -49,6 +49,7 @@ class HoldstationHistoryService {
     try {
       console.log("🚀 Initializing Holdstation History Service...")
 
+      // Criar provider com a rede correta
       this.provider = new ethers.JsonRpcProvider(
         RPC_URL,
         {
@@ -61,6 +62,7 @@ class HoldstationHistoryService {
       )
 
       // Inicializar o Manager da Holdstation para histórico
+      // Seguindo exatamente a documentação
       this.managerHistory = new sdk.Manager(this.provider, CHAIN_ID)
 
       this.initialized = true
@@ -70,6 +72,8 @@ class HoldstationHistoryService {
     }
   }
 
+  // Método para obter o histórico de transações
+  // Seguindo exatamente a documentação
   async getTransactionHistory(walletAddress: string, offset = 0, limit = 20): Promise<Transaction[]> {
     try {
       if (!this.initialized) {
@@ -83,18 +87,24 @@ class HoldstationHistoryService {
 
       console.log(`📜 Getting transaction history for: ${walletAddress} (offset: ${offset}, limit: ${limit})`)
 
-      // Obter o histórico da wallet usando a API da Holdstation
-      if (!this.walletHistory) {
-        this.walletHistory = await this.managerHistory.wallet(walletAddress)
+      // Obter ou criar o walletHistory para este endereço
+      let walletHistory = this.walletHistories.get(walletAddress)
+
+      if (!walletHistory) {
+        console.log(`Creating new wallet history for ${walletAddress}`)
+        walletHistory = await this.managerHistory.wallet(walletAddress)
+        this.walletHistories.set(walletAddress, walletHistory)
       }
 
-      const fetchedTransactions = await this.walletHistory.find(offset, limit)
+      // Buscar transações usando o método find conforme a documentação
+      console.log(`Calling walletHistory.find(${offset}, ${limit})`)
+      const fetchedTransactions = await walletHistory.find(offset, limit)
       console.log("Raw transactions from Holdstation:", fetchedTransactions)
 
-      // Filtrar e processar apenas transações dos tokens da wallet
+      // Processar as transações para o formato esperado
       const processedTransactions = this.processTransactions(fetchedTransactions, walletAddress)
 
-      console.log(`Found ${processedTransactions.length} wallet token transactions`)
+      console.log(`Found ${processedTransactions.length} processed transactions`)
       return processedTransactions
     } catch (error) {
       console.error("Error getting transaction history:", error)
@@ -102,32 +112,45 @@ class HoldstationHistoryService {
     }
   }
 
+  // Processar as transações brutas para o formato esperado
   private processTransactions(rawTransactions: any[], walletAddress: string): Transaction[] {
+    if (!Array.isArray(rawTransactions)) {
+      console.warn("Raw transactions is not an array:", rawTransactions)
+      return []
+    }
+
     const transactions: Transaction[] = []
 
     for (const tx of rawTransactions) {
       try {
-        // Verificar se a transação envolve tokens da wallet
-        const tokenInfo = this.getTokenInfoFromTransaction(tx)
-        if (!tokenInfo) {
-          continue // Pular transações que não são dos tokens da wallet
+        // Verificar se a transação tem dados mínimos necessários
+        if (!tx || !tx.hash) {
+          console.warn("Invalid transaction data:", tx)
+          continue
         }
 
+        // Determinar o tipo de transação e o token envolvido
+        const type = this.determineTransactionType(tx, walletAddress)
+        const tokenInfo = this.getTokenInfoFromTransaction(tx)
+
+        // Se não for um token da wallet, pular
+        if (!tokenInfo && type !== "swap") {
+          continue
+        }
+
+        // Criar objeto de transação
         const transaction: Transaction = {
-          id: tx.hash || tx.id || `${tx.blockNumber}-${tx.transactionIndex}`,
+          id: tx.hash || `tx-${Date.now()}-${Math.random()}`,
           hash: tx.hash,
-          type: this.determineTransactionType(tx, walletAddress),
-          amount: this.formatAmount(tx.value || tx.amount, tokenInfo.decimals),
-          tokenSymbol: tokenInfo.symbol,
-          tokenAddress: tokenInfo.address,
-          from: tx.from,
-          to: tx.to,
-          timestamp: new Date(tx.timestamp * 1000 || Date.now()),
-          status: this.getTransactionStatus(tx),
+          type: type,
+          amount: this.getTransactionAmount(tx),
+          tokenSymbol: tokenInfo?.symbol || "TPF",
+          tokenAddress: tokenInfo?.address || WALLET_TOKENS.TPF,
+          from: tx.from || "",
+          to: tx.to || "",
+          timestamp: new Date(tx.timestamp ? tx.timestamp * 1000 : Date.now()),
+          status: tx.blockNumber ? "completed" : "pending",
           blockNumber: tx.blockNumber,
-          gasUsed: tx.gasUsed?.toString(),
-          gasPrice: tx.gasPrice?.toString(),
-          value: tx.value?.toString(),
         }
 
         transactions.push(transaction)
@@ -140,82 +163,67 @@ class HoldstationHistoryService {
     return transactions.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
   }
 
-  private getTokenInfoFromTransaction(tx: any): { symbol: string; address: string; decimals: number } | null {
-    // Verificar se a transação envolve algum token da wallet
-    const tokenAddress = tx.tokenAddress || tx.contractAddress || tx.to
-
-    if (!tokenAddress) {
-      return null
-    }
-
-    // Procurar o token nos tokens da wallet
-    for (const [symbol, address] of Object.entries(WALLET_TOKENS)) {
-      if (address.toLowerCase() === tokenAddress.toLowerCase()) {
-        return {
-          symbol,
-          address,
-          decimals: 18, // Todos os tokens da wallet usam 18 decimais
-        }
-      }
-    }
-
-    return null
-  }
-
+  // Determinar o tipo de transação
   private determineTransactionType(tx: any, walletAddress: string): "send" | "receive" | "swap" {
-    const from = tx.from?.toLowerCase()
-    const to = tx.to?.toLowerCase()
-    const wallet = walletAddress.toLowerCase()
-
-    // Verificar se é um swap (pode ter múltiplas transferências)
-    if (tx.type === "swap" || tx.method === "swap" || tx.functionName?.includes("swap")) {
+    // Se a transação tem um método específico de swap
+    if (tx.method?.toLowerCase().includes("swap")) {
       return "swap"
     }
 
     // Verificar direção da transação
+    const from = tx.from?.toLowerCase()
+    const to = tx.to?.toLowerCase()
+    const wallet = walletAddress.toLowerCase()
+
     if (from === wallet) {
       return "send"
     } else if (to === wallet) {
       return "receive"
     }
 
-    // Fallback baseado no valor
-    return "receive"
+    // Fallback para swap se não conseguir determinar
+    return "swap"
   }
 
-  private formatAmount(amount: string | number, decimals: number): string {
-    try {
-      if (!amount) return "0"
+  // Obter informações do token da transação
+  private getTokenInfoFromTransaction(tx: any): { symbol: string; address: string } | null {
+    // Verificar se a transação tem um token específico
+    const tokenAddress = tx.tokenAddress || tx.contractAddress || tx.token
 
-      const amountStr = amount.toString()
-      if (amountStr === "0") return "0"
+    if (!tokenAddress) {
+      return null
+    }
 
-      // Se o valor já está formatado (contém ponto decimal)
-      if (amountStr.includes(".")) {
-        return Number.parseFloat(amountStr).toString()
+    // Verificar se é um dos tokens da wallet
+    for (const [symbol, address] of Object.entries(WALLET_TOKENS)) {
+      if (address.toLowerCase() === tokenAddress.toLowerCase()) {
+        return { symbol, address }
       }
-
-      // Converter de wei para unidade normal
-      const formatted = ethers.formatUnits(amountStr, decimals)
-      return Number.parseFloat(formatted).toString()
-    } catch (error) {
-      console.error("Error formatting amount:", error)
-      return "0"
     }
+
+    // Se não encontrou, retornar null
+    return null
   }
 
-  private getTransactionStatus(tx: any): "completed" | "pending" | "failed" {
-    if (tx.status === "0" || tx.status === 0) {
-      return "failed"
+  // Obter o valor da transação
+  private getTransactionAmount(tx: any): string {
+    if (tx.amount) {
+      return tx.amount.toString()
     }
 
-    if (tx.blockNumber && tx.blockNumber > 0) {
-      return "completed"
+    if (tx.value) {
+      // Converter de wei para ether se necessário
+      if (tx.value.toString().length > 10) {
+        return ethers.formatEther(tx.value)
+      }
+      return tx.value.toString()
     }
 
-    return "pending"
+    return "0"
   }
 
+  // Configurar watcher para novas transações
+  // Seguindo exatamente a documentação
   async watchTransactions(
     walletAddress: string,
     callback: () => void,
@@ -240,39 +248,25 @@ class HoldstationHistoryService {
       }
 
       // Criar novo watcher usando a API da Holdstation
+      // Seguindo exatamente a documentação
       const watcher = await this.managerHistory.watch(walletAddress, () => {
         console.log("🔔 New transaction detected for:", walletAddress)
-        callback()
+        if (typeof callback === "function") {
+          callback()
+        }
       })
 
       // Salvar referência do watcher
       this.watcherRefs.set(walletAddress, watcher)
 
-      return {
-        start: async () => {
-          try {
-            await watcher.start()
-            console.log("✅ Transaction watcher started for:", walletAddress)
-          } catch (error) {
-            console.error("Error starting transaction watcher:", error)
-          }
-        },
-        stop: () => {
-          try {
-            watcher.stop()
-            this.watcherRefs.delete(walletAddress)
-            console.log("🛑 Transaction watcher stopped for:", walletAddress)
-          } catch (error) {
-            console.error("Error stopping transaction watcher:", error)
-          }
-        },
-      }
+      return watcher
     } catch (error) {
       console.error("Error setting up transaction watcher:", error)
       return null
     }
   }
 
+  // Obter transações de um token específico
   async getTokenTransactions(walletAddress: string, tokenSymbol: string, limit = 50): Promise<Transaction[]> {
     try {
       console.log(`📜 Getting ${tokenSymbol} transactions for: ${walletAddress}`)
