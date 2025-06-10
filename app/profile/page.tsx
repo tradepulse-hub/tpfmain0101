@@ -963,7 +963,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Event Countdown Badge - posicionado mais na lateral com pointer-events */}
-          <div className="absolute right-0 top-2 transform translate-y-0 pointer-events-auto">
+          <div className="absolute right-0 top-0 transform -translate-y-2 pointer-events-auto z-50">
             <EventCountdownBadge />
           </div>
 
