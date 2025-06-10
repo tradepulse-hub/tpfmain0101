@@ -1,80 +1,28 @@
 import { ethers } from "ethers"
+import {
+  TokenProvider,
+  Sender,
+  config,
+  inmemoryTokenStorage,
+  SwapHelper,
+  type SwapParams,
+  ZeroX,
+} from "@holdstation/worldchain-sdk"
+import { Client, Multicall3 } from "@holdstation/worldchain-ethers-v6"
 
-// Configuração baseada na documentação da Holdstation
+// Configuração da rede Worldchain
 const RPC_URL = "https://worldchain-mainnet.g.alchemy.com/public"
+const CHAIN_ID = 480
 
-// Endereços dos contratos (precisam ser atualizados com os valores reais)
-// Por enquanto, usamos valores vazios e implementamos fallbacks
-const TOKEN_PROVIDER_ADDRESS = "" // Endereço do TokenProvider
-const QUOTER_ADDRESS = "" // Endereço do Quoter
-const SWAP_HELPER_ADDRESS = "" // Endereço do SwapHelper
-
-// Tokens padrão que queremos mostrar
-const DEFAULT_TOKENS = [
-  {
-    symbol: "WETH",
-    name: "Wrapped Ethereum",
-    address: "0x4200000000000000000000000000000000000006",
-    balance: "0.5",
-    decimals: 18,
-    icon: "/ethereum-abstract.png",
-  },
-  {
-    symbol: "USDCe",
-    name: "USD Coin",
-    address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
-    balance: "1500.0",
-    decimals: 6,
-    icon: "/usdc-coins.png",
-  },
-  {
-    symbol: "TPF",
-    name: "TPulseFi",
-    address: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
-    balance: "10000.0",
-    decimals: 18,
-    icon: "/logo-tpf.png",
-  },
-  {
-    symbol: "WLD",
-    name: "Worldcoin",
-    address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
-    balance: "42.67",
-    decimals: 18,
-    icon: "/worldcoin.jpeg",
-  },
-  {
-    symbol: "DNA",
-    name: "DNA Token",
-    address: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113",
-    balance: "125.45",
-    decimals: 18,
-    icon: "/dna-token.png",
-  },
-  {
-    symbol: "CASH",
-    name: "Cash Token",
-    address: "0xbfdA4F50a2d5B9b864511579D7dfa1C72f118575",
-    balance: "310.89",
-    decimals: 18,
-    icon: "/cash-token.png",
-  },
-  {
-    symbol: "WDD",
-    name: "World Drachma",
-    address: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B",
-    balance: "78.32",
-    decimals: 18,
-    icon: "/drachma-token.png",
-  },
-]
-
-interface TokenInfo {
-  address: string
-  chainId: number
-  decimals: number
-  symbol: string
-  name: string
+// Tokens conhecidos na Worldchain
+const KNOWN_TOKENS = {
+  WETH: "0x4200000000000000000000000000000000000006",
+  USDCe: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
+  TPF: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
+  WLD: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+  DNA: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113",
+  CASH: "0xbfdA4F50a2d5B9b864511579D7dfa1C72f118575",
+  WDD: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B",
 }
 
 interface TokenBalance {
@@ -86,38 +34,22 @@ interface TokenBalance {
   icon?: string
 }
 
-interface QuoteParams {
-  tokenIn: string
-  tokenOut: string
-  amountIn: string
-  slippage: string
-  fee: string
-}
-
-interface QuoteResponse {
+interface SwapQuote {
+  amountOut: string
   data: string
   to: string
   value: string
-  feeAmountOut: string
+  feeAmountOut?: string
 }
 
 class HoldstationService {
   private provider: ethers.JsonRpcProvider | null = null
-  private tokenProvider: ethers.Contract | null = null
-  private quoter: ethers.Contract | null = null
-  private swapHelper: ethers.Contract | null = null
+  private client: Client | null = null
+  private tokenProvider: TokenProvider | null = null
+  private sender: Sender | null = null
+  private swapHelper: SwapHelper | null = null
+  private zeroX: ZeroX | null = null
   private initialized = false
-
-  // Mapeamento de ícones para tokens conhecidos
-  private tokenIcons: Record<string, string> = {
-    WETH: "/ethereum-abstract.png",
-    USDCe: "/usdc-coins.png",
-    TPF: "/logo-tpf.png",
-    WLD: "/worldcoin.jpeg",
-    DNA: "/dna-token.png",
-    CASH: "/cash-token.png",
-    WDD: "/drachma-token.png",
-  }
 
   constructor() {
     if (typeof window !== "undefined") {
@@ -129,258 +61,305 @@ class HoldstationService {
     if (this.initialized) return
 
     try {
-      console.log("Initializing Holdstation Service...")
+      console.log("🚀 Initializing Holdstation Service...")
 
-      // Criar provider baseado na documentação
-      this.provider = new ethers.JsonRpcProvider(RPC_URL, {
-        chainId: 480,
-        name: "worldchain",
+      // Configurar provider conforme documentação
+      this.provider = new ethers.JsonRpcProvider(
+        RPC_URL,
+        {
+          chainId: CHAIN_ID,
+          name: "worldchain",
+        },
+        {
+          staticNetwork: true,
+        },
+      )
+
+      // Configurar client e multicall3
+      this.client = new Client(this.provider)
+      config.client = this.client
+      config.multicall3 = new Multicall3(this.provider)
+
+      // Inicializar TokenProvider
+      this.tokenProvider = new TokenProvider({
+        client: this.client,
+        multicall3: config.multicall3,
       })
+
+      // Inicializar Sender
+      this.sender = new Sender(this.provider)
+
+      // Inicializar SwapHelper
+      this.swapHelper = new SwapHelper(this.client, {
+        tokenStorage: inmemoryTokenStorage,
+      })
+
+      // Inicializar ZeroX
+      this.zeroX = new ZeroX(this.tokenProvider, inmemoryTokenStorage)
+      this.swapHelper.load(this.zeroX)
 
       // Testar conexão
       const network = await this.provider.getNetwork()
-      console.log(`Connected to network: ${network.name} (${network.chainId})`)
-
-      // Inicializar contratos quando os endereços estiverem disponíveis
-      if (TOKEN_PROVIDER_ADDRESS) {
-        // ABI simplificado para TokenProvider
-        const TOKEN_PROVIDER_ABI = [
-          "function tokenOf(string wallet) external view returns (string[] memory)",
-          "function balanceOf(tuple(string wallet, string[] tokens)) external view returns (uint256[])",
-          "function details(string[] tokens) external view returns (tuple(string address, uint256 chainId, uint8 decimals, string symbol, string name)[])",
-        ]
-        this.tokenProvider = new ethers.Contract(TOKEN_PROVIDER_ADDRESS, TOKEN_PROVIDER_ABI, this.provider)
-      }
-
-      if (QUOTER_ADDRESS) {
-        // ABI simplificado para Quoter
-        const QUOTER_ABI = [
-          "function simple(string tokenIn, string tokenOut) external view returns (uint256)",
-          "function smart(string tokenIn, string tokenOut, uint256 slippage, uint256 deadline) external view returns (uint256)",
-        ]
-        this.quoter = new ethers.Contract(QUOTER_ADDRESS, QUOTER_ABI, this.provider)
-      }
-
-      if (SWAP_HELPER_ADDRESS) {
-        // ABI simplificado para SwapHelper
-        const SWAP_HELPER_ABI = [
-          "function swap(tuple(string tokenIn, string tokenOut, string amountIn, bytes tx, string fee, string feeAmountOut, string feeReceiver)) external returns (bool)",
-        ]
-        this.swapHelper = new ethers.Contract(SWAP_HELPER_ADDRESS, SWAP_HELPER_ABI, this.provider)
-      }
+      console.log(`✅ Connected to ${network.name} (${network.chainId})`)
 
       this.initialized = true
-      console.log("Holdstation Service initialized successfully")
+      console.log("✅ Holdstation Service initialized successfully!")
     } catch (error) {
-      console.error("Failed to initialize Holdstation Service:", error)
+      console.error("❌ Failed to initialize Holdstation Service:", error)
     }
   }
 
-  // Obter todos os tokens de uma carteira
-  async getWalletTokens(walletAddress: string): Promise<string[]> {
+  // ==================== TOKEN BALANCES ====================
+
+  async getTokenBalances(walletAddress: string): Promise<TokenBalance[]> {
     try {
       if (!this.initialized) {
         await this.initialize()
       }
 
-      if (!this.tokenProvider || !TOKEN_PROVIDER_ADDRESS) {
-        console.warn("TokenProvider not available, using fallback tokens")
-        // Fallback para tokens conhecidos
-        return DEFAULT_TOKENS.map((token) => token.symbol)
+      if (!this.tokenProvider || !walletAddress) {
+        throw new Error("TokenProvider not initialized or wallet address missing")
       }
 
-      // Usar a API da Holdstation conforme documentação
-      const tokens = await this.tokenProvider.tokenOf(walletAddress)
-      console.log(`Found ${tokens.length} tokens for wallet ${walletAddress}`)
-      return tokens
+      console.log(`💰 Getting token balances for: ${walletAddress}`)
+
+      // Obter todos os tokens da carteira
+      const walletTokens = await this.tokenProvider.tokenOf(walletAddress)
+      console.log(`Found ${walletTokens.length} tokens in wallet`)
+
+      if (walletTokens.length === 0) {
+        // Se não encontrou tokens, usar tokens conhecidos
+        const tokenAddresses = Object.values(KNOWN_TOKENS)
+        return this.getBalancesForTokens(walletAddress, tokenAddresses)
+      }
+
+      return this.getBalancesForTokens(walletAddress, walletTokens)
     } catch (error) {
-      console.error("Error getting wallet tokens:", error)
+      console.error("Error getting token balances:", error)
       // Fallback para tokens conhecidos
-      return DEFAULT_TOKENS.map((token) => token.symbol)
+      const tokenAddresses = Object.values(KNOWN_TOKENS)
+      return this.getBalancesForTokens(walletAddress, tokenAddresses)
     }
   }
 
-  // Obter saldos de múltiplos tokens para uma carteira
-  async getTokenBalances(walletAddress: string, tokens?: string[]): Promise<TokenBalance[]> {
+  private async getBalancesForTokens(walletAddress: string, tokenAddresses: string[]): Promise<TokenBalance[]> {
     try {
-      if (!this.initialized) {
-        await this.initialize()
-      }
-
-      // Se não temos o TokenProvider ou o endereço não está definido, usar fallback
-      if (!this.tokenProvider || !TOKEN_PROVIDER_ADDRESS) {
-        console.warn("TokenProvider not available, using fallback balances")
-        // Retornar tokens padrão com saldos simulados
-        return DEFAULT_TOKENS
-      }
-
-      // Se tokens não fornecidos, buscar todos os tokens da carteira
-      if (!tokens) {
-        tokens = await this.getWalletTokens(walletAddress)
-      }
-
       // Obter detalhes dos tokens
-      const tokenDetails = await this.tokenProvider.details(tokens)
+      const tokenDetails = await this.tokenProvider!.details(...tokenAddresses)
       console.log("Token details:", tokenDetails)
 
-      // Obter saldos usando a API da Holdstation
-      const balances = await this.tokenProvider.balanceOf({
+      // Obter saldos
+      const balances = await this.tokenProvider!.balanceOf({
         wallet: walletAddress,
-        tokens: tokens,
+        tokens: tokenAddresses,
       })
       console.log("Token balances:", balances)
 
-      // Combinar detalhes e saldos
-      const tokenBalances: TokenBalance[] = tokens.map((token, index) => {
-        const details = tokenDetails[index]
-        const balance = balances[index]
+      // Processar resultados
+      const tokenBalances: TokenBalance[] = []
 
-        return {
-          symbol: details.symbol,
-          name: details.name,
-          address: details.address,
-          balance: ethers.formatUnits(balance, details.decimals),
-          decimals: details.decimals,
-          icon: this.tokenIcons[details.symbol],
+      for (const address of tokenAddresses) {
+        const details = tokenDetails[address]
+        const balance = balances[address]
+
+        if (details && balance !== undefined) {
+          const formattedBalance = ethers.formatUnits(balance, details.decimals)
+
+          tokenBalances.push({
+            symbol: details.symbol,
+            name: details.name,
+            address: details.address,
+            balance: formattedBalance,
+            decimals: details.decimals,
+            icon: this.getTokenIcon(details.symbol),
+          })
         }
-      })
+      }
 
       // Filtrar tokens com saldo > 0
       return tokenBalances.filter((token) => Number.parseFloat(token.balance) > 0)
     } catch (error) {
-      console.error("Error getting token balances:", error)
-      // Retornar tokens padrão com saldos simulados
-      return DEFAULT_TOKENS
+      console.error("Error processing token balances:", error)
+      return []
     }
   }
 
-  // Obter cotação simples
-  async getSimpleQuote(tokenIn: string, tokenOut: string): Promise<string> {
+  // ==================== SWAP FUNCTIONALITY ====================
+
+  async getSwapQuote(params: {
+    tokenIn: string
+    tokenOut: string
+    amountIn: string
+    slippage?: string
+    fee?: string
+  }): Promise<SwapQuote> {
     try {
       if (!this.initialized) {
         await this.initialize()
       }
 
-      if (!this.quoter || !QUOTER_ADDRESS) {
-        console.warn("Quoter not available, using fallback quote")
-        return this.getFallbackQuote(tokenIn, tokenOut)
+      if (!this.swapHelper) {
+        throw new Error("SwapHelper not initialized")
       }
 
-      // Usar a API da Holdstation conforme documentação
-      const quote = await this.quoter.simple(tokenIn, tokenOut)
-      return ethers.formatUnits(quote, 18)
-    } catch (error) {
-      console.error("Error getting simple quote:", error)
-      return this.getFallbackQuote(tokenIn, tokenOut)
-    }
-  }
+      console.log(`💱 Getting swap quote: ${params.amountIn} ${params.tokenIn} → ${params.tokenOut}`)
 
-  // Obter cotação inteligente com slippage
-  async getSmartQuote(tokenIn: string, tokenOut: string, slippage = 3, deadline = 10): Promise<string> {
-    try {
-      if (!this.initialized) {
-        await this.initialize()
+      const quoteParams: SwapParams["quoteInput"] = {
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: params.amountIn,
+        slippage: params.slippage || "0.3",
+        fee: params.fee || "0.2",
+        preferRouters: ["0x"],
       }
 
-      if (!this.quoter || !QUOTER_ADDRESS) {
-        console.warn("Quoter not available, using fallback quote")
-        const simpleQuote = this.getFallbackQuote(tokenIn, tokenOut)
-        const adjustedQuote = Number.parseFloat(simpleQuote) * (1 - slippage / 100)
-        return adjustedQuote.toString()
-      }
+      const result = await this.swapHelper.estimate.quote(quoteParams)
+      console.log("Swap quote result:", result)
 
-      // Usar a API da Holdstation conforme documentação
-      const quote = await this.quoter.smart(tokenIn, tokenOut, slippage, deadline)
-      return ethers.formatUnits(quote, 18)
-    } catch (error) {
-      console.error("Error getting smart quote:", error)
-      const simpleQuote = this.getFallbackQuote(tokenIn, tokenOut)
-      const adjustedQuote = Number.parseFloat(simpleQuote) * (1 - slippage / 100)
-      return adjustedQuote.toString()
-    }
-  }
-
-  // Obter cotação completa para swap
-  async getQuote(params: QuoteParams): Promise<QuoteResponse> {
-    try {
-      if (!this.initialized) {
-        await this.initialize()
-      }
-
-      if (!this.quoter || !QUOTER_ADDRESS) {
-        throw new Error("Quoter not available")
-      }
-
-      // Usar a API da Holdstation conforme documentação
-      const quote = await this.quoter.quote(params)
       return {
-        data: quote.data,
-        to: quote.to,
-        value: quote.value.toString(),
-        feeAmountOut: quote.feeAmountOut.toString(),
+        amountOut: result.amountOut || "0",
+        data: result.data,
+        to: result.to,
+        value: result.value,
+        feeAmountOut: result.addons?.feeAmountOut,
       }
     } catch (error) {
-      console.error("Error getting quote:", error)
-      // Fallback para simulação
-      return {
-        data: "0x",
-        to: "0x",
-        value: "0",
-        feeAmountOut: "0",
-      }
+      console.error("Error getting swap quote:", error)
+      throw error
     }
   }
 
-  // Executar swap
-  async executeSwap(swapParams: any): Promise<string> {
+  async executeSwap(params: {
+    tokenIn: string
+    tokenOut: string
+    amountIn: string
+    slippage?: string
+    fee?: string
+    feeReceiver?: string
+  }): Promise<string> {
     try {
       if (!this.initialized) {
         await this.initialize()
       }
 
-      if (!this.swapHelper || !SWAP_HELPER_ADDRESS) {
-        throw new Error("SwapHelper not available")
+      if (!this.swapHelper) {
+        throw new Error("SwapHelper not initialized")
       }
 
-      // Executar o swap usando a API da Holdstation
+      console.log("🚀 Executing swap...")
+
+      // Primeiro obter a cotação
+      const quote = await this.getSwapQuote(params)
+
+      // Preparar parâmetros do swap
+      const swapParams: SwapParams["input"] = {
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: params.amountIn,
+        tx: {
+          data: quote.data,
+          to: quote.to,
+          value: quote.value,
+        },
+        feeAmountOut: quote.feeAmountOut,
+        fee: params.fee || "0.2",
+        feeReceiver: params.feeReceiver || ethers.ZeroAddress,
+      }
+
       const result = await this.swapHelper.swap(swapParams)
-      return result.hash
+      console.log("✅ Swap executed successfully:", result)
+
+      return result.hash || result.transactionHash || "0x"
     } catch (error) {
-      console.error("Error executing swap:", error)
-      // Simular um hash de transação para desenvolvimento
-      return "0x" + Math.random().toString(16).substring(2, 66)
+      console.error("❌ Error executing swap:", error)
+      throw error
     }
   }
 
-  // Métodos auxiliares para fallback
-  getTokenName(symbol: string): string {
-    const token = DEFAULT_TOKENS.find((t) => t.symbol === symbol)
-    return token?.name || symbol
-  }
+  // ==================== SEND FUNCTIONALITY ====================
 
-  getTokenAddress(symbol: string): string {
-    const token = DEFAULT_TOKENS.find((t) => t.symbol === symbol)
-    return token?.address || ethers.ZeroAddress
-  }
+  async sendToken(params: {
+    to: string
+    amount: number
+    token?: string // Se omitido, envia ETH nativo
+  }): Promise<string> {
+    try {
+      if (!this.initialized) {
+        await this.initialize()
+      }
 
-  private getFallbackQuote(tokenIn: string, tokenOut: string): string {
-    const rates: Record<string, Record<string, number>> = {
-      WETH: { USDCe: 3500, TPF: 1000000, WLD: 1000, DNA: 10000, CASH: 5000, WDD: 2000 },
-      USDCe: { WETH: 0.0003, TPF: 300, WLD: 0.3, DNA: 3, CASH: 1.5, WDD: 0.6 },
-      TPF: { WETH: 0.000001, USDCe: 0.0033, WLD: 0.001, DNA: 0.01, CASH: 0.005, WDD: 0.002 },
-      WLD: { WETH: 0.001, USDCe: 3.33, TPF: 1000, DNA: 10, CASH: 5, WDD: 2 },
-      DNA: { WETH: 0.0001, USDCe: 0.33, TPF: 100, WLD: 0.1, CASH: 0.5, WDD: 0.2 },
-      CASH: { WETH: 0.0002, USDCe: 0.67, TPF: 200, WLD: 0.2, DNA: 2, WDD: 0.4 },
-      WDD: { WETH: 0.0005, USDCe: 1.67, TPF: 500, WLD: 0.5, DNA: 5, CASH: 2.5 },
+      if (!this.sender) {
+        throw new Error("Sender not initialized")
+      }
+
+      console.log(`📤 Sending ${params.amount} ${params.token || "ETH"} to ${params.to}`)
+
+      const sendParams = {
+        to: params.to,
+        amount: params.amount,
+        ...(params.token && { token: params.token }),
+      }
+
+      const result = await this.sender.send(sendParams)
+      console.log("✅ Token sent successfully:", result)
+
+      return result.hash || result.transactionHash || "0x"
+    } catch (error) {
+      console.error("❌ Error sending token:", error)
+      throw error
     }
-    return (rates[tokenIn]?.[tokenOut] || 1).toString()
   }
 
-  // Verificar se o serviço está inicializado
+  // ==================== UTILITY METHODS ====================
+
+  async getTokenDetails(tokenAddresses: string[]): Promise<Record<string, any>> {
+    try {
+      if (!this.tokenProvider) {
+        throw new Error("TokenProvider not initialized")
+      }
+
+      const details = await this.tokenProvider.details(...tokenAddresses)
+      return details
+    } catch (error) {
+      console.error("Error getting token details:", error)
+      return {}
+    }
+  }
+
+  private getTokenIcon(symbol: string): string {
+    const icons: Record<string, string> = {
+      WETH: "/ethereum-abstract.png",
+      USDCe: "/usdc-coins.png",
+      TPF: "/logo-tpf.png",
+      WLD: "/worldcoin.jpeg",
+      DNA: "/dna-token.png",
+      CASH: "/cash-token.png",
+      WDD: "/drachma-token.png",
+    }
+    return icons[symbol] || "/placeholder.svg?height=32&width=32"
+  }
+
+  getKnownTokens() {
+    return KNOWN_TOKENS
+  }
+
   isInitialized(): boolean {
     return this.initialized
+  }
+
+  async getNetworkInfo() {
+    try {
+      if (!this.provider) {
+        await this.initialize()
+      }
+      return await this.provider!.getNetwork()
+    } catch (error) {
+      console.error("Error getting network info:", error)
+      return null
+    }
   }
 }
 
 // Exportar instância única
 export const holdstationService = new HoldstationService()
+export type { TokenBalance, SwapQuote }
