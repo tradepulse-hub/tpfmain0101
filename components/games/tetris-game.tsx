@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 
 // Tipos de peças do Tetris
 const TETRIS_PIECES = {
@@ -64,21 +63,7 @@ interface TetrisGameProps {
 }
 
 export function TetrisGame({ onBack, minimalUI = false }: TetrisGameProps) {
-  // Adicionar este useEffect no início, logo após as declarações de estado:
-  useEffect(() => {
-    // Inicializar o jogo automaticamente quando o componente monta
-    const initGame = () => {
-      const firstPiece = getRandomPiece()
-      const secondPiece = getRandomPiece()
-      setCurrentPiece(createPiece(firstPiece))
-      setNextPiece(secondPiece)
-      setIsPlaying(true)
-    }
-
-    initGame()
-  }, [])
-
-  // Alterar os estados iniciais para:
+  // Estado do jogo
   const [board, setBoard] = useState<Board>(() =>
     Array(BOARD_HEIGHT)
       .fill(null)
@@ -90,11 +75,24 @@ export function TetrisGame({ onBack, minimalUI = false }: TetrisGameProps) {
   const [lines, setLines] = useState(0)
   const [level, setLevel] = useState(1)
   const [gameOver, setGameOver] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(true) // Mudar de false para true
+  const [isPlaying, setIsPlaying] = useState(true)
   const [isPaused, setIsPaused] = useState(false)
 
   const gameLoopRef = useRef<NodeJS.Timeout>()
   const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+
+  // Inicializar o jogo automaticamente
+  useEffect(() => {
+    const initGame = () => {
+      const firstPiece = getRandomPiece()
+      const secondPiece = getRandomPiece()
+      setCurrentPiece(createPiece(firstPiece))
+      setNextPiece(secondPiece)
+      setIsPlaying(true)
+    }
+
+    initGame()
+  }, [])
 
   // Gerar peça aleatória
   const getRandomPiece = useCallback((): PieceType => {
@@ -248,7 +246,6 @@ export function TetrisGame({ onBack, minimalUI = false }: TetrisGameProps) {
     setIsPlaying(true)
     setIsPaused(false)
 
-    // Na função startGame, adicionar após setIsPaused(false):
     // Forçar a criação da primeira peça imediatamente
     setTimeout(() => {
       if (!currentPiece) {
@@ -325,9 +322,8 @@ export function TetrisGame({ onBack, minimalUI = false }: TetrisGameProps) {
     setLevel(Math.floor(lines / 10) + 1)
   }, [lines])
 
-  // Adicionar este useEffect após os outros useEffects existentes
+  // Auto-iniciar o jogo
   useEffect(() => {
-    // Auto-iniciar o jogo quando o componente é montado
     if (!isPlaying && !gameOver && !currentPiece) {
       startGame()
     }
@@ -357,7 +353,7 @@ export function TetrisGame({ onBack, minimalUI = false }: TetrisGameProps) {
         {row.map((cell, x) => (
           <div
             key={x}
-            className={`w-6 h-6 border border-gray-600 ${
+            className={`w-4 h-4 border border-gray-700 ${
               cell === 1 ? "bg-gray-400" : cell === 2 ? `bg-blue-500` : "bg-gray-900"
             }`}
           />
@@ -374,101 +370,88 @@ export function TetrisGame({ onBack, minimalUI = false }: TetrisGameProps) {
     return shape.map((row, y) => (
       <div key={y} className="flex">
         {row.map((cell, x) => (
-          <div key={x} className={`w-4 h-4 border border-gray-600 ${cell ? "bg-blue-400" : "bg-gray-900"}`} />
+          <div key={x} className={`w-2 h-2 border border-gray-700 ${cell ? "bg-blue-400" : "bg-gray-900"}`} />
         ))}
       </div>
     ))
   }
 
   return (
-    <div className="flex flex-col items-center min-h-screen bg-gray-800 text-white p-4">
-      {/* Header com botão de voltar */}
+    <div className="flex flex-col items-center bg-gray-800 text-white p-1">
+      {/* Botão de voltar (apenas se fornecido) */}
       {onBack && (
-        <div className="w-full max-w-md flex items-center justify-between mb-4">
-          <Button onClick={onBack} variant="outline" size="sm">
-            ← Voltar
+        <div className="w-full flex justify-start mb-1">
+          <Button onClick={onBack} variant="outline" size="sm" className="text-xs py-0 px-1 h-6">
+            ←
           </Button>
-          <h1 className="text-2xl font-bold">Tetris</h1>
-          <div className="w-16"></div>
         </div>
       )}
 
-      {!onBack && <h1 className="text-3xl font-bold mb-4">Tetris Mobile</h1>}
-
-      <div className="flex flex-col lg:flex-row gap-4 items-start">
+      {/* Layout ultra-compacto */}
+      <div className="flex gap-1">
         {/* Tabuleiro principal */}
-        <Card className="p-4 bg-gray-900 border-gray-700">
-          <div className="select-none touch-none" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-            {renderBoard()}
-          </div>
-        </Card>
+        <div
+          className="bg-gray-900 border border-gray-700 p-1 rounded-sm select-none touch-none"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          {renderBoard()}
+        </div>
 
-        {/* Painel lateral */}
-        <div className="flex flex-col gap-4">
-          {/* Estatísticas */}
-          <Card className="p-4 bg-gray-900 border-gray-700 min-w-[150px]">
-            <div className="text-center space-y-2">
-              <div>
-                <div className="text-sm text-gray-400">Pontuação</div>
-                <div className="text-xl font-bold">{score}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-400">Linhas</div>
-                <div className="text-xl font-bold">{lines}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-400">Nível</div>
-                <div className="text-xl font-bold">{level}</div>
-              </div>
-            </div>
-          </Card>
-
+        {/* Painel lateral ultra-compacto */}
+        <div className="flex flex-col gap-1 w-16">
           {/* Próxima peça */}
-          <Card className="p-4 bg-gray-900 border-gray-700">
+          <div className="bg-gray-900 border border-gray-700 p-1 rounded-sm">
             <div className="text-center">
-              <div className="text-sm text-gray-400 mb-2">Próxima</div>
+              <div className="text-[10px] text-gray-400">Próx</div>
               <div className="flex flex-col items-center">{renderNextPiece()}</div>
             </div>
-          </Card>
-
-          {/* Controles */}
-          <div className="flex flex-col gap-2">
-            {!isPlaying ? (
-              <Button onClick={startGame} className="w-full">
-                {gameOver ? "Novo Jogo" : "Iniciar"}
-              </Button>
-            ) : (
-              <Button onClick={() => setIsPaused(!isPaused)} className="w-full" variant="outline">
-                {isPaused ? "Continuar" : "Pausar"}
-              </Button>
-            )}
           </div>
+
+          {/* Estatísticas */}
+          <div className="bg-gray-900 border border-gray-700 p-1 rounded-sm">
+            <div className="text-center space-y-1">
+              <div>
+                <div className="text-[10px] text-gray-400">Pts</div>
+                <div className="text-xs font-bold">{score}</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-gray-400">Lin</div>
+                <div className="text-xs font-bold">{lines}</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-gray-400">Nvl</div>
+                <div className="text-xs font-bold">{level}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Botão de pausa/continuar */}
+          <Button
+            onClick={() => setIsPaused(!isPaused)}
+            className="w-full text-xs py-0 h-6"
+            variant={isPaused ? "default" : "outline"}
+            size="sm"
+          >
+            {isPaused ? "▶️" : "⏸️"}
+          </Button>
         </div>
       </div>
 
-      {/* Instruções */}
-      {!minimalUI && (
-        <Card className="mt-4 p-4 bg-gray-900 border-gray-700 max-w-md">
-          <div className="text-center text-sm text-gray-400">
-            <div className="font-semibold mb-2">Como Jogar:</div>
-            <div>• Toque na peça para rotacionar</div>
-            <div>• Arraste horizontalmente para mover</div>
-            <div>• Arraste para baixo para acelerar</div>
-          </div>
-        </Card>
-      )}
-
+      {/* Game Over */}
       {gameOver && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <Card className="p-6 bg-gray-900 border-gray-700 text-center">
-            <h2 className="text-2xl font-bold mb-4">Game Over!</h2>
-            <div className="mb-4">
-              <div>Pontuação Final: {score}</div>
-              <div>Linhas: {lines}</div>
-              <div>Nível: {level}</div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-700 p-3 rounded-sm text-center">
+            <h2 className="text-sm font-bold mb-1">Game Over!</h2>
+            <div className="mb-2 text-xs">
+              <div>Pts: {score}</div>
+              <div>Lin: {lines}</div>
+              <div>Nvl: {level}</div>
             </div>
-            <Button onClick={startGame}>Jogar Novamente</Button>
-          </Card>
+            <Button onClick={startGame} size="sm" className="text-xs py-0 h-6">
+              Jogar Novamente
+            </Button>
+          </div>
         </div>
       )}
     </div>
