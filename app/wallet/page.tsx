@@ -97,39 +97,48 @@ export default function WalletPage() {
       setLoading(true)
       setError(null)
 
-      // Obter saldos usando o Enhanced Token Service
-      const realBalances = await enhancedTokenService.getAllTokenBalances(address)
-      console.log("Real token balances:", realBalances)
+      // Verificar se os serviços estão disponíveis
+      if (typeof window !== "undefined" && enhancedTokenService) {
+        // Obter saldos usando o Enhanced Token Service
+        const realBalances = await enhancedTokenService.getAllTokenBalances(address)
+        console.log("Real token balances:", realBalances)
 
-      // Converter para números e atualizar estados
-      const tpfBalance = Number(realBalances.TPF || "0")
-      setBalance(tpfBalance)
+        // Converter para números e atualizar estados
+        const tpfBalance = Number(realBalances.TPF || "0")
+        setBalance(tpfBalance)
 
-      // Sincronizar saldo TPF para outras páginas
-      balanceSyncService.updateTPFBalance(address, tpfBalance)
+        // Sincronizar saldo TPF para outras páginas
+        if (balanceSyncService) {
+          balanceSyncService.updateTPFBalance(address, tpfBalance)
+        }
 
-      // Converter todos os saldos para números
-      const numericBalances: Record<string, number> = {}
-      for (const [symbol, balance] of Object.entries(realBalances)) {
-        numericBalances[symbol] = Number(balance || "0")
+        // Converter todos os saldos para números
+        const numericBalances: Record<string, number> = {}
+        for (const [symbol, balance] of Object.entries(realBalances)) {
+          numericBalances[symbol] = Number(balance || "0")
+        }
+        setTokenBalances(numericBalances)
+      } else {
+        throw new Error("Services not available")
       }
-      setTokenBalances(numericBalances)
     } catch (error) {
       console.error("Erro ao carregar dados da carteira:", error)
       setError(translations.wallet?.errorMessage || "Não foi possível obter o saldo real. Tente definir manualmente.")
 
       // Fallback para saldos padrão em caso de erro
-      const fallbackBalance = 108567827.002 // Usar o saldo real mostrado na imagem
+      const fallbackBalance = 108567827.002
       setBalance(fallbackBalance)
 
       // Sincronizar saldo de fallback
-      balanceSyncService.updateTPFBalance(address, fallbackBalance)
+      if (balanceSyncService) {
+        balanceSyncService.updateTPFBalance(address, fallbackBalance)
+      }
 
       setTokenBalances({
         TPF: fallbackBalance,
         WLD: 42.67,
-        DNA: 22765.884, // Valor real da imagem
-        CASH: 5, // Valor real da imagem
+        DNA: 22765.884,
+        CASH: 5,
         WDD: 78.32,
         WETH: 0.5,
         USDCe: 250.0,
@@ -158,16 +167,38 @@ export default function WalletPage() {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
   }
 
-  // Obter informações dos tokens
-  const tokensInfo = walletService.getTokensInfo()
+  // Obter informações dos tokens de forma segura
+  const getTokensInfo = () => {
+    try {
+      if (walletService && typeof walletService.getTokensInfo === "function") {
+        return walletService.getTokensInfo()
+      }
+
+      // Fallback para tokens conhecidos
+      return {
+        WETH: { symbol: "WETH", name: "Wrapped Ether", logo: "/ethereum-abstract.png" },
+        USDCe: { symbol: "USDCe", name: "USD Coin (Bridged)", logo: "/usdc-coins.png" },
+        TPF: { symbol: "TPF", name: "TPulseFi", logo: "/logo-tpf.png" },
+        WLD: { symbol: "WLD", name: "Worldcoin", logo: "/worldcoin.jpeg" },
+        DNA: { symbol: "DNA", name: "DNA Token", logo: "/dna-token.png" },
+        CASH: { symbol: "CASH", name: "Cash Token", logo: "/cash-token.png" },
+        WDD: { symbol: "WDD", name: "Drachma Token", logo: "/drachma-token.png" },
+      }
+    } catch (error) {
+      console.error("Error getting tokens info:", error)
+      return {}
+    }
+  }
+
+  const tokensInfo = getTokensInfo()
 
   // Filtrar apenas os tokens que não são TPF
   const otherTokens = Object.entries(tokensInfo)
     .filter(([symbol]) => symbol !== "TPF")
     .map(([symbol, info]) => ({
       symbol,
-      name: info.name,
-      logo: info.logo,
+      name: info.name || symbol,
+      logo: info.logo || "/placeholder.svg?height=32&width=32",
       balance: tokenBalances[symbol] || 0,
     }))
 
