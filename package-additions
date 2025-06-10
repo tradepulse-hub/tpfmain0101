@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "@holdstation/worldchain-sdk": "^4.0.0",
+    "@holdstation/worldchain-ethers-v6": "^4.0.0",
+    "ethers": "^6.14.0"
+  },
+  "scripts": {
+    "holdstation:test": "node -e \"console.log('Testing Holdstation integration...')\"",
+    "holdstation:balances": "node -e \"require('./services/holdstation-service').holdstationService.getTokenBalances('0x...').then(console.log)\"",
+    "holdstation:swap": "node -e \"require('./services/holdstation-service').holdstationService.getSwapQuote({tokenIn: '0x...', tokenOut: '0x...', amountIn: '1'}).then(console.log)\""
+  }
+}
