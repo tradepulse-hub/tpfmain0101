@@ -2,7 +2,7 @@ import * as sdk from "@holdstation/worldchain-sdk"
 import { ethers } from "ethers"
 
 // Configuração da rede Worldchain
-const provider = new ethers.providers.JsonRpcProvider("https://worldchain-mainnet.g.alchemy.com/public");
+const RPC_URL = "https://worldchain-mainnet.g.alchemy.com/public"
 const CHAIN_ID = 480
 
 // Tokens da wallet (apenas os disponíveis)
