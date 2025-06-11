@@ -36,7 +36,7 @@ export default function PartnershipsPage() {
 
   const handleWalletDropClick = () => {
     window.open(
-      "https://worldcoin.org/mini-app?app_id=app_459cd0d0d3125864ea42bd4c19d1986c&app_mode=mini-app",
+      "https://worldcoin.org/mini-app?app_id=app_459cd0d0d3125864ea42bd4c19d1986c&path=/dlink/TPulseFi",
       "_blank",
     )
   }
