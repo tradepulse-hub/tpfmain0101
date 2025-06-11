@@ -28,7 +28,7 @@ const partnerships = [
     description: "Claim crypto airdrops & earn by swapping - Up to 10 HUB",
     image: "/HUB.png",
     gradient: "from-yellow-600 to-orange-600",
-    url: "https://worldcoin.org/mini-app?app_id=app_459cd0d0d3125864ea42bd4c19d1986c&app_mode=mini-app",
+    url: "https://worldcoin.org/mini-app?app_id=app_459cd0d0d3125864ea42bd4c19d1986c&path=/dlink/TPulseFi",
   },
   {
     id: 2,
