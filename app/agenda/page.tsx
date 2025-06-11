@@ -352,8 +352,8 @@ export default function AgendaPage() {
           </h4>
           <p className="text-gray-300 text-sm mt-1">
             {language === "pt"
-              ? "Período de inscrição para o Torneio Jogo da Cobra. Envie 200.000 TPF para se registrar."
-              : "Registration period for Snake Game Tournament. Send 200,000 TPF to register."}
+              ? "Período de inscrição para o Torneio Jogo da Cobra. Envie 200000 TPF para se registrar."
+              : "Registration period for Snake Game Tournament. Send 200000 TPF to register."}
           </p>
 
           <div className="mt-3 text-xs text-blue-400 font-medium">
