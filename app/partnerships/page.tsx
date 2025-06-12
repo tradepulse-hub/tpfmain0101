@@ -29,7 +29,7 @@ export default function PartnershipsPage() {
 
   const handleHoldStationClick = () => {
     window.open(
-      "https://worldcoin.org/mini-app?app_id=app_0d4b759921490adc1f2bd569fda9b53a&app_mode=mini-app",
+      "https://world.org/mini-app?app_id=app_0d4b759921490adc1f2bd569fda9b53a&path=/ref/f5S3wA",
       "_blank",
     )
   }
