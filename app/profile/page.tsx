@@ -44,7 +44,7 @@ const partnerships = [
     description: "Advanced trading and swap platform for WorldChain",
     image: "/holdstation-logo.jpg",
     gradient: "from-purple-600 to-blue-600",
-    url: "https://worldcoin.org/mini-app?app_id=app_0d4b759921490adc1f2bd569fda9b53a&app_mode=mini-app",
+    url: "https://world.org/mini-app?app_id=app_0d4b759921490adc1f2bd569fda9b53a&path=/ref/f5S3wA",
   },
   {
     id: 4,
