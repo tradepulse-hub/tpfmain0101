@@ -53,7 +53,7 @@ export function EventCountdownBadge() {
     {
       type: "snakeRegistration",
       title: "Tournament Registration",
-      description: "Send 200,000 TPF to register",
+      description: "Send 200000 TPF to register",
       endDate: new Date("2025-06-15T23:59:59Z"), // Termina dia 15 de junho
       icon: <Gamepad2 className="w-4 h-4 text-white" />,
       color: "from-green-500 to-emerald-600",
