@@ -1,20 +1,48 @@
 import { ethers } from "ethers"
+import {
+  config,
+  SwapHelper,
+  type SwapParams,
+  TokenProvider,
+  ZeroX,
+  HoldSo,
+  inmemoryTokenStorage,
+  Manager,
+} from "@holdstation/worldchain-sdk"
+import { Client, Multicall3 } from "@holdstation/worldchain-ethers-v6"
 import type { TokenBalance, SwapQuote } from "./types"
 
 // Configuração para Worldchain
 const RPC_URL = "https://worldchain-mainnet.g.alchemy.com/public"
 const CHAIN_ID = 480
 
-// Tokens conhecidos na Worldchain
-const KNOWN_TOKENS = {
+// Tokens que queremos suportar
+const SUPPORTED_TOKENS = {
   WLD: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
   TPF: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
   DNA: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113",
   WDD: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B",
 }
 
+// Mock inmemoryTransactionStorage
+const inmemoryTransactionStorage = {
+  getItem: (key: string) => {
+    return localStorage.getItem(key)
+  },
+  setItem: (key: string, value: string) => {
+    localStorage.setItem(key, value)
+  },
+  removeItem: (key: string) => {
+    localStorage.removeItem(key)
+  },
+}
+
 class HoldstationService {
   private provider: ethers.JsonRpcProvider | null = null
+  private client: Client | null = null
+  private swapHelper: SwapHelper | null = null
+  private tokenProvider: TokenProvider | null = null
+  private manager: Manager | null = null
   private initialized = false
 
   constructor() {
@@ -27,12 +55,52 @@ class HoldstationService {
     if (this.initialized) return
 
     try {
-      console.log("🚀 Initializing Holdstation Service...")
+      console.log("🚀 Initializing Holdstation Service with real SDK...")
 
-      // Setup com ethers v6
-      this.provider = new ethers.JsonRpcProvider(RPC_URL, {
-        chainId: CHAIN_ID,
-        name: "worldchain",
+      // Setup provider com ethers v6
+      this.provider = new ethers.JsonRpcProvider(
+        RPC_URL,
+        {
+          chainId: CHAIN_ID,
+          name: "worldchain",
+        },
+        {
+          staticNetwork: true,
+        },
+      )
+
+      // Setup client e multicall3
+      this.client = new Client(this.provider)
+      config.client = this.client
+      config.multicall3 = new Multicall3(this.provider)
+
+      // Setup token provider
+      this.tokenProvider = new TokenProvider({
+        client: this.client,
+        multicall3: config.multicall3,
+        storage: inmemoryTokenStorage,
+      })
+
+      // Setup swap helper
+      this.swapHelper = new SwapHelper(this.client, {
+        tokenStorage: inmemoryTokenStorage,
+      })
+
+      // Load swap modules
+      const zeroX = new ZeroX(this.tokenProvider, inmemoryTokenStorage)
+      const holdSo = new HoldSo(this.tokenProvider, inmemoryTokenStorage)
+
+      await this.swapHelper.load(zeroX)
+      await this.swapHelper.load(holdSo)
+
+      // Setup manager for transaction history
+      this.manager = new Manager({
+        client: this.client,
+        tokenProvider: this.tokenProvider,
+        storage: {
+          token: inmemoryTokenStorage,
+          tx: inmemoryTransactionStorage,
+        },
       })
 
       const network = await this.provider.getNetwork()
@@ -45,63 +113,114 @@ class HoldstationService {
     }
   }
 
-  // Obter saldos de tokens (mock por enquanto)
+  // Obter saldos de tokens reais
   async getTokenBalances(walletAddress: string): Promise<TokenBalance[]> {
     try {
       if (!this.initialized) {
         await this.initialize()
       }
 
-      console.log(`💰 Getting token balances for: ${walletAddress}`)
+      if (!this.tokenProvider) {
+        throw new Error("Token provider not initialized")
+      }
 
-      // Mock balances - em produção você implementaria a lógica real
-      const tokenBalances: TokenBalance[] = [
-        {
-          symbol: "TPF",
-          name: "TPulseFi",
-          address: KNOWN_TOKENS.TPF,
-          balance: "108567827.002",
-          decimals: 18,
-          icon: "/logo-tpf.png",
-          formattedBalance: "108567827.002",
-        },
-        {
-          symbol: "WLD",
-          name: "Worldcoin",
-          address: KNOWN_TOKENS.WLD,
-          balance: "42.67",
-          decimals: 18,
-          icon: "/worldcoin.jpeg",
-          formattedBalance: "42.67",
-        },
-        {
-          symbol: "DNA",
-          name: "DNA Token",
-          address: KNOWN_TOKENS.DNA,
-          balance: "22765.884",
-          decimals: 18,
-          icon: "/dna-token.png",
-          formattedBalance: "22765.884",
-        },
-        {
-          symbol: "WDD",
-          name: "Drachma Token",
-          address: KNOWN_TOKENS.WDD,
-          balance: "78.32",
-          decimals: 18,
-          icon: "/drachma-token.png",
-          formattedBalance: "78.32",
-        },
-      ]
+      console.log(`💰 Getting real token balances for: ${walletAddress}`)
 
-      return tokenBalances.filter((token) => Number.parseFloat(token.balance) >= 0)
+      // Get token details for supported tokens
+      const tokenAddresses = Object.values(SUPPORTED_TOKENS)
+      const tokenDetails = await this.tokenProvider.details(...tokenAddresses)
+
+      const tokenBalances: TokenBalance[] = []
+
+      for (const [symbol, address] of Object.entries(SUPPORTED_TOKENS)) {
+        try {
+          const tokenDetail = tokenDetails[address]
+          if (!tokenDetail) continue
+
+          // Get real balance using multicall
+          const balance = await this.getTokenBalance(walletAddress, address)
+
+          tokenBalances.push({
+            symbol: symbol,
+            name: tokenDetail.name || symbol,
+            address: address,
+            balance: balance,
+            decimals: tokenDetail.decimals || 18,
+            icon: this.getTokenIcon(symbol),
+            formattedBalance: balance,
+          })
+        } catch (error) {
+          console.error(`Error getting balance for ${symbol}:`, error)
+          // Add with 0 balance if error
+          tokenBalances.push({
+            symbol: symbol,
+            name: symbol,
+            address: address,
+            balance: "0",
+            decimals: 18,
+            icon: this.getTokenIcon(symbol),
+            formattedBalance: "0",
+          })
+        }
+      }
+
+      return tokenBalances
     } catch (error) {
       console.error("Error getting token balances:", error)
       return []
     }
   }
 
-  // Obter cotação de swap (mock por enquanto)
+  private async getTokenBalance(walletAddress: string, tokenAddress: string): Promise<string> {
+    try {
+      if (!this.client) throw new Error("Client not initialized")
+
+      // Use ERC20 balanceOf call
+      const balanceCallData = this.client.encodeFunctionData(
+        ["function balanceOf(address) view returns (uint256)"],
+        "balanceOf",
+        [walletAddress],
+      )
+
+      const calls = [
+        {
+          target: tokenAddress,
+          allowFailure: true,
+          callData: balanceCallData,
+        },
+      ]
+
+      const results = await config.multicall3.aggregate3(calls)
+
+      if (results[0]?.success && results[0]?.returnData !== "0x") {
+        const decoded = this.client.decodeFunctionResult(
+          ["function balanceOf(address) view returns (uint256)"],
+          "balanceOf",
+          results[0].returnData,
+        )
+
+        const balance = ethers.formatUnits(decoded[0], 18)
+        return Number.parseFloat(balance).toFixed(6)
+      }
+
+      return "0"
+    } catch (error) {
+      console.error(`Error getting balance for ${tokenAddress}:`, error)
+      return "0"
+    }
+  }
+
+  private getTokenIcon(symbol: string): string {
+    const icons: Record<string, string> = {
+      TPF: "/logo-tpf.png",
+      WLD: "/worldcoin.jpeg",
+      DNA: "/dna-token.png",
+      WDD: "/drachma-token.png",
+    }
+    return icons[symbol] || "/placeholder.svg"
+  }
+
+  // Obter cotação de swap real
   async getSwapQuote(params: {
     tokenIn: string
     tokenOut: string
@@ -114,29 +233,33 @@ class HoldstationService {
         await this.initialize()
       }
 
-      console.log(`💱 Getting swap quote: ${params.amountIn} ${params.tokenIn} → ${params.tokenOut}`)
-
-      // Simular cotação - em produção você usaria a API real do Holdstation
-      const amountInNum = Number.parseFloat(params.amountIn)
-      const mockRate = 0.95 // Taxa de conversão mock
-      const amountOut = (amountInNum * mockRate).toString()
-
-      const quote: SwapQuote = {
-        amountOut: amountOut,
-        data: "0x", // Mock data
-        to: "0x0000000000000000000000000000000000000000", // Mock address
-        value: "0",
-        feeAmountOut: (amountInNum * 0.003).toString(), // 0.3% fee
-        addons: {
-          outAmount: amountOut,
-          rateSwap: mockRate.toString(),
-          amountOutUsd: (amountInNum * mockRate * 1.2).toString(), // Mock USD value
-          minReceived: (amountInNum * mockRate * 0.97).toString(), // With slippage
-          feeAmountOut: (amountInNum * 0.003).toString(),
-        },
+      if (!this.swapHelper) {
+        throw new Error("Swap helper not initialized")
       }
 
-      console.log("Quote result:", quote)
+      console.log(`💱 Getting real swap quote: ${params.amountIn} ${params.tokenIn} → ${params.tokenOut}`)
+
+      const quoteParams: SwapParams["quoteInput"] = {
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: params.amountIn,
+        slippage: params.slippage || "0.5",
+        fee: params.fee || "0.2",
+        preferRouters: ["0x"], // Use 0x by default
+      }
+
+      const result = await this.swapHelper.estimate.quote(quoteParams)
+
+      const quote: SwapQuote = {
+        amountOut: result.addons?.outAmount || "0",
+        data: result.data,
+        to: result.to,
+        value: result.value || "0",
+        feeAmountOut: result.addons?.feeAmountOut,
+        addons: result.addons,
+      }
+
+      console.log("Real quote result:", quote)
       return quote
     } catch (error) {
       console.error("Error getting swap quote:", error)
@@ -144,7 +267,7 @@ class HoldstationService {
     }
   }
 
-  // Executar swap (mock por enquanto)
+  // Executar swap real
   async executeSwap(params: {
     tokenIn: string
     tokenOut: string
@@ -158,50 +281,52 @@ class HoldstationService {
         await this.initialize()
       }
 
-      console.log("🚀 Executing swap...")
+      if (!this.swapHelper) {
+        throw new Error("Swap helper not initialized")
+      }
 
-      // Simular transação - em produção você usaria a API real do Holdstation
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      console.log("🚀 Executing real swap...")
 
-      const mockTxHash = `0x${Math.random().toString(16).substr(2, 64)}`
-      console.log("Swap result:", mockTxHash)
+      // First get quote
+      const quote = await this.getSwapQuote(params)
 
-      return mockTxHash
+      // Execute swap
+      const swapParams: SwapParams["input"] = {
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: params.amountIn,
+        tx: {
+          data: quote.data,
+          to: quote.to,
+          value: quote.value,
+        },
+        feeAmountOut: quote.feeAmountOut,
+        fee: params.fee || "0.2",
+        feeReceiver: params.feeReceiver || ethers.ZeroAddress,
+      }
+
+      const result = await this.swapHelper.swap(swapParams)
+
+      if (!result.success) {
+        throw new Error(`Swap failed: ${result.errorCode}`)
+      }
+
+      console.log("Real swap result:", result.transactionId)
+      return result.transactionId || ""
     } catch (error) {
       console.error("❌ Error executing swap:", error)
       throw error
     }
   }
 
-  // Enviar tokens (mock por enquanto)
-  async sendToken(params: {
-    to: string
-    amount: number
-    token?: string
-  }): Promise<string> {
-    try {
-      if (!this.initialized) {
-        await this.initialize()
-      }
-
-      console.log(`📤 Sending ${params.amount} tokens to ${params.to}`)
-
-      // Simular transação - em produção você usaria a API real
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      const mockTxHash = `0x${Math.random().toString(16).substr(2, 64)}`
-      console.log("Send result:", mockTxHash)
-
-      return mockTxHash
-    } catch (error) {
-      console.error("❌ Error sending token:", error)
-      throw error
-    }
+  // Get manager for transaction history
+  getManager(): Manager | null {
+    return this.manager
   }
 
   // Métodos auxiliares
-  getKnownTokens() {
-    return KNOWN_TOKENS
+  getSupportedTokens() {
+    return SUPPORTED_TOKENS
   }
 
   isInitialized(): boolean {
