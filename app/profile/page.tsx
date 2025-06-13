@@ -7,8 +7,7 @@ import Image from "next/image"
 import { useState, useEffect, useRef } from "react"
 import { EditProfileModal } from "@/components/edit-profile-modal"
 import { useRouter } from "next/navigation"
-import { TransactionHistory } from "@/components/transaction-history"
-// Adicionar import para os ícones do Telegram e Twitter (X)
+// Remover import do TransactionHistory
 import { Settings, Share2, LogOut, Globe, ChevronDown, Check, ExternalLink, RefreshCw } from "lucide-react"
 
 // Importar as funções de idioma
@@ -1032,15 +1031,7 @@ export default function ProfilePage() {
           <DailyCheckIn />
         </motion.div>
 
-        {/* Transaction History */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.7 }}
-          className="w-full max-w-xs mt-2"
-        >
-          <TransactionHistory walletAddress={walletAddress} daysToShow={5} />
-        </motion.div>
+        {/* Transaction History REMOVIDO */}
       </motion.div>
 
       {/* Level Info Modal */}
