@@ -1,18 +1,18 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { walletService } from "@/services/wallet-service"
+import { balanceSyncService } from "@/services/balance-sync-service"
 
 interface SetBalanceModalProps {
   isOpen: boolean
   onClose: () => void
   currentBalance: number
+  walletAddress: string
 }
 
-export function SetBalanceModal({ isOpen, onClose, currentBalance }: SetBalanceModalProps) {
+export function SetBalanceModal({ isOpen, onClose, currentBalance, walletAddress }: SetBalanceModalProps) {
   const [amount, setAmount] = useState(currentBalance.toString())
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,17 +30,14 @@ export function SetBalanceModal({ isOpen, onClose, currentBalance }: SetBalanceM
         throw new Error("Valor inválido")
       }
 
-      const result = await walletService.setUserBalance(amountValue)
+      // Update balance using balance sync service
+      balanceSyncService.updateTPFBalance(walletAddress, amountValue)
 
-      if (result) {
-        setSuccess("Saldo atualizado com sucesso!")
-        setTimeout(() => {
-          onClose()
-          setSuccess(null)
-        }, 1500)
-      } else {
-        throw new Error("Erro ao atualizar saldo")
-      }
+      setSuccess("Saldo atualizado com sucesso!")
+      setTimeout(() => {
+        onClose()
+        setSuccess(null)
+      }, 1500)
     } catch (error) {
       setError(error instanceof Error ? error.message : "Erro desconhecido")
     } finally {
