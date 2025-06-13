@@ -119,6 +119,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
       setIsQuoting(true)
       try {
         console.log(`Getting quote: ${amountIn} ${tokenIn} → ${tokenOut}`)
+        console.log(`Token addresses: ${AVAILABLE_TOKENS[tokenIn].address} → ${AVAILABLE_TOKENS[tokenOut].address}`)
 
         if (holdstationService && typeof holdstationService.getSwapQuote === "function") {
           const quote = await holdstationService.getSwapQuote({
@@ -128,24 +129,29 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
             slippage: slippage,
           })
 
-          if (quote && quote.amountOut) {
+          console.log("Received quote:", quote)
+
+          if (quote && quote.amountOut && Number.parseFloat(quote.amountOut) > 0) {
             setAmountOut(quote.amountOut)
             setQuoteData(quote)
-            console.log(`Quote: ${quote.amountOut} ${tokenOut}`)
+            console.log(`Quote success: ${quote.amountOut} ${tokenOut}`)
           } else {
+            console.warn("Quote returned invalid data:", quote)
             setAmountOut("0")
             setQuoteData(null)
+            toast.error("Cotação inválida recebida")
           }
         } else {
           console.warn("Holdstation service not available")
           setAmountOut("0")
           setQuoteData(null)
+          toast.error("Serviço de cotação não disponível")
         }
       } catch (error) {
         console.error("Error getting quote:", error)
         setAmountOut("0")
         setQuoteData(null)
-        toast.error("Erro ao obter cotação")
+        toast.error(`Erro ao obter cotação: ${error.message}`)
       } finally {
         setIsQuoting(false)
       }
@@ -474,17 +480,26 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                   <div className="flex items-center justify-between">
                     <span className="flex items-center text-blue-400">
                       <Info size={12} className="mr-1" />
-                      Rate: 1 {tokenIn} = {(Number.parseFloat(amountOut) / Number.parseFloat(amountIn)).toFixed(6)}{" "}
+                      Rate: 1 {tokenIn} ={" "}
+                      {Number.parseFloat(amountOut) > 0 && Number.parseFloat(amountIn) > 0
+                        ? (Number.parseFloat(amountOut) / Number.parseFloat(amountIn)).toFixed(6)
+                        : "0"}{" "}
                       {tokenOut}
                     </span>
                     <span>Slippage: {slippage}%</span>
                   </div>
-                  {quoteData.addons.minReceived && (
+                  {quoteData.addons.minReceived && Number.parseFloat(quoteData.addons.minReceived) > 0 && (
                     <div className="flex justify-between">
                       <span>Min Received:</span>
                       <span>
                         {Number.parseFloat(quoteData.addons.minReceived).toFixed(6)} {tokenOut}
                       </span>
+                    </div>
+                  )}
+                  {quoteData.addons.rateSwap && Number.parseFloat(quoteData.addons.rateSwap) > 0 && (
+                    <div className="flex justify-between">
+                      <span>SDK Rate:</span>
+                      <span>{Number.parseFloat(quoteData.addons.rateSwap).toFixed(6)}</span>
                     </div>
                   )}
                 </div>
