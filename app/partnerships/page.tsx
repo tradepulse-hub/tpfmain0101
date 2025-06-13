@@ -151,7 +151,7 @@ export default function PartnershipsPage() {
             <div className="relative z-10">
               <div className="flex items-center justify-center mb-4">
                 <div className="relative w-full h-32 rounded-lg overflow-hidden">
-                  <Image src="/axo.png" alt="AXO - Claim Cute Free tokens everyday!" fill className="object-cover" />
+                  <Image src="/axo.jpg" alt="AXO - Claim Cute Free tokens everyday!" fill className="object-cover" />
                 </div>
               </div>
 
