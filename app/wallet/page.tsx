@@ -334,7 +334,10 @@ export default function WalletPage() {
                 {t.wallet?.assets || "Assets"}
               </button>
               <button
-                onClick={() => setActiveTab("activity")}
+                onClick={() => {
+                  console.log("Activity tab clicked")
+                  setActiveTab("activity")
+                }}
                 className={`py-2 px-4 rounded-md text-sm font-medium transition-all ${
                   activeTab === "activity"
                     ? "bg-gray-700/80 text-white shadow-sm"
