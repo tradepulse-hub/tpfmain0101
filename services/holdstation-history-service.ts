@@ -1,8 +1,7 @@
-import * as sdk from "@holdstation/worldchain-sdk"
 import { ethers } from "ethers"
 import type { Transaction } from "./types"
 
-// Configuração da rede Worldchain conforme documentação
+// Configuração da rede Worldchain
 const RPC_URL = "https://worldchain-mainnet.g.alchemy.com/public"
 const CHAIN_ID = 480
 
@@ -15,11 +14,8 @@ const WALLET_TOKENS = {
 }
 
 class HoldstationHistoryService {
-  private provider: ethers.providers.JsonRpcProvider | null = null
-  private managerHistory: sdk.Manager | null = null
-  private walletHistories: Map<string, any> = new Map()
+  private provider: ethers.JsonRpcProvider | null = null
   private initialized = false
-  private watcherRefs: Map<string, any> = new Map()
 
   constructor() {
     if (typeof window !== "undefined") {
@@ -33,11 +29,11 @@ class HoldstationHistoryService {
     try {
       console.log("🚀 Initializing Holdstation History Service...")
 
-      // Setup exato conforme documentação
-      this.provider = new ethers.providers.JsonRpcProvider(RPC_URL)
-
-      // Inicializar o Manager conforme documentação
-      this.managerHistory = new sdk.Manager(this.provider, CHAIN_ID)
+      // Setup com ethers v6
+      this.provider = new ethers.JsonRpcProvider(RPC_URL, {
+        chainId: CHAIN_ID,
+        name: "worldchain",
+      })
 
       this.initialized = true
       console.log("✅ Holdstation History Service initialized successfully!")
@@ -46,85 +42,23 @@ class HoldstationHistoryService {
     }
   }
 
-  // Obter histórico de transações conforme documentação
+  // Obter histórico de transações (mock por enquanto)
   async getTransactionHistory(walletAddress: string, offset = 0, limit = 20): Promise<Transaction[]> {
     try {
       if (!this.initialized) {
         await this.initialize()
       }
 
-      if (!this.managerHistory || !walletAddress) {
-        console.warn("Manager or wallet address not available")
-        return this.getMockTransactions(walletAddress)
-      }
-
       console.log(`📜 Getting transaction history for: ${walletAddress} (offset: ${offset}, limit: ${limit})`)
 
-      // Obter ou criar o walletHistory para este endereço
-      let walletHistory = this.walletHistories.get(walletAddress)
+      // Mock transactions - em produção você usaria a API real
+      const mockTransactions = this.getMockTransactions(walletAddress)
 
-      if (!walletHistory) {
-        console.log(`Creating new wallet history for ${walletAddress}`)
-        walletHistory = await this.managerHistory.wallet(walletAddress)
-        this.walletHistories.set(walletAddress, walletHistory)
-      }
-
-      // Buscar transações usando o método find conforme documentação
-      console.log(`Calling walletHistory.find(${offset}, ${limit})`)
-      const fetchedTransactions = await walletHistory.find(offset, limit)
-      console.log("Raw transactions from Holdstation:", fetchedTransactions)
-
-      // Processar as transações para o formato esperado
-      const processedTransactions = this.processTransactions(fetchedTransactions, walletAddress)
-
-      console.log(`Found ${processedTransactions.length} processed transactions`)
-      return processedTransactions
+      console.log(`Found ${mockTransactions.length} transactions`)
+      return mockTransactions.slice(offset, offset + limit)
     } catch (error) {
       console.error("Error getting transaction history:", error)
-      // Fallback para transações mock
       return this.getMockTransactions(walletAddress)
-    }
-  }
-
-  // Configurar watcher para novas transações conforme documentação
-  async watchTransactions(
-    walletAddress: string,
-    callback: () => void,
-  ): Promise<{ start: () => Promise<void>; stop: () => void } | null> {
-    try {
-      if (!this.initialized) {
-        await this.initialize()
-      }
-
-      if (!this.managerHistory || !walletAddress) {
-        console.warn("Manager or wallet address not available for watching")
-        return null
-      }
-
-      console.log(`👀 Setting up transaction watcher for: ${walletAddress}`)
-
-      // Parar watcher anterior se existir
-      const existingWatcher = this.watcherRefs.get(walletAddress)
-      if (existingWatcher) {
-        existingWatcher.stop()
-        this.watcherRefs.delete(walletAddress)
-      }
-
-      // Criar novo watcher seguindo exatamente a documentação
-      const watcher = await this.managerHistory.watch(walletAddress, () => {
-        console.log("🔔 New transaction detected for:", walletAddress)
-        if (typeof callback === "function") {
-          callback()
-        }
-      })
-
-      // Salvar referência do watcher
-      this.watcherRefs.set(walletAddress, watcher)
-
-      return watcher
-    } catch (error) {
-      console.error("Error setting up transaction watcher:", error)
-      return null
     }
   }
 
@@ -133,10 +67,7 @@ class HoldstationHistoryService {
     try {
       console.log(`📜 Getting ${tokenSymbol} transactions for: ${walletAddress}`)
 
-      // Obter todas as transações
       const allTransactions = await this.getTransactionHistory(walletAddress, 0, limit)
-
-      // Filtrar apenas transações do token específico
       const tokenTransactions = allTransactions.filter((tx) => tx.tokenSymbol === tokenSymbol)
 
       console.log(`Found ${tokenTransactions.length} ${tokenSymbol} transactions`)
@@ -147,145 +78,73 @@ class HoldstationHistoryService {
     }
   }
 
-  // Processar as transações brutas para o formato esperado
-  private processTransactions(rawTransactions: any[], walletAddress: string): Transaction[] {
-    if (!Array.isArray(rawTransactions)) {
-      console.warn("Raw transactions is not an array:", rawTransactions)
-      return []
-    }
-
-    const transactions: Transaction[] = []
-
-    for (const tx of rawTransactions) {
-      try {
-        // Verificar se a transação tem dados mínimos necessários
-        if (!tx || !tx.hash) {
-          console.warn("Invalid transaction data:", tx)
-          continue
-        }
-
-        // Determinar o tipo de transação e o token envolvido
-        const type = this.determineTransactionType(tx, walletAddress)
-        const tokenInfo = this.getTokenInfoFromTransaction(tx)
-
-        // Se não for um token da wallet, pular
-        if (!tokenInfo && type !== "swap") {
-          continue
-        }
-
-        // Criar objeto de transação
-        const transaction: Transaction = {
-          id: tx.hash || `tx-${Date.now()}-${Math.random()}`,
-          hash: tx.hash,
-          type: type,
-          amount: this.getTransactionAmount(tx),
-          tokenSymbol: tokenInfo?.symbol || "TPF",
-          tokenAddress: tokenInfo?.address || WALLET_TOKENS.TPF,
-          from: tx.from || "",
-          to: tx.to || "",
-          timestamp: new Date(tx.timestamp ? tx.timestamp * 1000 : Date.now()),
-          status: tx.blockNumber ? "completed" : "pending",
-          blockNumber: tx.blockNumber,
-        }
-
-        transactions.push(transaction)
-      } catch (error) {
-        console.error("Error processing transaction:", error, tx)
-      }
-    }
-
-    // Ordenar por timestamp (mais recente primeiro)
-    return transactions.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-  }
-
-  // Métodos auxiliares
-  private determineTransactionType(tx: any, walletAddress: string): "send" | "receive" | "swap" {
-    if (tx.method?.toLowerCase().includes("swap")) {
-      return "swap"
-    }
-
-    const from = tx.from?.toLowerCase()
-    const to = tx.to?.toLowerCase()
-    const wallet = walletAddress.toLowerCase()
-
-    if (from === wallet) {
-      return "send"
-    } else if (to === wallet) {
-      return "receive"
-    }
-
-    return "swap"
-  }
-
-  private getTokenInfoFromTransaction(tx: any): { symbol: string; address: string } | null {
-    const tokenAddress = tx.tokenAddress || tx.contractAddress || tx.token
-
-    if (!tokenAddress) {
-      return null
-    }
-
-    for (const [symbol, address] of Object.entries(WALLET_TOKENS)) {
-      if (address.toLowerCase() === tokenAddress.toLowerCase()) {
-        return { symbol, address }
-      }
-    }
-
-    return null
-  }
-
-  private getTransactionAmount(tx: any): string {
-    if (tx.amount) {
-      return tx.amount.toString()
-    }
-
-    if (tx.value) {
-      if (tx.value.toString().length > 10) {
-        return ethers.utils.formatEther(tx.value)
-      }
-      return tx.value.toString()
-    }
-
-    return "0"
-  }
-
-  // Transações mock para fallback
+  // Transações mock para demonstração
   private getMockTransactions(walletAddress: string): Transaction[] {
     return [
       {
         id: "1",
-        hash: "0x123...abc",
+        hash: "0x123abc456def789012345678901234567890abcdef123456789012345678901234",
         type: "receive",
         amount: "1000",
         tokenSymbol: "TPF",
         tokenAddress: WALLET_TOKENS.TPF,
-        from: "0x456...def",
+        from: "0x456def789012345678901234567890abcdef123456",
         to: walletAddress,
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 horas atrás
         status: "completed",
+        blockNumber: 12345678,
       },
       {
         id: "2",
-        hash: "0x456...def",
+        hash: "0x456def789012345678901234567890abcdef123456789012345678901234567890",
         type: "send",
         amount: "500",
         tokenSymbol: "TPF",
         tokenAddress: WALLET_TOKENS.TPF,
         from: walletAddress,
-        to: "0x789...ghi",
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
+        to: "0x789012345678901234567890abcdef123456789012",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 dia atrás
         status: "completed",
+        blockNumber: 12345677,
       },
       {
         id: "3",
-        hash: "0x789...ghi",
+        hash: "0x789012345678901234567890abcdef123456789012345678901234567890abcdef",
         type: "swap",
         amount: "100",
         tokenSymbol: "WLD",
         tokenAddress: WALLET_TOKENS.WLD,
         from: walletAddress,
-        to: "0xabc...123",
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48),
+        to: "0xabc123456789012345678901234567890abcdef123",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48), // 2 dias atrás
         status: "completed",
+        blockNumber: 12345676,
+      },
+      {
+        id: "4",
+        hash: "0xabc123456789012345678901234567890abcdef123456789012345678901234567",
+        type: "receive",
+        amount: "25.5",
+        tokenSymbol: "WLD",
+        tokenAddress: WALLET_TOKENS.WLD,
+        from: "0xdef456789012345678901234567890abcdef123456",
+        to: walletAddress,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 72), // 3 dias atrás
+        status: "completed",
+        blockNumber: 12345675,
+      },
+      {
+        id: "5",
+        hash: "0xdef456789012345678901234567890abcdef123456789012345678901234567890",
+        type: "send",
+        amount: "1500.75",
+        tokenSymbol: "DNA",
+        tokenAddress: WALLET_TOKENS.DNA,
+        from: walletAddress,
+        to: "0x123456789012345678901234567890abcdef123456",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 96), // 4 dias atrás
+        status: "completed",
+        blockNumber: 12345674,
       },
     ]
   }
@@ -294,25 +153,25 @@ class HoldstationHistoryService {
     return this.initialized
   }
 
-  // Limpar todos os watchers ao destruir o serviço
-  cleanup() {
-    for (const [address, watcher] of this.watcherRefs) {
-      try {
-        watcher.stop()
-        console.log("🛑 Cleaned up watcher for:", address)
-      } catch (error) {
-        console.error("Error cleaning up watcher:", error)
+  // Verificar se uma transação existe
+  async getTransaction(txHash: string): Promise<Transaction | null> {
+    try {
+      if (!this.provider) {
+        await this.initialize()
       }
+
+      console.log(`🔍 Getting transaction: ${txHash}`)
+
+      // Em produção, você buscaria a transação real
+      const mockTransactions = this.getMockTransactions("")
+      const transaction = mockTransactions.find((tx) => tx.hash === txHash)
+
+      return transaction || null
+    } catch (error) {
+      console.error("Error getting transaction:", error)
+      return null
     }
-    this.watcherRefs.clear()
   }
 }
 
 export const holdstationHistoryService = new HoldstationHistoryService()
-
-// Limpar watchers quando a página for fechada
-if (typeof window !== "undefined") {
-  window.addEventListener("beforeunload", () => {
-    holdstationHistoryService.cleanup()
-  })
-}
