@@ -41,10 +41,52 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
     setDebugLogs((prev) => [...prev.slice(-10), `${new Date().toLocaleTimeString()}: ${message}`])
   }
 
+  // Função para inspecionar MiniKit
+  const inspectMiniKit = () => {
+    addDebugLog("=== INSPEÇÃO DO MINIKIT ===")
+
+    if (typeof window !== "undefined" && window.MiniKit) {
+      addDebugLog("✅ MiniKit está disponível")
+
+      // Listar todas as propriedades e métodos disponíveis
+      const miniKitKeys = Object.keys(window.MiniKit)
+      addDebugLog(`Métodos disponíveis: ${miniKitKeys.join(", ")}`)
+
+      // Verificar métodos específicos
+      const methodsToCheck = [
+        "sendTransaction",
+        "sendTransactions",
+        "executeTransaction",
+        "signTransaction",
+        "payWithWorldcoin",
+        "pay",
+        "transfer",
+        "sendPayment",
+      ]
+
+      methodsToCheck.forEach((method) => {
+        const exists = typeof window.MiniKit[method] === "function"
+        addDebugLog(`${method}: ${exists ? "✅ Disponível" : "❌ Não encontrado"}`)
+      })
+
+      // Verificar se é conectado
+      if (typeof window.MiniKit.isConnected === "function") {
+        addDebugLog(`Conectado: ${window.MiniKit.isConnected()}`)
+      }
+
+      // Verificar outras propriedades
+      addDebugLog(`Tipo do MiniKit: ${typeof window.MiniKit}`)
+      addDebugLog(`Constructor: ${window.MiniKit.constructor?.name || "N/A"}`)
+    } else {
+      addDebugLog("❌ MiniKit não está disponível")
+    }
+  }
+
   // Carregar tokens disponíveis quando o modal abrir
   useEffect(() => {
     if (isOpen && walletAddress) {
       loadAvailableTokens()
+      inspectMiniKit() // Inspecionar MiniKit quando abrir o modal
       // Reset states when modal opens
       setTransactionStatus("idle")
       setTxHash("")
@@ -130,9 +172,8 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
       return
     }
 
-    // Verificar se MiniKit está disponível
-    addDebugLog(`MiniKit disponível: ${!!window.MiniKit}`)
-    addDebugLog(`MiniKit conectado: ${window.MiniKit?.isConnected?.()}`)
+    // Re-inspecionar MiniKit antes de usar
+    inspectMiniKit()
 
     if (!window.MiniKit) {
       console.error("❌ MiniKit not available")
@@ -170,10 +211,69 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
       }
 
       addDebugLog(`Parâmetros finais: ${JSON.stringify(transactionParams)}`)
-      addDebugLog("Chamando MiniKit.sendTransaction...")
 
-      // Enviar transação
-      const transactionId = await window.MiniKit.sendTransaction(transactionParams)
+      // Tentar diferentes métodos do MiniKit
+      let transactionId: string | null = null
+
+      addDebugLog("Tentando diferentes métodos do MiniKit...")
+
+      // Método 1: sendTransaction
+      if (typeof window.MiniKit.sendTransaction === "function") {
+        addDebugLog("Tentando MiniKit.sendTransaction...")
+        try {
+          transactionId = await window.MiniKit.sendTransaction(transactionParams)
+          addDebugLog(`✅ sendTransaction funcionou! ID: ${transactionId}`)
+        } catch (error) {
+          addDebugLog(`❌ sendTransaction falhou: ${error.message}`)
+        }
+      }
+
+      // Método 2: sendTransactions (plural)
+      if (!transactionId && typeof window.MiniKit.sendTransactions === "function") {
+        addDebugLog("Tentando MiniKit.sendTransactions...")
+        try {
+          transactionId = await window.MiniKit.sendTransactions([transactionParams])
+          addDebugLog(`✅ sendTransactions funcionou! ID: ${transactionId}`)
+        } catch (error) {
+          addDebugLog(`❌ sendTransactions falhou: ${error.message}`)
+        }
+      }
+
+      // Método 3: executeTransaction
+      if (!transactionId && typeof window.MiniKit.executeTransaction === "function") {
+        addDebugLog("Tentando MiniKit.executeTransaction...")
+        try {
+          transactionId = await window.MiniKit.executeTransaction(transactionParams)
+          addDebugLog(`✅ executeTransaction funcionou! ID: ${transactionId}`)
+        } catch (error) {
+          addDebugLog(`❌ executeTransaction falhou: ${error.message}`)
+        }
+      }
+
+      // Método 4: payWithWorldcoin (se for um pagamento)
+      if (!transactionId && typeof window.MiniKit.payWithWorldcoin === "function") {
+        addDebugLog("Tentando MiniKit.payWithWorldcoin...")
+        try {
+          const paymentParams = {
+            reference: `transfer-${Date.now()}`,
+            to: recipient,
+            tokens: [
+              {
+                symbol: selectedToken.symbol,
+                token_amount: amount,
+              },
+            ],
+          }
+          transactionId = await window.MiniKit.payWithWorldcoin(paymentParams)
+          addDebugLog(`✅ payWithWorldcoin funcionou! ID: ${transactionId}`)
+        } catch (error) {
+          addDebugLog(`❌ payWithWorldcoin falhou: ${error.message}`)
+        }
+      }
+
+      if (!transactionId) {
+        throw new Error("Nenhum método do MiniKit funcionou para enviar a transação")
+      }
 
       addDebugLog(`✅ Transação enviada! ID: ${transactionId}`)
       setTransactionStatus("confirming")
@@ -224,9 +324,6 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
           addDebugLog(`❌ Falha na verificação: ${errorText}`)
           throw new Error(`Verification failed: ${errorText}`)
         }
-      } else {
-        console.error("❌ No transaction ID received from MiniKit")
-        throw new Error("No transaction ID received")
       }
     } catch (error: any) {
       addDebugLog("=== ERRO NA TRANSAÇÃO ===")
@@ -581,10 +678,30 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
 declare global {
   interface Window {
     MiniKit?: {
-      sendTransaction: (params: {
+      sendTransaction?: (params: {
         to: string
         value: string
         data: string
+      }) => Promise<string>
+      sendTransactions?: (
+        transactions: Array<{
+          to: string
+          value: string
+          data: string
+        }>,
+      ) => Promise<string>
+      executeTransaction?: (params: {
+        to: string
+        value: string
+        data: string
+      }) => Promise<string>
+      payWithWorldcoin?: (params: {
+        reference: string
+        to: string
+        tokens: Array<{
+          symbol: string
+          token_amount: string
+        }>
       }) => Promise<string>
       isConnected?: () => boolean
     }
