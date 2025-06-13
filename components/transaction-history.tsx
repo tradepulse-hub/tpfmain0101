@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import { ArrowUpRight, ArrowDownLeft, RefreshCw, ExternalLink, ArrowUpDown } from "lucide-react"
 import { walletService } from "@/services/wallet-service"
 import type { Transaction } from "@/services/types"
-import { useTranslation } from "@/hooks/use-translation"
+import { useTranslation } from "@/lib/i18n"
 
 interface TransactionHistoryProps {
   walletAddress: string
