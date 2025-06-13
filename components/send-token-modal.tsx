@@ -3,12 +3,14 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Send, Loader2, AlertTriangle, ChevronDown } from "lucide-react"
+import { X, Send, Loader2, AlertTriangle, ChevronDown, CheckCircle } from "lucide-react"
 import { toast } from "sonner"
 import { useTranslation } from "@/lib/i18n"
 import { walletService } from "@/services/wallet-service"
+import { AbiService } from "@/services/abi-service"
 import type { TokenBalance } from "@/services/types"
 import Image from "next/image"
+import { ethers } from "ethers"
 
 interface SendTokenModalProps {
   isOpen: boolean
@@ -26,11 +28,20 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
   const [isLoadingTokens, setIsLoadingTokens] = useState(false)
   const [showTokenSelector, setShowTokenSelector] = useState(false)
   const [showWarning, setShowWarning] = useState(true)
+  const [transactionStatus, setTransactionStatus] = useState<"idle" | "pending" | "confirming" | "success" | "error">(
+    "idle",
+  )
+  const [txHash, setTxHash] = useState<string>("")
 
   // Carregar tokens disponíveis quando o modal abrir
   useEffect(() => {
     if (isOpen && walletAddress) {
       loadAvailableTokens()
+      // Reset states when modal opens
+      setTransactionStatus("idle")
+      setTxHash("")
+      setRecipient("")
+      setAmount("")
     }
   }, [isOpen, walletAddress])
 
@@ -92,38 +103,115 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
       return
     }
 
-    setIsLoading(true)
-    try {
-      console.log(`Sending ${amount} ${selectedToken.symbol} to ${recipient}`)
+    // Verificar se MiniKit está disponível
+    if (!window.MiniKit) {
+      toast.error(t.sendToken?.minikitNotInstalled || "MiniKit not available")
+      return
+    }
 
-      const result = await walletService.sendToken({
-        to: recipient,
-        amount: amountNum,
-        tokenAddress: selectedToken.address,
+    setIsLoading(true)
+    setTransactionStatus("pending")
+
+    try {
+      console.log(`🚀 Sending ${amount} ${selectedToken.symbol} to ${recipient}`)
+      console.log(`Using ABI service for token contract interaction`)
+
+      // Converter amount para wei usando os decimais corretos
+      const amountInWei = ethers.parseUnits(amount, selectedToken.decimals || 18)
+
+      // Usar ABI service para criar a interface
+      const erc20Interface = new ethers.Interface(AbiService.createERC20Interface())
+
+      // Codificar a função transfer
+      const transferData = erc20Interface.encodeFunctionData("transfer", [recipient, amountInWei])
+
+      console.log("Transaction data:", {
+        to: selectedToken.address,
+        value: "0", // Para ERC20, value é sempre 0
+        data: transferData,
+        amountInWei: amountInWei.toString(),
+        tokenSymbol: selectedToken.symbol,
       })
 
-      if (result.success) {
-        toast.success(t.sendToken?.tokensSentSuccess || "Tokens sent successfully!", {
-          description: `${amount} ${selectedToken.symbol} ${t.sendToken?.sentTo || "sent to"} ${recipient.substring(0, 10)}...`,
-          action: result.txHash
-            ? {
-                label: t.sendToken?.viewTx || "View TX",
-                onClick: () => window.open(`https://worldscan.org/tx/${result.txHash}`, "_blank"),
-              }
-            : undefined,
+      // Enviar transação via MiniKit
+      const transactionId = await window.MiniKit.sendTransaction({
+        to: selectedToken.address,
+        value: "0", // Para tokens ERC20, o value é sempre 0
+        data: transferData,
+      })
+
+      console.log("Transaction sent, ID:", transactionId)
+      setTransactionStatus("confirming")
+
+      if (transactionId) {
+        // Verificar status da transação
+        const verificationResult = await fetch("/api/confirm-transaction", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ transaction_id: transactionId }),
         })
 
-        setRecipient("")
-        setAmount("")
-        onClose()
+        if (verificationResult.ok) {
+          const txData = await verificationResult.json()
+          console.log("Transaction verified:", txData)
+
+          setTxHash(txData.hash || transactionId)
+          setTransactionStatus("success")
+
+          toast.success(t.sendToken?.tokensSentSuccess || "Tokens sent successfully!", {
+            description: `${amount} ${selectedToken.symbol} ${t.sendToken?.sentTo || "sent to"} ${recipient.substring(0, 10)}...`,
+            action: txData.hash
+              ? {
+                  label: t.sendToken?.viewTx || "View TX",
+                  onClick: () => window.open(`https://worldscan.org/tx/${txData.hash}`, "_blank"),
+                }
+              : undefined,
+          })
+
+          // Auto-close modal after success
+          setTimeout(() => {
+            onClose()
+          }, 3000)
+        } else {
+          throw new Error("Failed to verify transaction")
+        }
       } else {
-        throw new Error(result.error || "Transaction failed")
+        throw new Error("Transaction failed")
       }
-    } catch (error) {
-      console.error("Error sending tokens:", error)
-      toast.error(t.sendToken?.errorSendingTokens || "Error sending tokens")
+    } catch (error: any) {
+      console.error("❌ Error sending tokens:", error)
+      setTransactionStatus("error")
+
+      let errorMessage = t.sendToken?.errorSendingTokens || "Error sending tokens"
+
+      if (error.message?.includes("insufficient")) {
+        errorMessage = "Saldo insuficiente"
+      } else if (error.message?.includes("rejected")) {
+        errorMessage = "Transação rejeitada pelo usuário"
+      } else if (error.message?.includes("network")) {
+        errorMessage = "Erro de rede. Tente novamente."
+      }
+
+      toast.error(errorMessage)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const getStatusMessage = () => {
+    switch (transactionStatus) {
+      case "pending":
+        return "Enviando transação..."
+      case "confirming":
+        return "Confirmando na blockchain..."
+      case "success":
+        return "Transação enviada com sucesso!"
+      case "error":
+        return "Erro ao enviar transação"
+      default:
+        return ""
     }
   }
 
@@ -154,8 +242,54 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
               </button>
             </div>
 
+            {/* Transaction Status */}
+            {transactionStatus !== "idle" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className={`mb-4 p-3 rounded-lg border ${
+                  transactionStatus === "success"
+                    ? "bg-green-900/20 border-green-800/30"
+                    : transactionStatus === "error"
+                      ? "bg-red-900/20 border-red-800/30"
+                      : "bg-blue-900/20 border-blue-800/30"
+                }`}
+              >
+                <div className="flex items-center">
+                  {transactionStatus === "success" ? (
+                    <CheckCircle className="w-5 h-5 text-green-400 mr-3" />
+                  ) : transactionStatus === "error" ? (
+                    <AlertTriangle className="w-5 h-5 text-red-400 mr-3" />
+                  ) : (
+                    <Loader2 className="w-5 h-5 text-blue-400 mr-3 animate-spin" />
+                  )}
+                  <div className="flex-1">
+                    <p
+                      className={`text-sm ${
+                        transactionStatus === "success"
+                          ? "text-green-300"
+                          : transactionStatus === "error"
+                            ? "text-red-300"
+                            : "text-blue-300"
+                      }`}
+                    >
+                      {getStatusMessage()}
+                    </p>
+                    {txHash && (
+                      <button
+                        onClick={() => window.open(`https://worldscan.org/tx/${txHash}`, "_blank")}
+                        className="text-xs text-blue-400 hover:text-blue-300 mt-1"
+                      >
+                        Ver transação →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {/* Warning Message */}
-            {showWarning && (
+            {showWarning && transactionStatus === "idle" && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -192,7 +326,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
                     type="button"
                     onClick={() => setShowTokenSelector(!showTokenSelector)}
                     className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 flex items-center justify-between"
-                    disabled={isLoadingTokens}
+                    disabled={isLoadingTokens || isLoading}
                   >
                     {isLoadingTokens ? (
                       <span className="flex items-center">
@@ -276,6 +410,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
                   placeholder="0x..."
                   className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   required
+                  disabled={isLoading}
                 />
               </div>
 
@@ -288,6 +423,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
                       type="button"
                       onClick={handleMaxAmount}
                       className="text-xs text-blue-400 hover:text-blue-300"
+                      disabled={isLoading}
                     >
                       Max: {Number.parseFloat(selectedToken.balance).toFixed(4)} {selectedToken.symbol}
                     </button>
@@ -304,6 +440,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
                     max={selectedToken?.balance}
                     className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     required
+                    disabled={isLoading}
                   />
                   {selectedToken && (
                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">
@@ -315,14 +452,16 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
 
               <button
                 type="submit"
-                disabled={isLoading || !selectedToken || isLoadingTokens}
+                disabled={isLoading || !selectedToken || isLoadingTokens || transactionStatus === "success"}
                 className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
                     <Loader2 size={16} className="animate-spin mr-2" />
-                    {t.sendToken?.processing || "Processing..."}
+                    {transactionStatus === "pending" ? "Enviando..." : "Confirmando..."}
                   </div>
+                ) : transactionStatus === "success" ? (
+                  "✅ Enviado com Sucesso"
                 ) : (
                   `${t.sendToken?.sendTokens || "Send"} ${selectedToken?.symbol || "Tokens"}`
                 )}
@@ -333,4 +472,17 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
       )}
     </AnimatePresence>
   )
+}
+
+declare global {
+  interface Window {
+    MiniKit?: {
+      sendTransaction: (params: {
+        to: string
+        value: string
+        data: string
+      }) => Promise<string>
+      isConnected?: () => boolean
+    }
+  }
 }
