@@ -20,26 +20,10 @@ import { levelService } from "@/services/level-service"
 import { EventCountdownBadge } from "@/components/event-countdown-badge"
 import { balanceSyncService } from "@/services/balance-sync-service"
 
-// Dados das parcerias
+// Atualizar o array de parcerias com o link correto do AXO e o nome da imagem
 const partnerships = [
   {
     id: 1,
-    name: "Drop Wallet",
-    description: "Claim crypto airdrops & earn by swapping - Up to 10 HUB",
-    image: "/HUB.png",
-    gradient: "from-yellow-600 to-orange-600",
-    url: "https://worldcoin.org/mini-app?app_id=app_459cd0d0d3125864ea42bd4c19d1986c&path=/dlink/TPulseFi",
-  },
-  {
-    id: 2,
-    name: "Human Tap",
-    description: "Invite friends - For real humans only",
-    image: "/human-tap.jpg",
-    gradient: "from-cyan-600 to-blue-600",
-    url: "https://worldcoin.org/mini-app?app_id=app_40cf4a75c0ac4d247999bccb1ce8f857&app_mode=mini-app",
-  },
-  {
-    id: 3,
     name: "HoldStation",
     description: "Advanced trading and swap platform for WorldChain",
     image: "/holdstation-logo.jpg",
@@ -47,7 +31,31 @@ const partnerships = [
     url: "https://world.org/mini-app?app_id=app_0d4b759921490adc1f2bd569fda9b53a&path=/ref/f5S3wA",
   },
   {
+    id: 2,
+    name: "AXO",
+    description: "Claim Cute Free tokens everyday!",
+    image: "/axo.png",
+    gradient: "from-pink-600 to-purple-600",
+    url: "https://worldcoin.org/mini-app?app_id=app_8aeb55d57b7be834fb8d67e2f803d258&app_mode=mini-app",
+  },
+  {
+    id: 3,
+    name: "Drop Wallet",
+    description: "Claim crypto airdrops & earn by swapping - Up to 10 HUB",
+    image: "/HUB.png",
+    gradient: "from-yellow-600 to-orange-600",
+    url: "https://worldcoin.org/mini-app?app_id=app_459cd0d0d3125864ea42bd4c19d1986c&path=/dlink/TPulseFi",
+  },
+  {
     id: 4,
+    name: "Human Tap",
+    description: "Invite friends - For real humans only",
+    image: "/human-tap.jpg",
+    gradient: "from-cyan-600 to-blue-600",
+    url: "https://worldcoin.org/mini-app?app_id=app_40cf4a75c0ac4d247999bccb1ce8f857&app_mode=mini-app",
+  },
+  {
+    id: 5,
     name: "AstraCoin",
     description: "Decentralized finance platform with advanced trading",
     image: "/astracoin-logo.jpg",
