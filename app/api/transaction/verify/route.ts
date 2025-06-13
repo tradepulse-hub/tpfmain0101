@@ -23,6 +23,18 @@ export async function POST(req: NextRequest) {
     console.log("├─ APP_ID:", process.env.APP_ID ? "✅ Set" : "❌ Missing")
     console.log("├─ DEV_PORTAL_API_KEY:", process.env.DEV_PORTAL_API_KEY ? "✅ Set" : "❌ Missing")
 
+    // Verificar se as variáveis de ambiente estão configuradas
+    if (!process.env.APP_ID || !process.env.DEV_PORTAL_API_KEY) {
+      console.error("❌ Missing environment variables")
+      return NextResponse.json(
+        {
+          error: "Server configuration error",
+          details: "Missing APP_ID or DEV_PORTAL_API_KEY",
+        },
+        { status: 500 },
+      )
+    }
+
     const apiUrl = `https://developer.worldcoin.org/api/v2/minikit/transaction/${transaction_id}?app_id=${process.env.APP_ID}&type=transaction`
     console.log("API URL:", apiUrl)
 
@@ -91,4 +103,9 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     )
   }
+}
+
+// Adicionar suporte para GET também
+export async function GET(req: NextRequest) {
+  return NextResponse.json({ error: "Method not allowed. Use POST." }, { status: 405 })
 }
