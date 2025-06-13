@@ -3,7 +3,7 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Download, Copy, Check, QrCode, Info } from "lucide-react"
 import { toast } from "sonner"
-import { useTranslation } from "@/hooks/use-translation"
+import { useTranslation } from "@/lib/i18n"
 
 interface ReceiveTokenModalProps {
   isOpen: boolean
