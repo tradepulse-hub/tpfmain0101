@@ -7,7 +7,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
-import { Wallet, ArrowUpRight, ArrowDownLeft, AlertCircle, RefreshCw, ArrowUpDown } from "lucide-react"
+import {
+  Wallet,
+  ArrowUpRight,
+  ArrowDownLeft,
+  AlertCircle,
+  RefreshCw,
+  ArrowUpDown,
+  ChevronRight,
+  Copy,
+  TrendingUp,
+} from "lucide-react"
 import { walletService } from "@/services/wallet-service"
 import { SendTokenModal } from "@/components/send-token-modal"
 import { ReceiveTokenModal } from "@/components/receive-token-modal"
@@ -17,6 +27,9 @@ import { enhancedTokenService } from "@/services/holdstation-service"
 import { TokenDetailsModal } from "@/components/token-details-modal"
 import { SwapModal } from "@/components/swap-modal"
 import { balanceSyncService } from "@/services/balance-sync-service"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 export default function WalletPage() {
   const [walletAddress, setWalletAddress] = useState<string>("")
@@ -34,6 +47,7 @@ export default function WalletPage() {
   const [selectedTokenBalance, setSelectedTokenBalance] = useState<string>("0")
   const [isTokenDetailsOpen, setIsTokenDetailsOpen] = useState(false)
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false)
+  const [copiedAddress, setCopiedAddress] = useState(false)
 
   // Obter traduções com base no idioma atual
   const translations = getTranslations(language)
@@ -169,6 +183,14 @@ export default function WalletPage() {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
   }
 
+  const copyToClipboard = () => {
+    if (walletAddress) {
+      navigator.clipboard.writeText(walletAddress)
+      setCopiedAddress(true)
+      setTimeout(() => setCopiedAddress(false), 2000)
+    }
+  }
+
   // Obter informações dos tokens de forma segura (apenas tokens disponíveis)
   const getTokensInfo = () => {
     try {
@@ -190,10 +212,10 @@ export default function WalletPage() {
 
       // Fallback para tokens conhecidos (apenas disponíveis)
       return {
-        TPF: { symbol: "TPF", name: "TPulseFi", logo: "/logo-tpf.png" },
-        WLD: { symbol: "WLD", name: "Worldcoin", logo: "/worldcoin.jpeg" },
-        DNA: { symbol: "DNA", name: "DNA Token", logo: "/dna-token.png" },
-        WDD: { symbol: "WDD", name: "Drachma Token", logo: "/drachma-token.png" },
+        TPF: { symbol: "TPF", name: "TPulseFi", logo: "/logo-tpf.png", change: "+5.2%" },
+        WLD: { symbol: "WLD", name: "Worldcoin", logo: "/worldcoin.jpeg", change: "+2.8%" },
+        DNA: { symbol: "DNA", name: "DNA Token", logo: "/dna-token.png", change: "-1.4%" },
+        WDD: { symbol: "WDD", name: "Drachma Token", logo: "/drachma-token.png", change: "+0.7%" },
       }
     } catch (error) {
       console.error("Error getting tokens info:", error)
@@ -211,6 +233,7 @@ export default function WalletPage() {
       name: info.name || symbol,
       logo: info.logo || "/placeholder.svg?height=32&width=32",
       balance: tokenBalances[symbol] || 0,
+      change: info.change || "+0.0%",
     }))
 
   const handleTokenClick = (symbol: string, balance: number) => {
@@ -218,6 +241,16 @@ export default function WalletPage() {
     setSelectedTokenBalance(balance.toString())
     setIsTokenDetailsOpen(true)
   }
+
+  // Calcular valor total estimado (simplificado)
+  const calculateTotalValue = () => {
+    // Valores fictícios para demonstração
+    const tpfValue = balance * 0.00012
+    const otherTokensValue = Object.values(tokenBalances).reduce((acc, val) => acc + val * 0.0001, 0)
+    return tpfValue + otherTokensValue
+  }
+
+  const totalValue = calculateTotalValue()
 
   return (
     <main className="flex min-h-screen flex-col items-center p-4 relative overflow-hidden pb-20">
@@ -245,122 +278,297 @@ export default function WalletPage() {
           transition={{ duration: 0.5 }}
           className="w-full flex flex-col items-center"
         >
-          <div className="w-full flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-white">{translations.wallet?.title || "Carteira"}</h1>
+          {/* Cabeçalho com título e endereço da carteira */}
+          <div className="w-full flex flex-col mb-6">
+            <h1 className="text-2xl font-bold text-white mb-2">{translations.wallet?.title || "Carteira"}</h1>
+
             {walletAddress && (
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-gray-700 to-gray-800 flex items-center justify-center">
-                  <Wallet className="w-4 h-4 text-gray-300" />
+              <motion.div
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="flex items-center justify-between p-3 bg-gray-800/60 backdrop-blur-sm rounded-xl border border-gray-700/50"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-gray-700/50 flex items-center justify-center">
+                    <Wallet className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">{language === "en" ? "Wallet Address" : "Endereço"}</p>
+                    <p className="text-sm font-medium text-gray-200">{formatAddress(walletAddress)}</p>
+                  </div>
                 </div>
-                <span className="text-sm text-gray-300">{formatAddress(walletAddress)}</span>
-              </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full bg-gray-800 hover:bg-gray-700"
+                        onClick={copyToClipboard}
+                      >
+                        <Copy className={`h-4 w-4 ${copiedAddress ? "text-green-400" : "text-gray-400"}`} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{copiedAddress ? "Copied!" : "Copy address"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </motion.div>
             )}
           </div>
 
-          {/* Saldo TPF */}
-          <Card className="w-full bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 mb-6">
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-center">
-                <CardDescription>{translations.wallet?.balance || "Saldo TPF"}</CardDescription>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0"
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                >
-                  <RefreshCw size={14} className={`text-gray-400 ${isRefreshing ? "animate-spin" : ""}`} />
-                </Button>
-              </div>
-              {loading ? (
-                <div className="h-8 w-32 bg-gray-700 animate-pulse rounded"></div>
-              ) : (
-                <CardTitle className="text-3xl font-bold">
-                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-100 to-white">
-                    {balance.toLocaleString(language === "pt" ? "pt-BR" : "en-US")} TPF
-                  </span>
-                </CardTitle>
-              )}
-            </CardHeader>
-            <CardContent className="pb-4">
-              {/* Botões compactos */}
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-gray-800 border-gray-700 hover:bg-gray-700 text-white text-xs py-2"
-                  onClick={() => setIsSendModalOpen(true)}
-                >
-                  <ArrowUpRight className="w-3 h-3 mr-1" />
-                  {translations.wallet?.send || "Enviar"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-gray-800 border-gray-700 hover:bg-gray-700 text-white text-xs py-2"
-                  onClick={() => setIsReceiveTokenModalOpen(true)}
-                >
-                  <ArrowDownLeft className="w-3 h-3 mr-1" />
-                  {translations.wallet?.receive || "Receber"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-gray-800 border-gray-700 hover:bg-gray-700 text-white text-xs py-2"
-                  onClick={() => setIsSwapModalOpen(true)}
-                >
-                  <ArrowUpDown className="w-3 h-3 mr-1" />
-                  {translations.wallet?.swap || "Swap"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Card principal com saldo e valor total */}
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+            <Card className="w-full bg-gradient-to-br from-gray-800/80 to-gray-900/90 border border-gray-700/50 shadow-xl mb-6 overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-purple-600/10 z-0"></div>
 
-          {/* Outros Tokens Confiáveis */}
-          <Card className="w-full bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 mt-4 mb-6">
-            <CardHeader className="pb-2">
-              <CardDescription>{translations.wallet?.otherTokens || "Outros Tokens Confiáveis"}</CardDescription>
-            </CardHeader>
-            <CardContent className="pb-4">
-              {loading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-16 bg-gray-800 animate-pulse rounded-lg"></div>
-                  ))}
+              <CardHeader className="relative z-10 pb-0">
+                <div className="flex justify-between items-center">
+                  <CardDescription className="text-gray-300">
+                    {translations.wallet?.totalBalance || "Total Balance"}
+                  </CardDescription>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 rounded-full bg-gray-800/70 hover:bg-gray-700/70 p-0"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                  >
+                    <RefreshCw size={14} className={`text-gray-300 ${isRefreshing ? "animate-spin" : ""}`} />
+                  </Button>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {otherTokens.map((token) => (
-                    <button
-                      key={token.symbol}
-                      onClick={() => handleTokenClick(token.symbol, token.balance)}
-                      className="w-full flex items-center justify-between p-2 rounded-lg bg-gray-800/50 border border-gray-700/30 hover:bg-gray-700/50 transition-colors"
-                    >
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 rounded-full overflow-hidden mr-3">
-                          <Image src={token.logo || "/placeholder.svg"} alt={token.name} width={32} height={32} />
+
+                {loading ? (
+                  <div className="h-10 w-48 bg-gray-700/50 animate-pulse rounded-lg mt-1"></div>
+                ) : (
+                  <div className="space-y-1">
+                    <CardTitle className="text-3xl font-bold">
+                      <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-100 via-white to-blue-100">
+                        $
+                        {totalValue.toLocaleString(language === "pt" ? "pt-BR" : "en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    </CardTitle>
+                    <p className="text-sm text-gray-400">
+                      {balance.toLocaleString(language === "pt" ? "pt-BR" : "en-US")} TPF
+                    </p>
+                  </div>
+                )}
+              </CardHeader>
+
+              <CardContent className="relative z-10 pt-6 pb-4">
+                {/* Botões de ação */}
+                <div className="grid grid-cols-3 gap-3">
+                  <Button
+                    variant="secondary"
+                    className="bg-gradient-to-br from-blue-600/20 to-blue-700/20 border border-blue-500/20 hover:from-blue-600/30 hover:to-blue-700/30 text-white flex flex-col items-center h-auto py-3"
+                    onClick={() => setIsSendModalOpen(true)}
+                  >
+                    <div className="rounded-full bg-blue-500/20 p-2 mb-1">
+                      <ArrowUpRight className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <span className="text-xs font-medium">{translations.wallet?.send || "Send"}</span>
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    className="bg-gradient-to-br from-purple-600/20 to-purple-700/20 border border-purple-500/20 hover:from-purple-600/30 hover:to-purple-700/30 text-white flex flex-col items-center h-auto py-3"
+                    onClick={() => setIsReceiveTokenModalOpen(true)}
+                  >
+                    <div className="rounded-full bg-purple-500/20 p-2 mb-1">
+                      <ArrowDownLeft className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <span className="text-xs font-medium">{translations.wallet?.receive || "Receive"}</span>
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    className="bg-gradient-to-br from-green-600/20 to-green-700/20 border border-green-500/20 hover:from-green-600/30 hover:to-green-700/30 text-white flex flex-col items-center h-auto py-3"
+                    onClick={() => setIsSwapModalOpen(true)}
+                  >
+                    <div className="rounded-full bg-green-500/20 p-2 mb-1">
+                      <ArrowUpDown className="w-4 h-4 text-green-400" />
+                    </div>
+                    <span className="text-xs font-medium">{translations.wallet?.swap || "Swap"}</span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Tabs para Assets e Activity */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="w-full"
+          >
+            <Tabs defaultValue="assets" className="w-full">
+              <TabsList className="grid grid-cols-2 mb-4 bg-gray-800/60 border border-gray-700/50">
+                <TabsTrigger value="assets" className="data-[state=active]:bg-gray-700/60">
+                  {translations.wallet?.assets || "Assets"}
+                </TabsTrigger>
+                <TabsTrigger value="activity" className="data-[state=active]:bg-gray-700/60">
+                  {translations.wallet?.activity || "Activity"}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="assets" className="mt-0">
+                {/* TPF Token Card */}
+                <Card className="w-full bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 mb-4 overflow-hidden">
+                  <button onClick={() => handleTokenClick("TPF", balance)} className="w-full text-left">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-900/30 to-purple-900/30 border border-gray-700/50">
+                            <Image src="/logo-tpf.png" alt="TPF" fill className="object-cover p-1" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium text-white">TPulseFi</h3>
+                            <div className="flex items-center space-x-2">
+                              <p className="text-sm text-gray-400">TPF</p>
+                              <Badge
+                                variant="outline"
+                                className="text-xs bg-green-900/20 text-green-400 border-green-500/30"
+                              >
+                                <TrendingUp className="w-3 h-3 mr-1" />
+                                +5.2%
+                              </Badge>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="text-sm font-medium text-white">{token.symbol}</div>
-                          <div className="text-xs text-gray-400">{token.name}</div>
+
+                        <div className="flex items-center space-x-2">
+                          <div className="text-right">
+                            <p className="font-medium text-white">
+                              {loading ? (
+                                <span className="inline-block w-20 h-5 bg-gray-700 animate-pulse rounded"></span>
+                              ) : (
+                                balance.toLocaleString(language === "pt" ? "pt-BR" : "en-US")
+                              )}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              $
+                              {(balance * 0.00012).toLocaleString(language === "pt" ? "pt-BR" : "en-US", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-gray-500" />
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm font-medium text-white">
-                          {token.balance.toLocaleString(language === "pt" ? "pt-BR" : "en-US")}
-                        </div>
-                        <div className="text-xs text-gray-400">{token.symbol}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    </CardContent>
+                  </button>
+                </Card>
+
+                {/* Outros Tokens */}
+                <h3 className="text-sm font-medium text-gray-400 mb-3 ml-1">
+                  {translations.wallet?.otherTokens || "Other Tokens"}
+                </h3>
+
+                {loading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-16 bg-gray-800/60 animate-pulse rounded-lg"></div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {otherTokens.map((token) => (
+                      <Card
+                        key={token.symbol}
+                        className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 overflow-hidden"
+                      >
+                        <button
+                          onClick={() => handleTokenClick(token.symbol, token.balance)}
+                          className="w-full text-left"
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/50">
+                                  <Image
+                                    src={token.logo || "/placeholder.svg"}
+                                    alt={token.name}
+                                    fill
+                                    className="object-cover p-1"
+                                  />
+                                </div>
+                                <div>
+                                  <h3 className="font-medium text-white">{token.name}</h3>
+                                  <div className="flex items-center space-x-2">
+                                    <p className="text-sm text-gray-400">{token.symbol}</p>
+                                    <Badge
+                                      variant="outline"
+                                      className={`text-xs ${
+                                        token.change.startsWith("+")
+                                          ? "bg-green-900/20 text-green-400 border-green-500/30"
+                                          : "bg-red-900/20 text-red-400 border-red-500/30"
+                                      }`}
+                                    >
+                                      <TrendingUp className="w-3 h-3 mr-1" />
+                                      {token.change}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center space-x-2">
+                                <div className="text-right">
+                                  <p className="font-medium text-white">
+                                    {token.balance.toLocaleString(language === "pt" ? "pt-BR" : "en-US")}
+                                  </p>
+                                  <p className="text-xs text-gray-400">
+                                    $
+                                    {(token.balance * 0.0001).toLocaleString(language === "pt" ? "pt-BR" : "en-US", {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}
+                                  </p>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-gray-500" />
+                              </div>
+                            </div>
+                          </CardContent>
+                        </button>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="activity" className="mt-0">
+                <Card className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50">
+                  <CardContent className="p-6 flex flex-col items-center justify-center min-h-[200px]">
+                    <div className="w-16 h-16 rounded-full bg-gray-800/80 flex items-center justify-center mb-4">
+                      <RefreshCw className="w-8 h-8 text-gray-500" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-300 mb-1">
+                      {translations.wallet?.noActivity || "No recent activity"}
+                    </h3>
+                    <p className="text-sm text-gray-400 text-center max-w-xs">
+                      {translations.wallet?.activityDescription ||
+                        "Your transaction history will appear here once you start sending or receiving tokens."}
+                    </p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </motion.div>
 
           {/* Mensagem de erro ou informação */}
           {error && (
-            <div className="w-full mb-6">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="w-full mt-6"
+            >
               <div className="bg-red-900/20 border border-red-800/30 rounded-lg p-4">
                 <div className="flex items-start">
                   <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 mr-3 flex-shrink-0" />
@@ -372,7 +580,7 @@ export default function WalletPage() {
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
         </motion.div>
       </div>
