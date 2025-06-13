@@ -48,35 +48,28 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
     if (typeof window !== "undefined" && window.MiniKit) {
       addDebugLog("✅ MiniKit está disponível")
 
-      // Listar todas as propriedades e métodos disponíveis
+      // Verificar se tem commandsAsync
+      if (window.MiniKit.commandsAsync) {
+        addDebugLog("✅ MiniKit.commandsAsync está disponível")
+
+        // Verificar sendTransaction
+        if (typeof window.MiniKit.commandsAsync.sendTransaction === "function") {
+          addDebugLog("✅ MiniKit.commandsAsync.sendTransaction está disponível")
+        } else {
+          addDebugLog("❌ MiniKit.commandsAsync.sendTransaction não encontrado")
+        }
+      } else {
+        addDebugLog("❌ MiniKit.commandsAsync não está disponível")
+      }
+
+      // Listar todas as propriedades disponíveis
       const miniKitKeys = Object.keys(window.MiniKit)
-      addDebugLog(`Métodos disponíveis: ${miniKitKeys.join(", ")}`)
-
-      // Verificar métodos específicos
-      const methodsToCheck = [
-        "sendTransaction",
-        "sendTransactions",
-        "executeTransaction",
-        "signTransaction",
-        "payWithWorldcoin",
-        "pay",
-        "transfer",
-        "sendPayment",
-      ]
-
-      methodsToCheck.forEach((method) => {
-        const exists = typeof window.MiniKit[method] === "function"
-        addDebugLog(`${method}: ${exists ? "✅ Disponível" : "❌ Não encontrado"}`)
-      })
+      addDebugLog(`Propriedades do MiniKit: ${miniKitKeys.join(", ")}`)
 
       // Verificar se é conectado
       if (typeof window.MiniKit.isConnected === "function") {
         addDebugLog(`Conectado: ${window.MiniKit.isConnected()}`)
       }
-
-      // Verificar outras propriedades
-      addDebugLog(`Tipo do MiniKit: ${typeof window.MiniKit}`)
-      addDebugLog(`Constructor: ${window.MiniKit.constructor?.name || "N/A"}`)
     } else {
       addDebugLog("❌ MiniKit não está disponível")
     }
@@ -133,7 +126,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
     // Limpar logs anteriores
     setDebugLogs([])
 
-    addDebugLog("=== INICIANDO ENVIO DE TOKEN ===")
+    addDebugLog("=== INICIANDO ENVIO DE TOKEN (API NOVA) ===")
     addDebugLog(`Destinatário: ${recipient}`)
     addDebugLog(`Quantidade: ${amount}`)
     addDebugLog(`Token: ${selectedToken?.symbol}`)
@@ -158,8 +151,6 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
     const amountNum = Number.parseFloat(amount)
     const availableBalance = Number.parseFloat(selectedToken.balance)
 
-    console.log("Amount validation:", { amountNum, availableBalance, isValid: !isNaN(amountNum) && amountNum > 0 })
-
     if (isNaN(amountNum) || amountNum <= 0) {
       console.error("❌ Invalid amount:", { amount, amountNum })
       toast.error(t.sendToken?.invalidValue || "Invalid value")
@@ -175,9 +166,9 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
     // Re-inspecionar MiniKit antes de usar
     inspectMiniKit()
 
-    if (!window.MiniKit) {
-      console.error("❌ MiniKit not available")
-      toast.error(t.sendToken?.minikitNotInstalled || "MiniKit not available")
+    if (!window.MiniKit || !window.MiniKit.commandsAsync) {
+      console.error("❌ MiniKit.commandsAsync not available")
+      toast.error("MiniKit não está disponível ou é uma versão antiga")
       return
     }
 
@@ -185,7 +176,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
     setTransactionStatus("pending")
 
     try {
-      addDebugLog("🚀 Iniciando processo de envio...")
+      addDebugLog("🚀 Usando a nova API do MiniKit...")
       addDebugLog(`Token: ${selectedToken.symbol} (${selectedToken.address})`)
       addDebugLog(`Quantidade: ${amount} (${selectedToken.decimals} decimais)`)
 
@@ -194,136 +185,85 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
       const amountInWei = ethers.parseUnits(amount, selectedToken.decimals || 18)
       addDebugLog(`Quantidade em wei: ${amountInWei.toString()}`)
 
-      // Criar interface ERC20
-      addDebugLog("Criando interface ERC20...")
-      const erc20Interface = new ethers.Interface(AbiService.createERC20Interface())
-      addDebugLog("Interface ERC20 criada com sucesso")
+      // Preparar transação usando a nova API
+      addDebugLog("Preparando transação com a nova API...")
 
-      // Codificar função transfer
-      addDebugLog("Codificando função transfer...")
-      const transferData = erc20Interface.encodeFunctionData("transfer", [recipient, amountInWei])
-      addDebugLog(`Dados da transferência: ${transferData.substring(0, 50)}...`)
-
-      const transactionParams = {
-        to: selectedToken.address,
-        value: "0",
-        data: transferData,
+      const transactionPayload = {
+        transaction: [
+          {
+            address: selectedToken.address, // Endereço do contrato do token
+            abi: AbiService.getERC20ABI(), // ABI completo do ERC20
+            functionName: "transfer", // Nome da função
+            args: [recipient, amountInWei.toString()], // Argumentos: [to, amount]
+          },
+        ],
       }
 
-      addDebugLog(`Parâmetros finais: ${JSON.stringify(transactionParams)}`)
+      addDebugLog(`Payload da transação: ${JSON.stringify(transactionPayload, null, 2)}`)
+      addDebugLog("Chamando MiniKit.commandsAsync.sendTransaction...")
 
-      // Tentar diferentes métodos do MiniKit
-      let transactionId: string | null = null
+      // Enviar transação usando a nova API
+      const result = await window.MiniKit.commandsAsync.sendTransaction(transactionPayload)
 
-      addDebugLog("Tentando diferentes métodos do MiniKit...")
+      addDebugLog(`Resultado da transação: ${JSON.stringify(result)}`)
 
-      // Método 1: sendTransaction
-      if (typeof window.MiniKit.sendTransaction === "function") {
-        addDebugLog("Tentando MiniKit.sendTransaction...")
-        try {
-          transactionId = await window.MiniKit.sendTransaction(transactionParams)
-          addDebugLog(`✅ sendTransaction funcionou! ID: ${transactionId}`)
-        } catch (error) {
-          addDebugLog(`❌ sendTransaction falhou: ${error.message}`)
-        }
+      if (result.finalPayload?.status === "error") {
+        addDebugLog(`❌ Erro na transação: ${result.finalPayload.error}`)
+        throw new Error(`Transaction failed: ${result.finalPayload.error}`)
       }
 
-      // Método 2: sendTransactions (plural)
-      if (!transactionId && typeof window.MiniKit.sendTransactions === "function") {
-        addDebugLog("Tentando MiniKit.sendTransactions...")
-        try {
-          transactionId = await window.MiniKit.sendTransactions([transactionParams])
-          addDebugLog(`✅ sendTransactions funcionou! ID: ${transactionId}`)
-        } catch (error) {
-          addDebugLog(`❌ sendTransactions falhou: ${error.message}`)
-        }
-      }
-
-      // Método 3: executeTransaction
-      if (!transactionId && typeof window.MiniKit.executeTransaction === "function") {
-        addDebugLog("Tentando MiniKit.executeTransaction...")
-        try {
-          transactionId = await window.MiniKit.executeTransaction(transactionParams)
-          addDebugLog(`✅ executeTransaction funcionou! ID: ${transactionId}`)
-        } catch (error) {
-          addDebugLog(`❌ executeTransaction falhou: ${error.message}`)
-        }
-      }
-
-      // Método 4: payWithWorldcoin (se for um pagamento)
-      if (!transactionId && typeof window.MiniKit.payWithWorldcoin === "function") {
-        addDebugLog("Tentando MiniKit.payWithWorldcoin...")
-        try {
-          const paymentParams = {
-            reference: `transfer-${Date.now()}`,
-            to: recipient,
-            tokens: [
-              {
-                symbol: selectedToken.symbol,
-                token_amount: amount,
-              },
-            ],
-          }
-          transactionId = await window.MiniKit.payWithWorldcoin(paymentParams)
-          addDebugLog(`✅ payWithWorldcoin funcionou! ID: ${transactionId}`)
-        } catch (error) {
-          addDebugLog(`❌ payWithWorldcoin falhou: ${error.message}`)
-        }
-      }
-
+      const transactionId = result.finalPayload?.transaction_id
       if (!transactionId) {
-        throw new Error("Nenhum método do MiniKit funcionou para enviar a transação")
+        addDebugLog("❌ Nenhum transaction_id recebido")
+        throw new Error("No transaction ID received")
       }
 
       addDebugLog(`✅ Transação enviada! ID: ${transactionId}`)
       setTransactionStatus("confirming")
 
-      if (transactionId) {
-        addDebugLog("🔍 Verificando transação...")
+      // Verificar transação
+      addDebugLog("🔍 Verificando transação...")
+      const verificationPayload = { transaction_id: transactionId }
+      addDebugLog(`Payload de verificação: ${JSON.stringify(verificationPayload)}`)
 
-        const verificationPayload = { transaction_id: transactionId }
-        addDebugLog(`Payload de verificação: ${JSON.stringify(verificationPayload)}`)
+      const verificationResult = await fetch("/api/transaction-verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(verificationPayload),
+      })
 
-        const verificationResult = await fetch("/api/transaction-verify", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(verificationPayload),
+      addDebugLog(`Status da verificação: ${verificationResult.status}`)
+
+      if (verificationResult.ok) {
+        const txData = await verificationResult.json()
+        addDebugLog(`✅ Transação verificada: ${JSON.stringify(txData)}`)
+
+        setTxHash(txData.hash || transactionId)
+        setTransactionStatus("success")
+
+        toast.success(t.sendToken?.tokensSentSuccess || "Tokens sent successfully!", {
+          description: `${amount} ${selectedToken.symbol} ${t.sendToken?.sentTo || "sent to"} ${recipient.substring(0, 10)}...`,
+          action: txData.hash
+            ? {
+                label: t.sendToken?.viewTx || "View TX",
+                onClick: () => window.open(`https://worldscan.org/tx/${txData.hash}`, "_blank"),
+              }
+            : undefined,
         })
 
-        addDebugLog(`Status da verificação: ${verificationResult.status}`)
-        addDebugLog(`Verificação OK: ${verificationResult.ok}`)
+        console.log("🎉 Transaction completed successfully!")
 
-        if (verificationResult.ok) {
-          const txData = await verificationResult.json()
-          addDebugLog(`✅ Transação verificada: ${JSON.stringify(txData)}`)
-
-          setTxHash(txData.hash || transactionId)
-          setTransactionStatus("success")
-
-          toast.success(t.sendToken?.tokensSentSuccess || "Tokens sent successfully!", {
-            description: `${amount} ${selectedToken.symbol} ${t.sendToken?.sentTo || "sent to"} ${recipient.substring(0, 10)}...`,
-            action: txData.hash
-              ? {
-                  label: t.sendToken?.viewTx || "View TX",
-                  onClick: () => window.open(`https://worldscan.org/tx/${txData.hash}`, "_blank"),
-                }
-              : undefined,
-          })
-
-          console.log("🎉 Transaction completed successfully!")
-
-          // Auto-close modal after success
-          setTimeout(() => {
-            console.log("Auto-closing modal...")
-            onClose()
-          }, 3000)
-        } else {
-          const errorText = await verificationResult.text()
-          addDebugLog(`❌ Falha na verificação: ${errorText}`)
-          throw new Error(`Verification failed: ${errorText}`)
-        }
+        // Auto-close modal after success
+        setTimeout(() => {
+          console.log("Auto-closing modal...")
+          onClose()
+        }, 3000)
+      } else {
+        const errorText = await verificationResult.text()
+        addDebugLog(`❌ Falha na verificação: ${errorText}`)
+        throw new Error(`Verification failed: ${errorText}`)
       }
     } catch (error: any) {
       addDebugLog("=== ERRO NA TRANSAÇÃO ===")
@@ -346,16 +286,12 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
 
       if (error.message?.includes("insufficient")) {
         errorMessage = "Saldo insuficiente"
-        console.error("🔍 Insufficient balance error detected")
       } else if (error.message?.includes("rejected")) {
         errorMessage = "Transação rejeitada pelo usuário"
-        console.error("🔍 User rejection error detected")
       } else if (error.message?.includes("network")) {
         errorMessage = "Erro de rede. Tente novamente."
-        console.error("🔍 Network error detected")
       } else if (error.message?.includes("gas")) {
         errorMessage = "Erro de gas. Verifique se tem ETH suficiente."
-        console.error("🔍 Gas error detected")
       }
 
       console.error("Final error message:", errorMessage)
@@ -678,31 +614,34 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
 declare global {
   interface Window {
     MiniKit?: {
-      sendTransaction?: (params: {
-        to: string
-        value: string
-        data: string
-      }) => Promise<string>
-      sendTransactions?: (
-        transactions: Array<{
-          to: string
-          value: string
-          data: string
-        }>,
-      ) => Promise<string>
-      executeTransaction?: (params: {
-        to: string
-        value: string
-        data: string
-      }) => Promise<string>
-      payWithWorldcoin?: (params: {
-        reference: string
-        to: string
-        tokens: Array<{
-          symbol: string
-          token_amount: string
+      commandsAsync?: {
+        sendTransaction: (params: {
+          transaction: Array<{
+            address: string
+            abi: any[]
+            functionName: string
+            args: any[]
+            value?: string
+          }>
+          permit2?: Array<{
+            permitted: {
+              token: string
+              amount: string
+            }
+            spender: string
+            nonce: string
+            deadline: string
+          }>
+          formatPayload?: boolean
+        }) => Promise<{
+          commandPayload: any
+          finalPayload: {
+            status: "success" | "error"
+            transaction_id?: string
+            error?: string
+          }
         }>
-      }) => Promise<string>
+      }
       isConnected?: () => boolean
     }
   }
