@@ -159,9 +159,15 @@ class WalletService {
   }): Promise<{ success: boolean; txHash?: string; error?: string }> {
     try {
       console.log(`📤 Sending ${params.amount} tokens to ${params.to}`)
+      console.log(`Token address: ${params.tokenAddress || "ETH"}`)
 
-      // Mock successful transaction
+      // Aqui você pode implementar a lógica real de envio
+      // Por enquanto, simular envio bem-sucedido
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
       const mockTxHash = `0x${Math.random().toString(16).substr(2, 64)}`
+
+      console.log(`✅ Token sent successfully: ${mockTxHash}`)
 
       return {
         success: true,
