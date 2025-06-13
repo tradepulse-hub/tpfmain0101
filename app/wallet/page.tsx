@@ -27,7 +27,7 @@ import { ReceiveTokenModal } from "@/components/receive-token-modal"
 import { SwapModal } from "@/components/swap-modal"
 import { TransactionHistory } from "@/components/transaction-history"
 import { toast } from "sonner"
-import { useTranslation } from "@/hooks/use-translation"
+import { useTranslation } from "@/lib/i18n"
 
 export default function WalletPage() {
   const [walletAddress, setWalletAddress] = useState<string>("")
@@ -42,7 +42,7 @@ export default function WalletPage() {
   // Modal states
   const [isSetBalanceModalOpen, setIsSetBalanceModalOpen] = useState(false)
   const [isSendModalOpen, setIsSendModalOpen] = useState(false)
-  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
+  const [isReceiveModalOpen, setIsReceiveTokenModalOpen] = useState(false)
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false)
 
   const router = useRouter()
@@ -186,7 +186,7 @@ export default function WalletPage() {
 
       <ReceiveTokenModal
         isOpen={isReceiveModalOpen}
-        onClose={() => setIsReceiveModalOpen(false)}
+        onClose={() => setIsReceiveTokenModalOpen(false)}
         walletAddress={walletAddress}
       />
 
@@ -289,7 +289,7 @@ export default function WalletPage() {
                   <Button
                     variant="secondary"
                     className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
-                    onClick={() => setIsReceiveModalOpen(true)}
+                    onClick={() => setIsReceiveTokenModalOpen(true)}
                   >
                     <div className="rounded-full bg-gray-700 p-2 mb-1">
                       <ArrowDownLeft className="w-4 h-4 text-gray-400" />
