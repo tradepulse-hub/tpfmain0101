@@ -27,6 +27,7 @@ import { ReceiveTokenModal } from "@/components/receive-token-modal"
 import { SwapModal } from "@/components/swap-modal"
 import { TransactionHistory } from "@/components/transaction-history"
 import { toast } from "sonner"
+import { useTranslation } from "@/hooks/use-translation"
 
 export default function WalletPage() {
   const [walletAddress, setWalletAddress] = useState<string>("")
@@ -45,6 +46,7 @@ export default function WalletPage() {
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false)
 
   const router = useRouter()
+  const { t } = useTranslation()
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -126,10 +128,10 @@ export default function WalletPage() {
     setIsRefreshing(true)
     try {
       await fetchWalletData(walletAddress)
-      toast.success("Saldos atualizados!")
+      toast.success(t.wallet?.balancesUpdated || "Balances updated!")
     } catch (error) {
       console.error("Erro ao atualizar saldo:", error)
-      toast.error("Erro ao atualizar saldos")
+      toast.error(t.wallet?.errorUpdatingBalances || "Error updating balances")
     } finally {
       setIsRefreshing(false)
     }
@@ -199,7 +201,7 @@ export default function WalletPage() {
         >
           {/* Header */}
           <div className="w-full flex flex-col mb-6">
-            <h1 className="text-2xl font-bold text-white mb-2">Carteira</h1>
+            <h1 className="text-2xl font-bold text-white mb-2">{t.wallet?.title || "Wallet"}</h1>
 
             {walletAddress && (
               <motion.div
@@ -213,7 +215,7 @@ export default function WalletPage() {
                     <Wallet className="w-5 h-5 text-blue-400" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400">Endereço</p>
+                    <p className="text-xs text-gray-400">{t.wallet?.address || "Address"}</p>
                     <p className="text-sm font-medium text-gray-200">{formatAddress(walletAddress)}</p>
                   </div>
                 </div>
@@ -230,7 +232,9 @@ export default function WalletPage() {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>{copiedAddress ? "Copiado!" : "Copiar endereço"}</p>
+                      <p>
+                        {copiedAddress ? t.wallet?.addressCopied || "Copied!" : t.wallet?.copyAddress || "Copy address"}
+                      </p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -245,7 +249,7 @@ export default function WalletPage() {
 
               <CardHeader className="relative z-10 pb-0">
                 <div className="flex justify-between items-center">
-                  <CardDescription className="text-gray-300">TPF Balance</CardDescription>
+                  <CardDescription className="text-gray-300">{t.wallet?.balance || "TPF Balance"}</CardDescription>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -279,7 +283,7 @@ export default function WalletPage() {
                     <div className="rounded-full bg-gray-700 p-2 mb-1">
                       <ArrowUpRight className="w-4 h-4 text-gray-400" />
                     </div>
-                    <span className="text-xs font-medium">Enviar</span>
+                    <span className="text-xs font-medium">{t.wallet?.send || "Send"}</span>
                   </Button>
 
                   <Button
@@ -290,7 +294,7 @@ export default function WalletPage() {
                     <div className="rounded-full bg-gray-700 p-2 mb-1">
                       <ArrowDownLeft className="w-4 h-4 text-gray-400" />
                     </div>
-                    <span className="text-xs font-medium">Receber</span>
+                    <span className="text-xs font-medium">{t.wallet?.receive || "Receive"}</span>
                   </Button>
 
                   <Button
@@ -301,7 +305,7 @@ export default function WalletPage() {
                     <div className="rounded-full bg-gray-700 p-2 mb-1">
                       <ArrowUpDown className="w-4 h-4 text-gray-400" />
                     </div>
-                    <span className="text-xs font-medium">Swap</span>
+                    <span className="text-xs font-medium">{t.wallet?.swap || "Swap"}</span>
                   </Button>
                 </div>
               </CardContent>
@@ -323,7 +327,7 @@ export default function WalletPage() {
                   activeTab === "assets" ? "bg-gray-700/60 text-white" : "text-gray-400 hover:text-gray-300"
                 }`}
               >
-                Assets
+                {t.wallet?.assets || "Assets"}
               </button>
               <button
                 onClick={() => setActiveTab("activity")}
@@ -331,7 +335,7 @@ export default function WalletPage() {
                   activeTab === "activity" ? "bg-gray-700/60 text-white" : "text-gray-400 hover:text-gray-300"
                 }`}
               >
-                Atividade
+                {t.wallet?.activity || "Activity"}
               </button>
             </div>
 
@@ -378,7 +382,9 @@ export default function WalletPage() {
                 </Card>
 
                 {/* Other Tokens */}
-                <h3 className="text-sm font-medium text-gray-400 mb-3 ml-1">Outros Tokens</h3>
+                <h3 className="text-sm font-medium text-gray-400 mb-3 ml-1">
+                  {t.wallet?.otherTokens || "Other Tokens"}
+                </h3>
 
                 {loading ? (
                   <div className="space-y-3">
@@ -458,7 +464,9 @@ export default function WalletPage() {
                   <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 mr-3 flex-shrink-0" />
                   <div>
                     <h3 className="text-red-300 font-medium mb-1">Erro ao obter saldo</h3>
-                    <p className="text-red-200/80 text-sm">{error}</p>
+                    <p className="text-red-200/80 text-sm">
+                      {t.wallet?.errorMessage || "Could not get real balance. Try setting it manually."}
+                    </p>
                     <Button
                       variant="outline"
                       size="sm"
