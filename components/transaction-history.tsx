@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { ArrowUpRight, ArrowDownLeft, RefreshCw, ExternalLink, ArrowUpDown } from "lucide-react"
 import { walletService } from "@/services/wallet-service"
 import type { Transaction } from "@/services/types"
+import { useTranslation } from "@/hooks/use-translation"
 
 interface TransactionHistoryProps {
   walletAddress: string
@@ -16,6 +17,7 @@ export function TransactionHistory({ walletAddress, daysToShow = 7, tokenFilter 
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { t } = useTranslation()
 
   useEffect(() => {
     if (!walletAddress) return
@@ -83,9 +85,9 @@ export function TransactionHistory({ walletAddress, daysToShow = 7, tokenFilter 
   const getTransactionTypeText = (type: string) => {
     switch (type) {
       case "send":
-        return "Enviado"
+        return t.history?.sent || "Sent"
       case "receive":
-        return "Recebido"
+        return t.history?.received || "Received"
       case "swap":
         return "Swap"
       default:
@@ -100,7 +102,9 @@ export function TransactionHistory({ walletAddress, daysToShow = 7, tokenFilter 
       className="bg-gray-900/50 rounded-lg border border-gray-800 p-4"
     >
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-white font-medium">{tokenFilter ? `Histórico ${tokenFilter}` : "Atividade Recente"}</h3>
+        <h3 className="text-white font-medium">
+          {tokenFilter ? `Histórico ${tokenFilter}` : t.history?.title || "Recent Activity"}
+        </h3>
         <button
           onClick={handleRefresh}
           disabled={isLoading}
@@ -164,7 +168,9 @@ export function TransactionHistory({ walletAddress, daysToShow = 7, tokenFilter 
         ) : (
           <div className="text-center py-6 text-gray-400">
             <div className="text-sm">
-              {tokenFilter ? `Nenhuma transação ${tokenFilter} encontrada` : "Nenhuma transação recente"}
+              {tokenFilter
+                ? `Nenhuma transação ${tokenFilter} encontrada`
+                : t.history?.noTransactions || "No recent transactions"}
             </div>
           </div>
         )}
