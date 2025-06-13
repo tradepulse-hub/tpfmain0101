@@ -25,7 +25,6 @@ import { SetBalanceModal } from "@/components/set-balance-modal"
 import { SendTokenModal } from "@/components/send-token-modal"
 import { ReceiveTokenModal } from "@/components/receive-token-modal"
 import { SwapModal } from "@/components/swap-modal"
-import { TransactionHistory } from "@/components/transaction-history"
 import { toast } from "sonner"
 import { useTranslation } from "@/lib/i18n"
 
@@ -37,7 +36,6 @@ export default function WalletPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copiedAddress, setCopiedAddress] = useState(false)
-  const [activeTab, setActiveTab] = useState<"assets" | "activity">("assets")
 
   // Modal states
   const [isSetBalanceModalOpen, setIsSetBalanceModalOpen] = useState(false)
@@ -314,159 +312,114 @@ export default function WalletPage() {
             </Card>
           </motion.div>
 
-          {/* Tabs */}
+          {/* Assets Section - Removido tabs, apenas mostra assets diretamente */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
             className="w-full"
           >
-            {/* Tab Headers */}
-            <div className="grid grid-cols-2 mb-4 bg-gray-800/60 border border-gray-700/50 rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab("assets")}
-                className={`py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                  activeTab === "assets"
-                    ? "bg-gray-700/80 text-white shadow-sm"
-                    : "text-gray-400 hover:text-gray-300 hover:bg-gray-700/40"
-                }`}
-              >
-                {t.wallet?.assets || "Assets"}
-              </button>
-              <button
-                onClick={() => {
-                  console.log("Activity tab clicked")
-                  setActiveTab("activity")
-                }}
-                className={`py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                  activeTab === "activity"
-                    ? "bg-gray-700/80 text-white shadow-sm"
-                    : "text-gray-400 hover:text-gray-300 hover:bg-gray-700/40"
-                }`}
-              >
-                {t.wallet?.activity || "Activity"}
-              </button>
-            </div>
-
-            {/* Tab Content */}
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              {activeTab === "assets" && (
-                <div className="space-y-4">
-                  {/* TPF Token Card */}
-                  <Card className="w-full bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 overflow-hidden">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-900/30 to-purple-900/30 border border-gray-700/50">
-                            <Image src="/logo-tpf.png" alt="TPF" fill className="object-cover p-1" />
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-white">TPulseFi</h3>
-                            <div className="flex items-center space-x-2">
-                              <p className="text-sm text-gray-400">TPF</p>
-                              <Badge
-                                variant="outline"
-                                className="text-xs bg-green-900/20 text-green-400 border-green-500/30"
-                              >
-                                <TrendingUp className="w-3 h-3 mr-1" />
-                                +5.2%
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-
+            <div className="space-y-4">
+              {/* TPF Token Card */}
+              <Card className="w-full bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 overflow-hidden">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-900/30 to-purple-900/30 border border-gray-700/50">
+                        <Image src="/logo-tpf.png" alt="TPF" fill className="object-cover p-1" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-white">TPulseFi</h3>
                         <div className="flex items-center space-x-2">
-                          <div className="text-right">
-                            <p className="font-medium text-white">
-                              {loading ? (
-                                <span className="inline-block w-20 h-5 bg-gray-700 animate-pulse rounded"></span>
-                              ) : (
-                                `${balance > 0 ? balance.toLocaleString("pt-BR") : "0"}`
-                              )}
-                            </p>
-                            <p className="text-xs text-gray-400">TPF</p>
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-gray-500" />
+                          <p className="text-sm text-gray-400">TPF</p>
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-green-900/20 text-green-400 border-green-500/30"
+                          >
+                            <TrendingUp className="w-3 h-3 mr-1" />
+                            +5.2%
+                          </Badge>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Other Tokens */}
-                  <h3 className="text-sm font-medium text-gray-400 mb-3 ml-1">
-                    {t.wallet?.otherTokens || "Other Tokens"}
-                  </h3>
-
-                  {loading ? (
-                    <div className="space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="h-16 bg-gray-800/60 animate-pulse rounded-lg"></div>
-                      ))}
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {otherTokens.map((token) => (
-                        <Card
-                          key={token.symbol}
-                          className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 overflow-hidden"
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/50">
-                                  <Image
-                                    src={token.logo || "/placeholder.svg"}
-                                    alt={token.name}
-                                    fill
-                                    className="object-cover p-1"
-                                  />
-                                </div>
-                                <div>
-                                  <h3 className="font-medium text-white">{token.name}</h3>
-                                  <div className="flex items-center space-x-2">
-                                    <p className="text-sm text-gray-400">{token.symbol}</p>
-                                    <Badge
-                                      variant="outline"
-                                      className={`text-xs ${
-                                        token.change.startsWith("+")
-                                          ? "bg-green-900/20 text-green-400 border-green-500/30"
-                                          : "bg-red-900/20 text-red-400 border-red-500/30"
-                                      }`}
-                                    >
-                                      <TrendingUp className="w-3 h-3 mr-1" />
-                                      {token.change}
-                                    </Badge>
-                                  </div>
-                                </div>
-                              </div>
 
+                    <div className="flex items-center space-x-2">
+                      <div className="text-right">
+                        <p className="font-medium text-white">
+                          {loading ? (
+                            <span className="inline-block w-20 h-5 bg-gray-700 animate-pulse rounded"></span>
+                          ) : (
+                            `${balance > 0 ? balance.toLocaleString("pt-BR") : "0"}`
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-400">TPF</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Other Tokens */}
+              <h3 className="text-sm font-medium text-gray-400 mb-3 ml-1">{t.wallet?.otherTokens || "Other Tokens"}</h3>
+
+              {loading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-16 bg-gray-800/60 animate-pulse rounded-lg"></div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {otherTokens.map((token) => (
+                    <Card
+                      key={token.symbol}
+                      className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 overflow-hidden"
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/50">
+                              <Image
+                                src={token.logo || "/placeholder.svg"}
+                                alt={token.name}
+                                fill
+                                className="object-cover p-1"
+                              />
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-white">{token.name}</h3>
                               <div className="flex items-center space-x-2">
-                                <div className="text-right">
-                                  <p className="font-medium text-white">{token.balance.toLocaleString("pt-BR")}</p>
-                                  <p className="text-xs text-gray-400">{token.symbol}</p>
-                                </div>
-                                <ChevronRight className="w-4 h-4 text-gray-500" />
+                                <p className="text-sm text-gray-400">{token.symbol}</p>
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs ${
+                                    token.change.startsWith("+")
+                                      ? "bg-green-900/20 text-green-400 border-green-500/30"
+                                      : "bg-red-900/20 text-red-400 border-red-500/30"
+                                  }`}
+                                >
+                                  <TrendingUp className="w-3 h-3 mr-1" />
+                                  {token.change}
+                                </Badge>
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                          </div>
 
-              {activeTab === "activity" && (
-                <div className="w-full">
-                  <TransactionHistory walletAddress={walletAddress} daysToShow={30} />
+                          <div className="flex items-center space-x-2">
+                            <div className="text-right">
+                              <p className="font-medium text-white">{token.balance.toLocaleString("pt-BR")}</p>
+                              <p className="text-xs text-gray-400">{token.symbol}</p>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-gray-500" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               )}
-            </motion.div>
+            </div>
           </motion.div>
 
           {/* Error Message */}
