@@ -3,16 +3,19 @@ import PERMIT2_ABI from "../abi/Permit2.json"
 
 export class AbiService {
   static getERC20ABI() {
+    console.log("📋 Getting ERC20 ABI...")
     return ERC20_ABI
   }
 
   static getPermit2ABI() {
+    console.log("📋 Getting Permit2 ABI...")
     return PERMIT2_ABI
   }
 
   // Função helper para obter apenas as funções necessárias
   static getERC20TransferABI() {
-    return ERC20_ABI.filter(
+    console.log("📋 Getting ERC20 Transfer ABI functions...")
+    const transferFunctions = ERC20_ABI.filter(
       (item) =>
         item.name === "transfer" ||
         item.name === "balanceOf" ||
@@ -20,11 +23,14 @@ export class AbiService {
         item.name === "symbol" ||
         item.name === "name",
     )
+    console.log("Found transfer functions:", transferFunctions.length)
+    return transferFunctions
   }
 
   // Função helper para criar interface do ethers
   static createERC20Interface() {
-    return [
+    console.log("🔧 Creating ERC20 Interface...")
+    const interfaceArray = [
       "function transfer(address _to, uint256 _value) returns (bool)",
       "function balanceOf(address _owner) view returns (uint256 balance)",
       "function decimals() view returns (uint8)",
@@ -34,6 +40,8 @@ export class AbiService {
       "function approve(address _spender, uint256 _value) returns (bool)",
       "function allowance(address _owner, address _spender) view returns (uint256)",
     ]
+    console.log("Interface functions:", interfaceArray)
+    return interfaceArray
   }
 
   // Constantes de endereços conhecidos
