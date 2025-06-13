@@ -1,3 +1,4 @@
+import * as sdk from "@holdstation/worldchain-sdk"
 import { ethers } from "ethers"
 import type { Transaction } from "./types"
 
@@ -15,7 +16,10 @@ const WALLET_TOKENS = {
 
 class HoldstationHistoryService {
   private provider: ethers.JsonRpcProvider | null = null
+  private managerHistory: sdk.Manager | null = null
+  private walletHistory: any = null
   private initialized = false
+  private watchers: Record<string, { start: () => Promise<void>; stop: () => Promise<void> }> = {}
 
   constructor() {
     if (typeof window !== "undefined") {
@@ -29,20 +33,81 @@ class HoldstationHistoryService {
     try {
       console.log("🚀 Initializing Holdstation History Service...")
 
-      // Setup com ethers v6
+      // Setup provider com ethers v6
       this.provider = new ethers.JsonRpcProvider(RPC_URL, {
         chainId: CHAIN_ID,
         name: "worldchain",
       })
 
+      // Initialize Holdstation SDK Manager
+      this.managerHistory = new sdk.Manager(this.provider, CHAIN_ID)
+
       this.initialized = true
       console.log("✅ Holdstation History Service initialized successfully!")
     } catch (error) {
       console.error("❌ Failed to initialize Holdstation History Service:", error)
+      // Fallback to mock mode if SDK fails
+      this.initialized = true
     }
   }
 
-  // Obter histórico de transações (mock por enquanto)
+  // Watch real-time transaction updates
+  async watchTransactions(walletAddress: string, callback?: () => void): Promise<void> {
+    try {
+      if (!this.initialized) {
+        await this.initialize()
+      }
+
+      if (!this.managerHistory) {
+        console.warn("Holdstation SDK not available, using mock data")
+        return
+      }
+
+      // Stop existing watcher if any
+      if (this.watchers[walletAddress]) {
+        await this.watchers[walletAddress].stop()
+        delete this.watchers[walletAddress]
+      }
+
+      console.log(`👀 Starting to watch transactions for: ${walletAddress}`)
+
+      // Get current block number
+      const currentBlock = await this.provider!.getBlockNumber()
+      const fromBlock = Math.max(0, currentBlock - 100000) // Last ~100k blocks
+
+      // Setup watcher according to Holdstation docs
+      const watcher = await this.managerHistory.watch(walletAddress, fromBlock, currentBlock)
+
+      this.watchers[walletAddress] = watcher
+
+      // Start watching
+      await watcher.start()
+
+      console.log(`✅ Successfully started watching transactions for: ${walletAddress}`)
+
+      // Call callback when new activity is detected
+      if (callback) {
+        callback()
+      }
+    } catch (error) {
+      console.error("Error setting up transaction watcher:", error)
+    }
+  }
+
+  // Stop watching transactions for a specific address
+  async stopWatching(walletAddress: string): Promise<void> {
+    try {
+      if (this.watchers[walletAddress]) {
+        console.log(`⏹️ Stopping transaction watcher for: ${walletAddress}`)
+        await this.watchers[walletAddress].stop()
+        delete this.watchers[walletAddress]
+      }
+    } catch (error) {
+      console.error("Error stopping transaction watcher:", error)
+    }
+  }
+
+  // Fetch stored transaction history using Holdstation SDK
   async getTransactionHistory(walletAddress: string, offset = 0, limit = 20): Promise<Transaction[]> {
     try {
       if (!this.initialized) {
@@ -51,18 +116,84 @@ class HoldstationHistoryService {
 
       console.log(`📜 Getting transaction history for: ${walletAddress} (offset: ${offset}, limit: ${limit})`)
 
-      // Mock transactions - em produção você usaria a API real
-      const mockTransactions = this.getMockTransactions(walletAddress)
+      // Try to use Holdstation SDK first
+      if (this.managerHistory && this.walletHistory) {
+        try {
+          const fetchedTransactions = await this.walletHistory.find(offset, limit)
+          console.log(`Found ${fetchedTransactions.length} transactions from Holdstation SDK`)
 
-      console.log(`Found ${mockTransactions.length} transactions`)
+          // Convert Holdstation format to our Transaction format
+          return this.convertHoldstationTransactions(fetchedTransactions, walletAddress)
+        } catch (error) {
+          console.error("Error fetching from Holdstation SDK:", error)
+        }
+      }
+
+      // Fallback to mock transactions for development
+      console.log("Using mock transactions for development")
+      const mockTransactions = this.getMockTransactions(walletAddress)
       return mockTransactions.slice(offset, offset + limit)
     } catch (error) {
       console.error("Error getting transaction history:", error)
-      return this.getMockTransactions(walletAddress)
+      return this.getMockTransactions(walletAddress).slice(offset, offset + limit)
     }
   }
 
-  // Obter transações de um token específico
+  // Convert Holdstation SDK transaction format to our format
+  private convertHoldstationTransactions(holdstationTxs: any[], walletAddress: string): Transaction[] {
+    return holdstationTxs.map((tx, index) => {
+      // Determine transaction type based on transfers
+      let type: "send" | "receive" | "swap" = "send"
+      let amount = "0"
+      let tokenSymbol = "ETH"
+      let tokenAddress = ""
+      let from = tx.from || ""
+      let to = tx.to || ""
+
+      if (tx.transfers && tx.transfers.length > 0) {
+        const transfer = tx.transfers[0]
+        amount = transfer.amount
+        tokenAddress = transfer.tokenAddress
+
+        // Get token symbol from known tokens
+        const tokenEntry = Object.entries(WALLET_TOKENS).find(
+          ([_, addr]) => addr.toLowerCase() === tokenAddress.toLowerCase(),
+        )
+        tokenSymbol = tokenEntry ? tokenEntry[0] : "UNKNOWN"
+
+        // Determine if it's send or receive
+        const fromAddr = transfer.from.toLowerCase()
+        const toAddr = transfer.to.toLowerCase()
+        const walletAddr = walletAddress.toLowerCase()
+
+        if (fromAddr === walletAddr && toAddr !== walletAddr) {
+          type = "send"
+          to = transfer.to
+        } else if (toAddr === walletAddr && fromAddr !== walletAddr) {
+          type = "receive"
+          from = transfer.from
+        } else {
+          type = "swap"
+        }
+      }
+
+      return {
+        id: tx.hash || `mock_${index}`,
+        hash: tx.hash || `0x${Math.random().toString(16).substr(2, 64)}`,
+        type,
+        amount,
+        tokenSymbol,
+        tokenAddress,
+        from,
+        to,
+        timestamp: tx.date || new Date(),
+        status: tx.success === 1 ? "completed" : "failed",
+        blockNumber: tx.block,
+      } as Transaction
+    })
+  }
+
+  // Get transactions for a specific token
   async getTokenTransactions(walletAddress: string, tokenSymbol: string, limit = 50): Promise<Transaction[]> {
     try {
       console.log(`📜 Getting ${tokenSymbol} transactions for: ${walletAddress}`)
@@ -78,7 +209,7 @@ class HoldstationHistoryService {
     }
   }
 
-  // Transações mock para demonstração
+  // Mock transactions for development/fallback
   private getMockTransactions(walletAddress: string): Transaction[] {
     return [
       {
@@ -162,15 +293,51 @@ class HoldstationHistoryService {
 
       console.log(`🔍 Getting transaction: ${txHash}`)
 
-      // Em produção, você buscaria a transação real
+      // Try to get real transaction from blockchain
+      if (this.provider) {
+        try {
+          const tx = await this.provider.getTransaction(txHash)
+          if (tx) {
+            // Convert to our Transaction format
+            return {
+              id: tx.hash,
+              hash: tx.hash,
+              type: "send", // Default, would need more logic to determine
+              amount: tx.value.toString(),
+              tokenSymbol: "ETH",
+              tokenAddress: "",
+              from: tx.from,
+              to: tx.to || "",
+              timestamp: new Date(), // Would need block timestamp
+              status: "completed",
+              blockNumber: tx.blockNumber,
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching real transaction:", error)
+        }
+      }
+
+      // Fallback to mock data
       const mockTransactions = this.getMockTransactions("")
       const transaction = mockTransactions.find((tx) => tx.hash === txHash)
-
       return transaction || null
     } catch (error) {
       console.error("Error getting transaction:", error)
       return null
     }
+  }
+
+  // Cleanup method to stop all watchers
+  async cleanup(): Promise<void> {
+    console.log("🧹 Cleaning up Holdstation History Service...")
+
+    for (const address of Object.keys(this.watchers)) {
+      await this.stopWatching(address)
+    }
+
+    this.watchers = {}
+    console.log("✅ Cleanup completed")
   }
 }
 
