@@ -80,12 +80,23 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    console.log("=== SEND TOKEN DEBUG START ===")
+    console.log("Form data:", { recipient, amount, selectedToken })
+    console.log("Wallet address:", walletAddress)
+    console.log("Available tokens:", availableTokens)
+
     if (!recipient || !amount || !selectedToken) {
+      console.error("❌ Missing required fields:", {
+        recipient: !!recipient,
+        amount: !!amount,
+        selectedToken: !!selectedToken,
+      })
       toast.error(t.sendToken?.fillAllFields || "Fill all fields")
       return
     }
 
     if (!recipient.startsWith("0x") || recipient.length !== 42) {
+      console.error("❌ Invalid recipient address:", recipient)
       toast.error(t.sendToken?.invalidAddress || "Invalid address")
       return
     }
@@ -93,18 +104,28 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
     const amountNum = Number.parseFloat(amount)
     const availableBalance = Number.parseFloat(selectedToken.balance)
 
+    console.log("Amount validation:", { amountNum, availableBalance, isValid: !isNaN(amountNum) && amountNum > 0 })
+
     if (isNaN(amountNum) || amountNum <= 0) {
+      console.error("❌ Invalid amount:", { amount, amountNum })
       toast.error(t.sendToken?.invalidValue || "Invalid value")
       return
     }
 
     if (amountNum > availableBalance) {
+      console.error("❌ Insufficient balance:", { requested: amountNum, available: availableBalance })
       toast.error(`Saldo insuficiente. Você tem ${availableBalance} ${selectedToken.symbol}`)
       return
     }
 
     // Verificar se MiniKit está disponível
+    console.log("MiniKit availability:", {
+      windowMiniKit: !!window.MiniKit,
+      isConnected: window.MiniKit?.isConnected?.(),
+    })
+
     if (!window.MiniKit) {
+      console.error("❌ MiniKit not available")
       toast.error(t.sendToken?.minikitNotInstalled || "MiniKit not available")
       return
     }
@@ -113,49 +134,64 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
     setTransactionStatus("pending")
 
     try {
-      console.log(`🚀 Sending ${amount} ${selectedToken.symbol} to ${recipient}`)
-      console.log(`Using ABI service for token contract interaction`)
+      console.log(`🚀 Starting token send process...`)
+      console.log(`├─ Token: ${selectedToken.symbol} (${selectedToken.address})`)
+      console.log(`├─ Amount: ${amount} (${selectedToken.decimals} decimals)`)
+      console.log(`├─ To: ${recipient}`)
+      console.log(`└─ From: ${walletAddress}`)
 
       // Converter amount para wei usando os decimais corretos
+      console.log("Converting amount to wei...")
       const amountInWei = ethers.parseUnits(amount, selectedToken.decimals || 18)
+      console.log(`Amount in wei: ${amountInWei.toString()}`)
 
       // Usar ABI service para criar a interface
+      console.log("Creating ERC20 interface...")
       const erc20Interface = new ethers.Interface(AbiService.createERC20Interface())
+      console.log("ERC20 interface created successfully")
 
       // Codificar a função transfer
+      console.log("Encoding transfer function...")
       const transferData = erc20Interface.encodeFunctionData("transfer", [recipient, amountInWei])
+      console.log(`Transfer data encoded: ${transferData}`)
 
-      console.log("Transaction data:", {
+      const transactionParams = {
         to: selectedToken.address,
         value: "0", // Para ERC20, value é sempre 0
         data: transferData,
-        amountInWei: amountInWei.toString(),
-        tokenSymbol: selectedToken.symbol,
-      })
+      }
+
+      console.log("Final transaction parameters:", transactionParams)
+      console.log("Calling MiniKit.sendTransaction...")
 
       // Enviar transação via MiniKit
-      const transactionId = await window.MiniKit.sendTransaction({
-        to: selectedToken.address,
-        value: "0", // Para tokens ERC20, o value é sempre 0
-        data: transferData,
-      })
+      const transactionId = await window.MiniKit.sendTransaction(transactionParams)
 
-      console.log("Transaction sent, ID:", transactionId)
+      console.log("✅ MiniKit.sendTransaction completed")
+      console.log("Transaction ID received:", transactionId)
       setTransactionStatus("confirming")
 
       if (transactionId) {
+        console.log("🔍 Verifying transaction...")
+
         // Verificar status da transação
+        const verificationPayload = { transaction_id: transactionId }
+        console.log("Verification payload:", verificationPayload)
+
         const verificationResult = await fetch("/api/confirm-transaction", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ transaction_id: transactionId }),
+          body: JSON.stringify(verificationPayload),
         })
+
+        console.log("Verification response status:", verificationResult.status)
+        console.log("Verification response ok:", verificationResult.ok)
 
         if (verificationResult.ok) {
           const txData = await verificationResult.json()
-          console.log("Transaction verified:", txData)
+          console.log("✅ Transaction verified successfully:", txData)
 
           setTxHash(txData.hash || transactionId)
           setTransactionStatus("success")
@@ -170,32 +206,61 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
               : undefined,
           })
 
+          console.log("🎉 Transaction completed successfully!")
+
           // Auto-close modal after success
           setTimeout(() => {
+            console.log("Auto-closing modal...")
             onClose()
           }, 3000)
         } else {
-          throw new Error("Failed to verify transaction")
+          const errorText = await verificationResult.text()
+          console.error("❌ Verification failed:")
+          console.error("Status:", verificationResult.status)
+          console.error("Response:", errorText)
+          throw new Error(`Verification failed: ${errorText}`)
         }
       } else {
-        throw new Error("Transaction failed")
+        console.error("❌ No transaction ID received from MiniKit")
+        throw new Error("No transaction ID received")
       }
     } catch (error: any) {
-      console.error("❌ Error sending tokens:", error)
+      console.error("=== TRANSACTION ERROR ===")
+      console.error("Error type:", typeof error)
+      console.error("Error message:", error.message)
+      console.error("Error stack:", error.stack)
+      console.error("Full error object:", error)
+
+      if (error.code) {
+        console.error("Error code:", error.code)
+      }
+
+      if (error.reason) {
+        console.error("Error reason:", error.reason)
+      }
+
       setTransactionStatus("error")
 
       let errorMessage = t.sendToken?.errorSendingTokens || "Error sending tokens"
 
       if (error.message?.includes("insufficient")) {
         errorMessage = "Saldo insuficiente"
+        console.error("🔍 Insufficient balance error detected")
       } else if (error.message?.includes("rejected")) {
         errorMessage = "Transação rejeitada pelo usuário"
+        console.error("🔍 User rejection error detected")
       } else if (error.message?.includes("network")) {
         errorMessage = "Erro de rede. Tente novamente."
+        console.error("🔍 Network error detected")
+      } else if (error.message?.includes("gas")) {
+        errorMessage = "Erro de gas. Verifique se tem ETH suficiente."
+        console.error("🔍 Gas error detected")
       }
 
+      console.error("Final error message:", errorMessage)
       toast.error(errorMessage)
     } finally {
+      console.log("=== SEND TOKEN DEBUG END ===")
       setIsLoading(false)
     }
   }
