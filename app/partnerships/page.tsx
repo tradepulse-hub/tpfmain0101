@@ -28,10 +28,7 @@ export default function PartnershipsPage() {
   }, [])
 
   const handleHoldStationClick = () => {
-    window.open(
-      "https://world.org/mini-app?app_id=app_0d4b759921490adc1f2bd569fda9b53a&path=/ref/f5S3wA",
-      "_blank",
-    )
+    window.open("https://world.org/mini-app?app_id=app_0d4b759921490adc1f2bd569fda9b53a&path=/ref/f5S3wA", "_blank")
   }
 
   const handleWalletDropClick = () => {
@@ -47,6 +44,10 @@ export default function PartnershipsPage() {
 
   const handleAstraCoinClick = (url: string) => {
     window.open(url, "_blank")
+  }
+
+  const handleAxoClick = () => {
+    window.open("https://worldcoin.org/mini-app?app_id=app_axo_example&path=/claim", "_blank")
   }
 
   return (
@@ -75,21 +76,115 @@ export default function PartnershipsPage() {
           </p>
         </motion.div>
 
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="w-full space-y-4"
-        >
+        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="w-full space-y-4">
           <h2 className="text-xl font-semibold text-white mb-4 text-center">
             {translations.partnerships?.ourPartners || "Our Partners"}
           </h2>
 
+          {/* HoldStation - Primeiro lugar */}
+          <motion.div
+            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-6 cursor-pointer group"
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleHoldStationClick}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100"
+              initial={{ x: "-100%" }}
+              whileHover={{ x: "100%" }}
+              transition={{ duration: 0.6 }}
+            />
+
+            <div className="relative z-10">
+              <div className="flex items-center justify-center mb-4">
+                <div className="relative w-full h-32 rounded-lg overflow-hidden">
+                  <Image src="/holdstation-logo.jpg" alt="HoldStation" fill className="object-cover" />
+                </div>
+              </div>
+
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-white mb-2 flex items-center justify-center gap-2">
+                  {translations.partnerships?.holdstationTitle || "HoldStation"}
+                  <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                </h3>
+                <p className="text-gray-300 text-sm mb-4">
+                  {translations.partnerships?.holdstationDescription ||
+                    "Advanced trading and swap platform for WorldChain"}
+                </p>
+
+                <motion.button
+                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 group-hover:from-purple-500 group-hover:to-blue-500 transition-all duration-300"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {translations.partnerships?.visitApp || "Visit App"}
+                  <ArrowUpRight className="w-4 h-4" />
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* AXO - Nova parceria */}
+          <motion.div
+            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-6 cursor-pointer group"
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleAxoClick}
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-pink-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100"
+              initial={{ x: "-100%" }}
+              whileHover={{ x: "100%" }}
+              transition={{ duration: 0.6 }}
+            />
+
+            <div className="relative z-10">
+              <div className="flex items-center justify-center mb-4">
+                <div className="relative w-full h-32 rounded-lg overflow-hidden">
+                  <Image
+                    src="/axo-banner.jpg"
+                    alt="AXO - Claim Cute Free tokens everyday!"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              </div>
+
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-white mb-2 flex items-center justify-center gap-2">
+                  AXO
+                  <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
+                </h3>
+                <p className="text-gray-300 text-sm mb-4">Claim Cute Free tokens everyday!</p>
+
+                <motion.button
+                  className="w-full bg-gradient-to-r from-pink-600 to-purple-600 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 group-hover:from-pink-500 group-hover:to-purple-500 transition-all duration-300"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Claim Now
+                  <ArrowUpRight className="w-4 h-4" />
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Drop Wallet - mantém posição original mas agora em terceiro */}
           <motion.div
             className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-6 cursor-pointer group"
             whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleWalletDropClick}
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
@@ -179,50 +274,6 @@ export default function PartnershipsPage() {
                     <ArrowUpRight className="w-4 h-4" />
                   </motion.button>
                 </div>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            className="relative overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/30 p-6 cursor-pointer group"
-            whileHover={{ scale: 1.02, y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleHoldStationClick}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100"
-              initial={{ x: "-100%" }}
-              whileHover={{ x: "100%" }}
-              transition={{ duration: 0.6 }}
-            />
-
-            <div className="relative z-10">
-              <div className="flex items-center justify-center mb-4">
-                <div className="relative w-full h-32 rounded-lg overflow-hidden">
-                  <Image src="/holdstation-logo.jpg" alt="HoldStation" fill className="object-cover" />
-                </div>
-              </div>
-
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-white mb-2 flex items-center justify-center gap-2">
-                  {translations.partnerships?.holdstationTitle || "HoldStation"}
-                  <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" />
-                </h3>
-                <p className="text-gray-300 text-sm mb-4">
-                  {translations.partnerships?.holdstationDescription ||
-                    "Advanced trading and swap platform for WorldChain"}
-                </p>
-
-                <motion.button
-                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 group-hover:from-purple-500 group-hover:to-blue-500 transition-all duration-300"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  {translations.partnerships?.visitApp || "Visit App"}
-                  <ArrowUpRight className="w-4 h-4" />
-                </motion.button>
               </div>
             </div>
           </motion.div>
