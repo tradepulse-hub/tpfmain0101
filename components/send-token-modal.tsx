@@ -5,7 +5,7 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Send, Loader2, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
-import { useTranslation } from "@/hooks/use-translation"
+import { useTranslation } from "@/lib/i18n"
 
 interface SendTokenModalProps {
   isOpen: boolean
