@@ -30,6 +30,7 @@ import { balanceSyncService } from "@/services/balance-sync-service"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { holdstationHistoryService, type Transaction } from "@/services/holdstation-history-service"
 
 export default function WalletPage() {
   const [walletAddress, setWalletAddress] = useState<string>("")
@@ -48,6 +49,10 @@ export default function WalletPage() {
   const [isTokenDetailsOpen, setIsTokenDetailsOpen] = useState(false)
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false)
   const [copiedAddress, setCopiedAddress] = useState(false)
+
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loadingTransactions, setLoadingTransactions] = useState(false)
+  const [transactionWatcher, setTransactionWatcher] = useState<any>(null)
 
   // Obter traduções com base no idioma atual
   const translations = getTranslations(language)
@@ -84,6 +89,12 @@ export default function WalletPage() {
 
         // Carregar saldo
         await fetchWalletData(savedAddress)
+
+        // Carregar histórico de transações
+        await loadTransactionHistory()
+
+        // Configurar watcher para novas transações
+        await setupTransactionWatcher()
       } catch (error) {
         console.error("Erro ao verificar autenticação:", error)
         router.push("/")
@@ -103,6 +114,10 @@ export default function WalletPage() {
 
     return () => {
       window.removeEventListener("tpf_balance_updated", handleBalanceUpdate)
+      // Cleanup transaction watcher
+      if (transactionWatcher) {
+        transactionWatcher.stop()
+      }
     }
   }, [router, walletAddress])
 
@@ -188,6 +203,65 @@ export default function WalletPage() {
       navigator.clipboard.writeText(walletAddress)
       setCopiedAddress(true)
       setTimeout(() => setCopiedAddress(false), 2000)
+    }
+  }
+
+  const loadTransactionHistory = async () => {
+    if (!walletAddress) return
+
+    setLoadingTransactions(true)
+    try {
+      console.log("Loading transaction history for:", walletAddress)
+      const history = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, 20)
+      setTransactions(history)
+      console.log("Loaded transactions:", history)
+    } catch (error) {
+      console.error("Error loading transaction history:", error)
+    } finally {
+      setLoadingTransactions(false)
+    }
+  }
+
+  const setupTransactionWatcher = async () => {
+    if (!walletAddress || transactionWatcher) return
+
+    try {
+      const watcher = await holdstationHistoryService.watchTransactions(walletAddress, () => {
+        console.log("New transaction detected, reloading history...")
+        loadTransactionHistory()
+      })
+      setTransactionWatcher(watcher)
+      if (watcher) {
+        await watcher.start()
+      }
+    } catch (error) {
+      console.error("Error setting up transaction watcher:", error)
+    }
+  }
+
+  const formatTransactionType = (type: Transaction["type"]) => {
+    switch (type) {
+      case "send":
+        return language === "pt" ? "Enviado" : "Sent"
+      case "receive":
+        return language === "pt" ? "Recebido" : "Received"
+      case "swap":
+        return language === "pt" ? "Troca" : "Swap"
+      default:
+        return type
+    }
+  }
+
+  const getTransactionIcon = (type: Transaction["type"]) => {
+    switch (type) {
+      case "send":
+        return <ArrowUpRight className="w-4 h-4 text-red-400" />
+      case "receive":
+        return <ArrowDownLeft className="w-4 h-4 text-green-400" />
+      case "swap":
+        return <ArrowUpDown className="w-4 h-4 text-blue-400" />
+      default:
+        return <ArrowUpDown className="w-4 h-4 text-gray-400" />
     }
   }
 
@@ -524,17 +598,91 @@ export default function WalletPage() {
 
               <TabsContent value="activity" className="mt-0">
                 <Card className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50">
-                  <CardContent className="p-6 flex flex-col items-center justify-center min-h-[200px]">
-                    <div className="w-16 h-16 rounded-full bg-gray-800/80 flex items-center justify-center mb-4">
-                      <RefreshCw className="w-8 h-8 text-gray-500" />
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-center">
+                      <CardDescription className="text-gray-300">
+                        {translations.wallet?.recentActivity || "Recent Activity"}
+                      </CardDescription>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={loadTransactionHistory}
+                        disabled={loadingTransactions}
+                      >
+                        <RefreshCw size={14} className={`text-gray-400 ${loadingTransactions ? "animate-spin" : ""}`} />
+                      </Button>
                     </div>
-                    <h3 className="text-lg font-medium text-gray-300 mb-1">
-                      {translations.wallet?.noActivity || "No recent activity"}
-                    </h3>
-                    <p className="text-sm text-gray-400 text-center max-w-xs">
-                      {translations.wallet?.activityDescription ||
-                        "Your transaction history will appear here once you start sending or receiving tokens."}
-                    </p>
+                  </CardHeader>
+                  <CardContent className="pb-4">
+                    {loadingTransactions ? (
+                      <div className="space-y-3">
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="h-16 bg-gray-800/60 animate-pulse rounded-lg"></div>
+                        ))}
+                      </div>
+                    ) : transactions.length > 0 ? (
+                      <div className="space-y-3 max-h-80 overflow-y-auto">
+                        {transactions.map((tx) => (
+                          <div
+                            key={tx.id}
+                            className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/30 hover:bg-gray-700/50 transition-colors"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 rounded-full bg-gray-700/80 border border-gray-600/50 flex items-center justify-center">
+                                {getTransactionIcon(tx.type)}
+                              </div>
+                              <div>
+                                <div className="flex items-center space-x-2">
+                                  <p className="text-sm font-medium text-white">{formatTransactionType(tx.type)}</p>
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-xs ${
+                                      tx.status === "completed"
+                                        ? "bg-green-900/20 text-green-400 border-green-500/30"
+                                        : tx.status === "pending"
+                                          ? "bg-yellow-900/20 text-yellow-400 border-yellow-500/30"
+                                          : "bg-red-900/20 text-red-400 border-red-500/30"
+                                    }`}
+                                  >
+                                    {tx.status}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-gray-400">
+                                  {tx.timestamp.toLocaleDateString(language === "pt" ? "pt-BR" : "en-US")}{" "}
+                                  {tx.timestamp.toLocaleTimeString()}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium text-white">
+                                {Number(tx.amount).toLocaleString(language === "pt" ? "pt-BR" : "en-US", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 6,
+                                })}{" "}
+                                {tx.tokenSymbol}
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                {tx.hash.substring(0, 8)}...{tx.hash.substring(tx.hash.length - 6)}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center min-h-[200px]">
+                        <div className="w-16 h-16 rounded-full bg-gray-800/80 flex items-center justify-center mb-4">
+                          <RefreshCw className="w-8 h-8 text-gray-500" />
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-300 mb-1">
+                          {translations.wallet?.noActivity || "No recent activity"}
+                        </h3>
+                        <p className="text-sm text-gray-400 text-center max-w-xs">
+                          {translations.wallet?.activityDescription ||
+                            "Your transaction history will appear here once you start sending or receiving tokens."}
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
