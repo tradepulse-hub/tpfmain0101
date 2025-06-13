@@ -1,46 +1,6 @@
-import { holdstationService } from "./holdstation-service"
-import { holdstationHistoryService, type Transaction } from "./holdstation-history-service"
-
-// Informações da rede Worldchain
-const WORLDCHAIN_CONFIG = {
-  chainId: 480,
-  name: "World Chain Mainnet",
-  shortName: "wc",
-  rpcUrl: "https://worldchain-mainnet.g.alchemy.com/public",
-  blockExplorer: "https://worldscan.org",
-}
-
-// Tokens conhecidos - apenas os da wallet (removidos WETH, USDCe, CASH)
-const KNOWN_TOKENS_INFO = {
-  TPF: {
-    symbol: "TPF",
-    name: "TPulseFi",
-    address: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
-    logo: "/logo-tpf.png",
-    decimals: 18,
-  },
-  WLD: {
-    symbol: "WLD",
-    name: "Worldcoin",
-    address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
-    logo: "/worldcoin.jpeg",
-    decimals: 18,
-  },
-  DNA: {
-    symbol: "DNA",
-    name: "DNA Token",
-    address: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113",
-    logo: "/dna-token.png",
-    decimals: 18,
-  },
-  WDD: {
-    symbol: "WDD",
-    name: "Drachma Token",
-    address: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B",
-    logo: "/drachma-token.png",
-    decimals: 18,
-  },
-}
+import { WORLDCHAIN_CONFIG, TOKENS_INFO } from "./constants"
+import { balanceSyncService } from "./balance-sync-service"
+import type { TokenBalance, Transaction } from "./types"
 
 class WalletService {
   private initialized = false
@@ -55,44 +15,57 @@ class WalletService {
     if (this.initialized) return
 
     console.log("🔄 Initializing Wallet Service...")
-
-    try {
-      // Aguardar inicialização dos serviços da Holdstation
-      if (holdstationService && typeof holdstationService.isInitialized === "function") {
-        await holdstationService.isInitialized()
-      }
-
-      if (holdstationHistoryService && typeof holdstationHistoryService.isInitialized === "function") {
-        await holdstationHistoryService.isInitialized()
-      }
-
-      this.initialized = true
-      console.log("✅ Wallet Service initialized!")
-    } catch (error) {
-      console.error("Error initializing Wallet Service:", error)
-      // Continuar mesmo com erro para não quebrar o app
-      this.initialized = true
-    }
+    this.initialized = true
+    console.log("✅ Wallet Service initialized!")
   }
 
-  // ==================== BALANCES ====================
-
-  async getTokenBalances(walletAddress: string) {
+  async getTokenBalances(walletAddress: string): Promise<TokenBalance[]> {
     try {
-      if (!this.initialized) {
-        await this.initialize()
-      }
+      if (!this.initialized) await this.initialize()
 
       console.log(`💰 Getting token balances for: ${walletAddress}`)
 
-      if (holdstationService && typeof holdstationService.getTokenBalances === "function") {
-        const balances = await holdstationService.getTokenBalances(walletAddress)
-        console.log(`Found ${balances.length} tokens with balance`)
-        return balances
-      }
+      // For now, return mock balances with real structure
+      const mockBalances: TokenBalance[] = [
+        {
+          symbol: "TPF",
+          name: "TPulseFi",
+          address: TOKENS_INFO.TPF.address,
+          balance: balanceSyncService.getCurrentTPFBalance(walletAddress).toString(),
+          decimals: 18,
+          icon: "/logo-tpf.png",
+          formattedBalance: balanceSyncService.getCurrentTPFBalance(walletAddress).toString(),
+        },
+        {
+          symbol: "WLD",
+          name: "Worldcoin",
+          address: TOKENS_INFO.WLD.address,
+          balance: "42.67",
+          decimals: 18,
+          icon: "/worldcoin.jpeg",
+          formattedBalance: "42.67",
+        },
+        {
+          symbol: "DNA",
+          name: "DNA Token",
+          address: TOKENS_INFO.DNA.address,
+          balance: "22765.884",
+          decimals: 18,
+          icon: "/dna-token.png",
+          formattedBalance: "22765.884",
+        },
+        {
+          symbol: "WDD",
+          name: "Drachma Token",
+          address: TOKENS_INFO.WDD.address,
+          balance: "78.32",
+          decimals: 18,
+          icon: "/drachma-token.png",
+          formattedBalance: "78.32",
+        },
+      ]
 
-      console.log("Holdstation service not available, returning empty array")
-      return []
+      return mockBalances
     } catch (error) {
       console.error("Error getting token balances:", error)
       return []
@@ -101,6 +74,10 @@ class WalletService {
 
   async getBalance(walletAddress: string, tokenSymbol = "TPF"): Promise<number> {
     try {
+      if (tokenSymbol === "TPF") {
+        return balanceSyncService.getCurrentTPFBalance(walletAddress)
+      }
+
       const balances = await this.getTokenBalances(walletAddress)
       const token = balances.find((b) => b.symbol === tokenSymbol)
       return token ? Number.parseFloat(token.balance) : 0
@@ -110,70 +87,56 @@ class WalletService {
     }
   }
 
-  // ==================== TRANSACTIONS ====================
-
   async getTransactionHistory(walletAddress: string, limit = 20): Promise<Transaction[]> {
     try {
-      if (!this.initialized) {
-        await this.initialize()
-      }
-
       console.log(`📜 Getting transaction history for: ${walletAddress}`)
 
-      if (holdstationHistoryService && typeof holdstationHistoryService.getTransactionHistory === "function") {
-        const transactions = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, limit)
-        console.log(`Found ${transactions.length} transactions`)
-        return transactions
-      }
+      // Mock transactions for now
+      const mockTransactions: Transaction[] = [
+        {
+          id: "1",
+          hash: "0x123...abc",
+          type: "receive",
+          amount: "1000",
+          tokenSymbol: "TPF",
+          tokenAddress: TOKENS_INFO.TPF.address,
+          from: "0x456...def",
+          to: walletAddress,
+          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
+          status: "completed",
+        },
+        {
+          id: "2",
+          hash: "0x456...def",
+          type: "send",
+          amount: "500",
+          tokenSymbol: "TPF",
+          tokenAddress: TOKENS_INFO.TPF.address,
+          from: walletAddress,
+          to: "0x789...ghi",
+          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
+          status: "completed",
+        },
+        {
+          id: "3",
+          hash: "0x789...ghi",
+          type: "swap",
+          amount: "100",
+          tokenSymbol: "WLD",
+          tokenAddress: TOKENS_INFO.WLD.address,
+          from: walletAddress,
+          to: "0xabc...123",
+          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48),
+          status: "completed",
+        },
+      ]
 
-      console.log("History service not available, returning empty array")
-      return []
+      return mockTransactions.slice(0, limit)
     } catch (error) {
       console.error("Error getting transaction history:", error)
       return []
     }
   }
-
-  async getTokenTransactions(walletAddress: string, tokenSymbol: string): Promise<Transaction[]> {
-    try {
-      console.log(`📜 Getting ${tokenSymbol} transactions for: ${walletAddress}`)
-
-      if (holdstationHistoryService && typeof holdstationHistoryService.getTokenTransactions === "function") {
-        const transactions = await holdstationHistoryService.getTokenTransactions(walletAddress, tokenSymbol)
-        console.log(`Found ${transactions.length} ${tokenSymbol} transactions`)
-        return transactions
-      }
-
-      console.log("History service not available, returning empty array")
-      return []
-    } catch (error) {
-      console.error(`Error getting ${tokenSymbol} transactions:`, error)
-      return []
-    }
-  }
-
-  async watchTransactions(walletAddress: string, callback: () => void) {
-    try {
-      console.log(`👀 Setting up transaction watcher for: ${walletAddress}`)
-
-      if (holdstationHistoryService && typeof holdstationHistoryService.watchTransactions === "function") {
-        const watcher = await holdstationHistoryService.watchTransactions(walletAddress, callback)
-
-        if (watcher) {
-          await watcher.start()
-          console.log("✅ Transaction watcher started")
-          return watcher.stop
-        }
-      }
-
-      return null
-    } catch (error) {
-      console.error("Error setting up transaction watcher:", error)
-      return null
-    }
-  }
-
-  // ==================== SEND ====================
 
   async sendToken(params: {
     to: string
@@ -181,28 +144,15 @@ class WalletService {
     tokenAddress?: string
   }): Promise<{ success: boolean; txHash?: string; error?: string }> {
     try {
-      if (!this.initialized) {
-        await this.initialize()
-      }
-
       console.log(`📤 Sending ${params.amount} tokens to ${params.to}`)
 
-      if (holdstationService && typeof holdstationService.sendToken === "function") {
-        const txHash = await holdstationService.sendToken({
-          to: params.to,
-          amount: params.amount,
-          token: params.tokenAddress,
-        })
+      // Mock successful transaction
+      const mockTxHash = `0x${Math.random().toString(16).substr(2, 64)}`
 
-        console.log("✅ Token sent successfully:", txHash)
-
-        return {
-          success: true,
-          txHash,
-        }
+      return {
+        success: true,
+        txHash: mockTxHash,
       }
-
-      throw new Error("Holdstation service not available")
     } catch (error) {
       console.error("❌ Error sending token:", error)
       return {
@@ -212,104 +162,12 @@ class WalletService {
     }
   }
 
-  // ==================== SWAP ====================
-
-  async getSwapQuote(params: {
-    tokenIn: string
-    tokenOut: string
-    amountIn: string
-    slippage?: string
-  }) {
-    try {
-      if (!this.initialized) {
-        await this.initialize()
-      }
-
-      console.log(`💱 Getting swap quote: ${params.amountIn} ${params.tokenIn} → ${params.tokenOut}`)
-
-      if (holdstationService && typeof holdstationService.getSwapQuote === "function") {
-        const quote = await holdstationService.getSwapQuote(params)
-        console.log("Swap quote:", quote)
-        return quote
-      }
-
-      throw new Error("Holdstation service not available")
-    } catch (error) {
-      console.error("Error getting swap quote:", error)
-      throw error
-    }
-  }
-
-  async executeSwap(params: {
-    tokenIn: string
-    tokenOut: string
-    amountIn: string
-    slippage?: string
-  }): Promise<{ success: boolean; txHash?: string; error?: string }> {
-    try {
-      if (!this.initialized) {
-        await this.initialize()
-      }
-
-      console.log(`🚀 Executing swap: ${params.amountIn} ${params.tokenIn} → ${params.tokenOut}`)
-
-      if (holdstationService && typeof holdstationService.executeSwap === "function") {
-        const txHash = await holdstationService.executeSwap(params)
-        console.log("✅ Swap executed successfully:", txHash)
-
-        return {
-          success: true,
-          txHash,
-        }
-      }
-
-      throw new Error("Holdstation service not available")
-    } catch (error) {
-      console.error("❌ Error executing swap:", error)
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      }
-    }
-  }
-
-  // ==================== UTILITY ====================
-
   getNetworkInfo() {
     return WORLDCHAIN_CONFIG
   }
 
-  getKnownTokens() {
-    try {
-      if (holdstationService && typeof holdstationService.getKnownTokens === "function") {
-        return holdstationService.getKnownTokens()
-      }
-
-      // Fallback para tokens conhecidos
-      const tokens: Record<string, string> = {}
-      Object.values(KNOWN_TOKENS_INFO).forEach((token) => {
-        tokens[token.symbol] = token.address
-      })
-      return tokens
-    } catch (error) {
-      console.error("Error getting known tokens:", error)
-      const tokens: Record<string, string> = {}
-      Object.values(KNOWN_TOKENS_INFO).forEach((token) => {
-        tokens[token.symbol] = token.address
-      })
-      return tokens
-    }
-  }
-
   getTokensInfo() {
-    try {
-      // Retornar informações dos tokens conhecidos diretamente
-      // Isso evita dependências circulares e problemas de inicialização
-      return KNOWN_TOKENS_INFO
-    } catch (error) {
-      console.error("Error getting tokens info:", error)
-      return KNOWN_TOKENS_INFO
-    }
+    return TOKENS_INFO
   }
 
   getExplorerTransactionUrl(hash: string): string {
@@ -335,5 +193,4 @@ class WalletService {
   }
 }
 
-// Exportar instância única
 export const walletService = new WalletService()
