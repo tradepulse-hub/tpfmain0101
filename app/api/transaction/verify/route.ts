@@ -6,32 +6,59 @@ interface IRequestPayload {
 
 export async function POST(req: NextRequest) {
   try {
-    const { transaction_id } = (await req.json()) as IRequestPayload
+    console.log("=== TRANSACTION VERIFY API START ===")
+
+    const body = await req.json()
+    console.log("Request body:", body)
+
+    const { transaction_id } = body as IRequestPayload
 
     if (!transaction_id) {
+      console.error("❌ Missing transaction_id in request")
       return NextResponse.json({ error: "Invalid transaction_id" }, { status: 400 })
     }
 
-    console.log("Verifying transaction:", transaction_id)
+    console.log("✅ Transaction ID received:", transaction_id)
+    console.log("Environment check:")
+    console.log("├─ APP_ID:", process.env.APP_ID ? "✅ Set" : "❌ Missing")
+    console.log("├─ DEV_PORTAL_API_KEY:", process.env.DEV_PORTAL_API_KEY ? "✅ Set" : "❌ Missing")
 
-    const response = await fetch(
-      `https://developer.worldcoin.org/api/v2/minikit/transaction/${transaction_id}?app_id=${process.env.APP_ID}&type=transaction`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${process.env.DEV_PORTAL_API_KEY}`,
-        },
+    const apiUrl = `https://developer.worldcoin.org/api/v2/minikit/transaction/${transaction_id}?app_id=${process.env.APP_ID}&type=transaction`
+    console.log("API URL:", apiUrl)
+
+    console.log("Making request to Worldcoin API...")
+    const response = await fetch(apiUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${process.env.DEV_PORTAL_API_KEY}`,
+        "Content-Type": "application/json",
       },
-    )
+    })
+
+    console.log("Worldcoin API response:")
+    console.log("├─ Status:", response.status)
+    console.log("├─ Status Text:", response.statusText)
+    console.log("├─ OK:", response.ok)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error("Error verifying transaction:", errorText)
-      return NextResponse.json({ error: "Failed to verify transaction" }, { status: response.status })
+      console.error("❌ Worldcoin API Error:")
+      console.error("├─ Status:", response.status)
+      console.error("├─ Response:", errorText)
+      console.error("└─ Headers:", Object.fromEntries(response.headers.entries()))
+
+      return NextResponse.json(
+        {
+          error: "Failed to verify transaction",
+          details: errorText,
+          status: response.status,
+        },
+        { status: response.status },
+      )
     }
 
     const transaction = await response.json()
-    console.log("Transaction verified:", transaction)
+    console.log("✅ Transaction data received:", transaction)
 
     // Mapear a resposta para um formato consistente
     const result = {
@@ -44,9 +71,24 @@ export async function POST(req: NextRequest) {
       updatedAt: transaction.updatedAt,
     }
 
+    console.log("✅ Formatted result:", result)
+    console.log("=== TRANSACTION VERIFY API END ===")
+
     return NextResponse.json(result)
   } catch (error) {
-    console.error("Error in confirm-transaction API:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("=== TRANSACTION VERIFY API ERROR ===")
+    console.error("Error type:", typeof error)
+    console.error("Error message:", error.message)
+    console.error("Error stack:", error.stack)
+    console.error("Full error:", error)
+    console.error("=== END ERROR ===")
+
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: error.message,
+      },
+      { status: 500 },
+    )
   }
 }
