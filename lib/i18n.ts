@@ -85,6 +85,14 @@ export interface WalletTranslations {
   swap?: string
   otherTokens?: string
   errorMessage?: string
+  address?: string
+  assets?: string
+  activity?: string
+  copyAddress?: string
+  addressCopied?: string
+  refreshBalances?: string
+  balancesUpdated?: string
+  errorUpdatingBalances?: string
 }
 
 export interface SwapTranslations {
@@ -540,8 +548,16 @@ export function getTranslations(lang: Language): Translations {
           send: "Enviar",
           receive: "Receber",
           swap: "Trocar",
-          otherTokens: "Outros Tokens Confiáveis",
+          otherTokens: "Outros Tokens",
           errorMessage: "Não foi possível obter o saldo real. Tente definir manualmente.",
+          address: "Endereço",
+          assets: "Assets",
+          activity: "Atividade",
+          copyAddress: "Copiar endereço",
+          addressCopied: "Endereço copiado!",
+          refreshBalances: "Atualizar saldos",
+          balancesUpdated: "Saldos atualizados!",
+          errorUpdatingBalances: "Erro ao atualizar saldos",
         },
         swap: {
           title: "Trocar Tokens",
@@ -959,8 +975,16 @@ export function getTranslations(lang: Language): Translations {
           send: "Send",
           receive: "Receive",
           swap: "Swap",
-          otherTokens: "Other Trusted Tokens",
+          otherTokens: "Other Tokens",
           errorMessage: "Could not get real balance. Try setting it manually.",
+          address: "Address",
+          assets: "Assets",
+          activity: "Activity",
+          copyAddress: "Copy address",
+          addressCopied: "Address copied!",
+          refreshBalances: "Refresh balances",
+          balancesUpdated: "Balances updated!",
+          errorUpdatingBalances: "Error updating balances",
         },
         swap: {
           title: "Swap Tokens",
