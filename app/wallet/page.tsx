@@ -326,9 +326,7 @@ export default function WalletPage() {
 
               <CardHeader className="relative z-10 pb-0">
                 <div className="flex justify-between items-center">
-                  <CardDescription className="text-gray-300">
-                    {translations.wallet?.totalBalance || "Total Balance"}
-                  </CardDescription>
+                  <CardDescription className="text-gray-300">TPF Balance</CardDescription>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -345,13 +343,7 @@ export default function WalletPage() {
                 ) : (
                   <div className="space-y-1">
                     <CardTitle className="text-3xl font-bold">
-                      <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-100 via-white to-blue-100">
-                        $
-                        {totalValue.toLocaleString(language === "pt" ? "pt-BR" : "en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
+                      <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-100 via-white to-blue-100"></span>
                     </CardTitle>
                     <p className="text-sm text-gray-400">
                       {balance.toLocaleString(language === "pt" ? "pt-BR" : "en-US")} TPF
@@ -365,33 +357,33 @@ export default function WalletPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <Button
                     variant="secondary"
-                    className="bg-gradient-to-br from-blue-600/20 to-blue-700/20 border border-blue-500/20 hover:from-blue-600/30 hover:to-blue-700/30 text-white flex flex-col items-center h-auto py-3"
+                    className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
                     onClick={() => setIsSendModalOpen(true)}
                   >
-                    <div className="rounded-full bg-blue-500/20 p-2 mb-1">
-                      <ArrowUpRight className="w-4 h-4 text-blue-400" />
+                    <div className="rounded-full bg-gray-700 p-2 mb-1">
+                      <ArrowUpRight className="w-4 h-4 text-gray-400" />
                     </div>
                     <span className="text-xs font-medium">{translations.wallet?.send || "Send"}</span>
                   </Button>
 
                   <Button
                     variant="secondary"
-                    className="bg-gradient-to-br from-purple-600/20 to-purple-700/20 border border-purple-500/20 hover:from-purple-600/30 hover:to-purple-700/30 text-white flex flex-col items-center h-auto py-3"
+                    className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
                     onClick={() => setIsReceiveTokenModalOpen(true)}
                   >
-                    <div className="rounded-full bg-purple-500/20 p-2 mb-1">
-                      <ArrowDownLeft className="w-4 h-4 text-purple-400" />
+                    <div className="rounded-full bg-gray-700 p-2 mb-1">
+                      <ArrowDownLeft className="w-4 h-4 text-gray-400" />
                     </div>
                     <span className="text-xs font-medium">{translations.wallet?.receive || "Receive"}</span>
                   </Button>
 
                   <Button
                     variant="secondary"
-                    className="bg-gradient-to-br from-green-600/20 to-green-700/20 border border-green-500/20 hover:from-green-600/30 hover:to-green-700/30 text-white flex flex-col items-center h-auto py-3"
+                    className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
                     onClick={() => setIsSwapModalOpen(true)}
                   >
-                    <div className="rounded-full bg-green-500/20 p-2 mb-1">
-                      <ArrowUpDown className="w-4 h-4 text-green-400" />
+                    <div className="rounded-full bg-gray-700 p-2 mb-1">
+                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
                     </div>
                     <span className="text-xs font-medium">{translations.wallet?.swap || "Swap"}</span>
                   </Button>
@@ -451,13 +443,7 @@ export default function WalletPage() {
                                 balance.toLocaleString(language === "pt" ? "pt-BR" : "en-US")
                               )}
                             </p>
-                            <p className="text-xs text-gray-400">
-                              $
-                              {(balance * 0.00012).toLocaleString(language === "pt" ? "pt-BR" : "en-US", {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                            </p>
+                            <p className="text-xs text-gray-400"></p>
                           </div>
                           <ChevronRight className="w-4 h-4 text-gray-500" />
                         </div>
@@ -523,13 +509,7 @@ export default function WalletPage() {
                                   <p className="font-medium text-white">
                                     {token.balance.toLocaleString(language === "pt" ? "pt-BR" : "en-US")}
                                   </p>
-                                  <p className="text-xs text-gray-400">
-                                    $
-                                    {(token.balance * 0.0001).toLocaleString(language === "pt" ? "pt-BR" : "en-US", {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })}
-                                  </p>
+                                  <p className="text-xs text-gray-400"></p>
                                 </div>
                                 <ChevronRight className="w-4 h-4 text-gray-500" />
                               </div>
