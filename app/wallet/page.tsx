@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Copy,
   TrendingUp,
+  FileText,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,7 @@ import { SetBalanceModal } from "@/components/set-balance-modal"
 import { SendTokenModal } from "@/components/send-token-modal"
 import { ReceiveTokenModal } from "@/components/receive-token-modal"
 import { SwapModal } from "@/components/swap-modal"
+import { TransactionHistoryModal } from "@/components/transaction-history-modal"
 import { toast } from "sonner"
 import { useTranslation } from "@/lib/i18n"
 
@@ -42,6 +44,7 @@ export default function WalletPage() {
   const [isSendModalOpen, setIsSendModalOpen] = useState(false)
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false)
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
 
   const router = useRouter()
   const { t } = useTranslation()
@@ -192,6 +195,12 @@ export default function WalletPage() {
 
       <SwapModal isOpen={isSwapModalOpen} onClose={() => setIsSwapModalOpen(false)} walletAddress={walletAddress} />
 
+      <TransactionHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        walletAddress={walletAddress}
+      />
+
       <div className="z-10 w-full max-w-md mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -250,15 +259,43 @@ export default function WalletPage() {
               <CardHeader className="relative z-10 pb-0">
                 <div className="flex justify-between items-center">
                   <CardDescription className="text-gray-300">{t.wallet?.balance || "TPF Balance"}</CardDescription>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 rounded-full bg-gray-800/70 hover:bg-gray-700/70 p-0"
-                    onClick={handleRefresh}
-                    disabled={isRefreshing}
-                  >
-                    <RefreshCw size={14} className={`text-gray-300 ${isRefreshing ? "animate-spin" : ""}`} />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 rounded-full bg-gray-800/70 hover:bg-gray-700/70 p-0"
+                            onClick={() => setIsHistoryModalOpen(true)}
+                          >
+                            <FileText size={14} className="text-gray-300" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{t.wallet?.activity || "Transaction History"}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 rounded-full bg-gray-800/70 hover:bg-gray-700/70 p-0"
+                            onClick={handleRefresh}
+                            disabled={isRefreshing}
+                          >
+                            <RefreshCw size={14} className={`text-gray-300 ${isRefreshing ? "animate-spin" : ""}`} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{t.wallet?.refreshBalances || "Refresh balances"}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </div>
 
                 {loading ? (
