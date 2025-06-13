@@ -3,8 +3,9 @@
 import type React from "react"
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Send, Loader2 } from "lucide-react"
+import { X, Send, Loader2, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
+import { useTranslation } from "@/hooks/use-translation"
 
 interface SendTokenModalProps {
   isOpen: boolean
@@ -13,15 +14,28 @@ interface SendTokenModalProps {
 }
 
 export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModalProps) {
+  const { t } = useTranslation()
   const [recipient, setRecipient] = useState("")
   const [amount, setAmount] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [showWarning, setShowWarning] = useState(true)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!recipient || !amount) {
-      toast.error("Preencha todos os campos")
+      toast.error(t.sendToken?.fillAllFields || "Fill all fields")
+      return
+    }
+
+    if (!recipient.startsWith("0x") || recipient.length !== 42) {
+      toast.error(t.sendToken?.invalidAddress || "Invalid address")
+      return
+    }
+
+    const amountNum = Number.parseFloat(amount)
+    if (isNaN(amountNum) || amountNum <= 0) {
+      toast.error(t.sendToken?.invalidValue || "Invalid value")
       return
     }
 
@@ -32,8 +46,8 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
       // Simular envio por enquanto
       await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      toast.success("Tokens enviados com sucesso!", {
-        description: `${amount} TPF enviados para ${recipient.substring(0, 10)}...`,
+      toast.success(t.sendToken?.tokensSentSuccess || "Tokens sent successfully!", {
+        description: `${amount} TPF ${t.sendToken?.sentTo || "sent to"} ${recipient.substring(0, 10)}...`,
       })
 
       setRecipient("")
@@ -41,7 +55,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
       onClose()
     } catch (error) {
       console.error("Error sending tokens:", error)
-      toast.error("Erro ao enviar tokens")
+      toast.error(t.sendToken?.errorSendingTokens || "Error sending tokens")
     } finally {
       setIsLoading(false)
     }
@@ -67,16 +81,47 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-white flex items-center">
                 <Send size={20} className="mr-2 text-blue-400" />
-                Enviar Tokens
+                {t.sendToken?.title || "Send Tokens"}
               </h3>
               <button onClick={onClose} className="text-gray-400 hover:text-white">
                 <X size={20} />
               </button>
             </div>
 
+            {/* Warning Message */}
+            {showWarning && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-4 p-3 bg-yellow-900/20 border border-yellow-800/30 rounded-lg"
+              >
+                <div className="flex items-start">
+                  <AlertTriangle className="w-5 h-5 text-yellow-400 mt-0.5 mr-3 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-yellow-200 text-sm mb-2">
+                      {t.sendToken?.warning || "Please verify the recipient address before sending tokens."}
+                    </p>
+                    <p className="text-yellow-200/80 text-xs">
+                      {t.sendToken?.warningWorldchain ||
+                        "Do not send to wallets that don't support Worldchain, otherwise you may lose your assets. Do not send to exchanges."}
+                    </p>
+                    <button
+                      onClick={() => setShowWarning(false)}
+                      className="text-yellow-400 text-xs mt-2 hover:text-yellow-300"
+                    >
+                      {t.sendToken?.hideWarning || "Hide warning"}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Endereço do Destinatário</label>
+                <label className="block text-sm text-gray-400 mb-2">
+                  {t.sendToken?.recipientAddress || "Recipient Address"}
+                </label>
                 <input
                   type="text"
                   value={recipient}
@@ -88,7 +133,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Quantidade (TPF)</label>
+                <label className="block text-sm text-gray-400 mb-2">{t.sendToken?.quantity || "Quantity (TPF)"}</label>
                 <input
                   type="number"
                   value={amount}
@@ -109,10 +154,10 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
                 {isLoading ? (
                   <div className="flex items-center justify-center">
                     <Loader2 size={16} className="animate-spin mr-2" />
-                    Enviando...
+                    {t.sendToken?.processing || "Processing..."}
                   </div>
                 ) : (
-                  "Enviar Tokens"
+                  t.sendToken?.sendTokens || "Send Tokens"
                 )}
               </button>
             </form>
