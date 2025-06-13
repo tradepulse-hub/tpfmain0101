@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, ArrowUpRight, ArrowDownLeft, ArrowUpDown, ExternalLink, RefreshCw } from "lucide-react"
+import { X, ArrowUpRight, ArrowDownLeft, ArrowUpDown, ExternalLink, RefreshCw, Bug } from "lucide-react"
 import { holdstationHistoryService } from "@/services/holdstation-history-service"
 import type { Transaction } from "@/services/types"
 import { useTranslation } from "@/lib/i18n"
+import { toast } from "sonner"
 
 interface TransactionHistoryModalProps {
   isOpen: boolean
@@ -18,8 +19,16 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [refetch, setRefetch] = useState(false)
+  const [debugLogs, setDebugLogs] = useState<string[]>([])
+  const [showDebugLogs, setShowDebugLogs] = useState(false)
   const { t } = useTranslation()
   const watcherSetupRef = useRef(false)
+
+  // Função helper para adicionar logs
+  const addDebugLog = (message: string) => {
+    console.log(message)
+    setDebugLogs((prev) => [...prev.slice(-20), `${new Date().toLocaleTimeString()}: ${message}`])
+  }
 
   // Setup real-time transaction watching
   useEffect(() => {
@@ -27,17 +36,19 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
 
     const setupWatcher = async () => {
       try {
-        console.log("🔄 Setting up transaction watcher...")
+        addDebugLog("=== CONFIGURANDO WATCHER DE TRANSAÇÕES ===")
+        addDebugLog(`Endereço da carteira: ${walletAddress}`)
 
         // Setup watcher with callback to trigger refetch
         await holdstationHistoryService.watchTransactions(walletAddress, () => {
-          console.log("📡 New transaction detected, refetching...")
+          addDebugLog("📡 Nova transação detectada pelo watcher!")
           setRefetch((prev) => !prev)
         })
 
         watcherSetupRef.current = true
-        console.log("✅ Transaction watcher setup completed")
+        addDebugLog("✅ Watcher de transações configurado com sucesso")
       } catch (error) {
+        addDebugLog(`❌ Erro ao configurar watcher: ${error.message}`)
         console.error("❌ Error setting up transaction watcher:", error)
       }
     }
@@ -47,6 +58,7 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
     // Cleanup watcher when modal closes or component unmounts
     return () => {
       if (watcherSetupRef.current) {
+        addDebugLog("🧹 Limpando watcher de transações...")
         holdstationHistoryService.stopWatching(walletAddress)
         watcherSetupRef.current = false
       }
@@ -65,27 +77,171 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
     setError(null)
 
     try {
-      console.log("📜 Loading transactions for modal...")
+      addDebugLog("=== CARREGANDO HISTÓRICO DE TRANSAÇÕES ===")
+      addDebugLog(`Endereço: ${walletAddress}`)
+      addDebugLog("Limite: 50 transações")
+
+      // Verificar se o serviço Holdstation está disponível
+      addDebugLog("🔍 Verificando disponibilidade do serviço Holdstation...")
+
+      if (!holdstationHistoryService) {
+        addDebugLog("❌ Serviço Holdstation não está disponível")
+        throw new Error("Holdstation service not available")
+      }
+
+      addDebugLog("✅ Serviço Holdstation disponível")
 
       // Use Holdstation service to fetch transactions
+      addDebugLog("📡 Fazendo chamada para holdstationHistoryService.getTransactionHistory...")
       const fetchedTransactions = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, 50)
 
-      setTransactions(fetchedTransactions)
-      console.log(`✅ Loaded ${fetchedTransactions.length} transactions`)
+      addDebugLog(`📊 Resposta recebida: ${fetchedTransactions.length} transações`)
+      addDebugLog(`Dados brutos: ${JSON.stringify(fetchedTransactions.slice(0, 2), null, 2)}`)
+
+      // Processar e validar transações
+      addDebugLog("🔄 Processando transações...")
+      const validTransactions = fetchedTransactions.filter((tx) => {
+        const isValid = tx.id && tx.hash && tx.type && tx.amount && tx.tokenSymbol
+        if (!isValid) {
+          addDebugLog(`⚠️ Transação inválida filtrada: ${JSON.stringify(tx)}`)
+        }
+        return isValid
+      })
+
+      addDebugLog(`✅ ${validTransactions.length} transações válidas após filtro`)
+
+      // Ordenar por timestamp (mais recente primeiro)
+      validTransactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      addDebugLog("📅 Transações ordenadas por timestamp")
+
+      setTransactions(validTransactions)
+      addDebugLog(`✅ Estado atualizado com ${validTransactions.length} transações`)
+
+      // Log detalhado das primeiras transações
+      if (validTransactions.length > 0) {
+        addDebugLog("=== PRIMEIRAS 3 TRANSAÇÕES ===")
+        validTransactions.slice(0, 3).forEach((tx, index) => {
+          addDebugLog(`${index + 1}. ${tx.type.toUpperCase()} - ${tx.amount} ${tx.tokenSymbol} - ${tx.hash}`)
+        })
+      }
     } catch (error) {
+      addDebugLog("=== ERRO AO CARREGAR TRANSAÇÕES ===")
+      addDebugLog(`Tipo do erro: ${typeof error}`)
+      addDebugLog(`Mensagem: ${error.message}`)
+      addDebugLog(`Stack: ${error.stack}`)
+
       console.error("❌ Error loading transactions:", error)
       setError("Erro ao carregar histórico de transações")
+
+      // Tentar carregar transações mock como fallback
+      addDebugLog("🔄 Tentando carregar transações mock como fallback...")
+      try {
+        const mockTransactions = await loadMockTransactions()
+        setTransactions(mockTransactions)
+        addDebugLog(`✅ ${mockTransactions.length} transações mock carregadas`)
+      } catch (mockError) {
+        addDebugLog(`❌ Erro ao carregar mock: ${mockError.message}`)
+      }
     } finally {
       setIsLoading(false)
+      addDebugLog("=== FIM DO CARREGAMENTO ===")
     }
+  }
+
+  const loadMockTransactions = async (): Promise<Transaction[]> => {
+    addDebugLog("📝 Gerando transações mock...")
+
+    const mockTransactions: Transaction[] = [
+      {
+        id: "mock_1",
+        hash: "0x123...abc",
+        type: "receive",
+        amount: "1000.0",
+        tokenSymbol: "TPF",
+        tokenAddress: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
+        from: "0x456...def",
+        to: walletAddress,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
+        status: "completed",
+        blockNumber: 12345,
+      },
+      {
+        id: "mock_2",
+        hash: "0x456...def",
+        type: "send",
+        amount: "500.0",
+        tokenSymbol: "TPF",
+        tokenAddress: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
+        from: walletAddress,
+        to: "0x789...ghi",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
+        status: "completed",
+        blockNumber: 12344,
+      },
+      {
+        id: "mock_3",
+        hash: "0x789...ghi",
+        type: "swap",
+        amount: "100.0",
+        tokenSymbol: "WLD",
+        tokenAddress: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+        from: walletAddress,
+        to: "0xabc...123",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48),
+        status: "completed",
+        blockNumber: 12343,
+      },
+    ]
+
+    addDebugLog(`Mock gerado: ${mockTransactions.length} transações`)
+    return mockTransactions
   }
 
   const handleRefresh = async () => {
     if (isLoading || !walletAddress) return
 
-    console.log("🔄 Manual refresh triggered")
+    addDebugLog("🔄 Refresh manual acionado")
     await loadTransactions()
   }
+
+  const inspectHoldstationService = () => {
+    addDebugLog("=== INSPEÇÃO DO SERVIÇO HOLDSTATION ===")
+
+    try {
+      if (holdstationHistoryService) {
+        addDebugLog("✅ holdstationHistoryService está disponível")
+
+        // Verificar métodos disponíveis
+        const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(holdstationHistoryService))
+        addDebugLog(`Métodos disponíveis: ${methods.join(", ")}`)
+
+        // Verificar se getTransactionHistory existe
+        if (typeof holdstationHistoryService.getTransactionHistory === "function") {
+          addDebugLog("✅ getTransactionHistory está disponível")
+        } else {
+          addDebugLog("❌ getTransactionHistory não encontrado")
+        }
+
+        // Verificar se watchTransactions existe
+        if (typeof holdstationHistoryService.watchTransactions === "function") {
+          addDebugLog("✅ watchTransactions está disponível")
+        } else {
+          addDebugLog("❌ watchTransactions não encontrado")
+        }
+      } else {
+        addDebugLog("❌ holdstationHistoryService não está disponível")
+      }
+    } catch (error) {
+      addDebugLog(`❌ Erro na inspeção: ${error.message}`)
+    }
+  }
+
+  // Inspecionar serviço quando modal abrir
+  useEffect(() => {
+    if (isOpen) {
+      inspectHoldstationService()
+    }
+  }, [isOpen])
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -154,6 +310,13 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => setShowDebugLogs(!showDebugLogs)}
+                  className="text-gray-400 hover:text-white transition-colors p-1"
+                  title="Toggle Debug Logs"
+                >
+                  <Bug size={16} />
+                </button>
+                <button
                   onClick={handleRefresh}
                   disabled={isLoading}
                   className="text-gray-400 hover:text-white transition-colors p-1"
@@ -167,11 +330,50 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
               </div>
             </div>
 
+            {/* Debug Logs */}
+            {showDebugLogs && debugLogs.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="border-b border-gray-800 bg-gray-800/30"
+              >
+                <div className="p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-400">Debug Logs ({debugLogs.length})</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(debugLogs.join("\n"))
+                        toast.success("Logs copiados!")
+                      }}
+                      className="text-xs text-blue-400 hover:text-blue-300"
+                    >
+                      📋 Copiar
+                    </button>
+                  </div>
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-2 max-h-40 overflow-y-auto">
+                    <div className="space-y-1">
+                      {debugLogs.map((log, index) => (
+                        <div key={index} className="text-xs font-mono text-gray-300">
+                          {log}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {/* Content */}
             <div className="p-4 overflow-y-auto max-h-[calc(80vh-100px)]">
               {error && (
                 <div className="mb-4 p-3 bg-red-900/20 border border-red-800/30 rounded-lg">
                   <p className="text-red-300 text-sm">{error}</p>
+                  <button
+                    onClick={() => setShowDebugLogs(true)}
+                    className="text-xs text-red-400 hover:text-red-300 mt-1"
+                  >
+                    Ver logs de debug →
+                  </button>
                 </div>
               )}
 
@@ -243,6 +445,12 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
                     <div className="text-xs mt-2 text-gray-500">
                       Transactions will appear here when detected by Holdstation SDK
                     </div>
+                    <button
+                      onClick={() => setShowDebugLogs(true)}
+                      className="text-xs text-blue-400 hover:text-blue-300 mt-2"
+                    >
+                      Ver logs de debug →
+                    </button>
                   </div>
                 )}
               </div>
