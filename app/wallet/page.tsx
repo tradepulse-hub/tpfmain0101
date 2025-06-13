@@ -27,7 +27,6 @@ import { enhancedTokenService } from "@/services/holdstation-service"
 import { TokenDetailsModal } from "@/components/token-details-modal"
 import { SwapModal } from "@/components/swap-modal"
 import { balanceSyncService } from "@/services/balance-sync-service"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { holdstationHistoryService, type Transaction } from "@/services/holdstation-history-service"
@@ -53,6 +52,7 @@ export default function WalletPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loadingTransactions, setLoadingTransactions] = useState(false)
   const [transactionWatcher, setTransactionWatcher] = useState<any>(null)
+  const [activeTab, setActiveTab] = useState<"assets" | "activity">("assets")
 
   // Obter traduções com base no idioma atual
   const translations = getTranslations(language)
@@ -473,17 +473,29 @@ export default function WalletPage() {
             transition={{ delay: 0.4 }}
             className="w-full"
           >
-            <Tabs defaultValue="assets" className="w-full">
-              <TabsList className="grid grid-cols-2 mb-4 bg-gray-800/60 border border-gray-700/50">
-                <TabsTrigger value="assets" className="data-[state=active]:bg-gray-700/60">
-                  {translations.wallet?.assets || "Assets"}
-                </TabsTrigger>
-                <TabsTrigger value="activity" className="data-[state=active]:bg-gray-700/60">
-                  {translations.wallet?.activity || "Activity"}
-                </TabsTrigger>
-              </TabsList>
+            {/* Tab Headers */}
+            <div className="grid grid-cols-2 mb-4 bg-gray-800/60 border border-gray-700/50 rounded-lg p-1">
+              <button
+                onClick={() => setActiveTab("assets")}
+                className={`py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                  activeTab === "assets" ? "bg-gray-700/60 text-white" : "text-gray-400 hover:text-gray-300"
+                }`}
+              >
+                {translations.wallet?.assets || "Assets"}
+              </button>
+              <button
+                onClick={() => setActiveTab("activity")}
+                className={`py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                  activeTab === "activity" ? "bg-gray-700/60 text-white" : "text-gray-400 hover:text-gray-300"
+                }`}
+              >
+                {translations.wallet?.activity || "Activity"}
+              </button>
+            </div>
 
-              <TabsContent value="assets" className="mt-0">
+            {/* Tab Content */}
+            {activeTab === "assets" && (
+              <div className="mt-0">
                 {/* TPF Token Card */}
                 <Card className="w-full bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 mb-4 overflow-hidden">
                   <button onClick={() => handleTokenClick("TPF", balance)} className="w-full text-left">
@@ -594,9 +606,11 @@ export default function WalletPage() {
                     ))}
                   </div>
                 )}
-              </TabsContent>
+              </div>
+            )}
 
-              <TabsContent value="activity" className="mt-0">
+            {activeTab === "activity" && (
+              <div className="mt-0">
                 <Card className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50">
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-center">
@@ -685,8 +699,8 @@ export default function WalletPage() {
                     )}
                   </CardContent>
                 </Card>
-              </TabsContent>
-            </Tabs>
+              </div>
+            )}
           </motion.div>
 
           {/* Mensagem de erro ou informação */}
