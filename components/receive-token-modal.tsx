@@ -1,10 +1,8 @@
 "use client"
-
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import QRCode from "react-qr-code"
-import { Copy, Check, AlertTriangle, X } from "lucide-react"
-import { getCurrentLanguage } from "../lib/i18n"
+import { X, Download, Copy, Check, QrCode } from "lucide-react"
+import { toast } from "sonner"
 
 interface ReceiveTokenModalProps {
   isOpen: boolean
@@ -14,55 +12,17 @@ interface ReceiveTokenModalProps {
 
 export function ReceiveTokenModal({ isOpen, onClose, walletAddress }: ReceiveTokenModalProps) {
   const [copied, setCopied] = useState(false)
-  const [language, setLanguage] = useState<"en" | "pt">("en")
-  const [translations, setTranslations] = useState({
-    title: "Receive Tokens",
-    attention: "ATTENTION:",
-    warningText: "Only receive tokens from Worldchain. Tokens from other networks may be permanently lost.",
-    yourAddress: "Your address",
-  })
-
-  useEffect(() => {
-    const updateLanguage = () => {
-      const currentLang = getCurrentLanguage()
-      setLanguage(currentLang)
-
-      if (currentLang === "pt") {
-        setTranslations({
-          title: "Receber Tokens",
-          attention: "ATENÇÃO:",
-          warningText:
-            "Receba apenas tokens da Worldchain. Tokens de outras redes poderão ser perdidos permanentemente.",
-          yourAddress: "Seu endereço",
-        })
-      } else {
-        setTranslations({
-          title: "Receive Tokens",
-          attention: "ATTENTION:",
-          warningText: "Only receive tokens from Worldchain. Tokens from other networks may be permanently lost.",
-          yourAddress: "Your address",
-        })
-      }
-    }
-
-    updateLanguage()
-    window.addEventListener("languageChange", updateLanguage)
-    return () => window.removeEventListener("languageChange", updateLanguage)
-  }, [])
 
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(walletAddress)
       setCopied(true)
+      toast.success("Endereço copiado!")
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error("Error copying:", err)
+      toast.error("Erro ao copiar endereço")
     }
-  }
-
-  const formatAddress = (address: string) => {
-    if (!address) return ""
-    return `${address.substring(0, 8)}...${address.substring(address.length - 6)}`
   }
 
   return (
@@ -72,50 +32,59 @@ export function ReceiveTokenModal({ isOpen, onClose, walletAddress }: ReceiveTok
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-black/70"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
           onClick={onClose}
         >
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-gray-900 rounded-lg border border-gray-800 p-3 w-full max-w-xs"
+            className="bg-gray-900 rounded-lg border border-gray-800 p-4 w-full max-w-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-base font-bold text-white">{translations.title}</h3>
-              <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close">
-                <X size={18} />
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-white flex items-center">
+                <Download size={20} className="mr-2 text-green-400" />
+                Receber Tokens
+              </h3>
+              <button onClick={onClose} className="text-gray-400 hover:text-white">
+                <X size={20} />
               </button>
             </div>
 
-            <div className="mb-2 text-xs text-amber-400 bg-amber-900/30 p-1.5 rounded flex items-start">
-              <AlertTriangle size={14} className="mr-1 mt-0.5 flex-shrink-0" />
+            <div className="text-center space-y-4">
+              {/* QR Code Placeholder */}
+              <div className="w-48 h-48 mx-auto bg-gray-800 border border-gray-700 rounded-lg flex items-center justify-center">
+                <QrCode size={64} className="text-gray-600" />
+              </div>
+
               <div>
-                <span className="font-bold">{translations.attention}</span> {translations.warningText}
-              </div>
-            </div>
-
-            <div className="flex justify-center mb-2">
-              <div className="bg-white p-2 rounded">
-                <QRCode value={walletAddress} size={128} />
-              </div>
-            </div>
-
-            <div className="bg-gray-800/50 rounded p-2">
-              <div className="text-gray-400 text-xs mb-1">{translations.yourAddress}</div>
-              <div className="flex items-center justify-between">
-                <div className="text-white font-mono text-xs overflow-hidden overflow-ellipsis">
-                  {formatAddress(walletAddress)}
+                <p className="text-gray-400 text-sm mb-2">Seu endereço da carteira:</p>
+                <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
+                  <p className="text-white font-mono text-sm break-all">{walletAddress}</p>
                 </div>
-                <button
-                  onClick={copyToClipboard}
-                  className="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded transition-colors"
-                  aria-label="Copy address"
-                >
-                  {copied ? <Check size={14} /> : <Copy size={14} />}
-                </button>
               </div>
+
+              <button
+                onClick={copyToClipboard}
+                className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-lg flex items-center justify-center"
+              >
+                {copied ? (
+                  <>
+                    <Check size={16} className="mr-2" />
+                    Copiado!
+                  </>
+                ) : (
+                  <>
+                    <Copy size={16} className="mr-2" />
+                    Copiar Endereço
+                  </>
+                )}
+              </button>
+
+              <p className="text-gray-500 text-xs">
+                Compartilhe este endereço para receber tokens TPF e outros tokens da Worldchain
+              </p>
             </div>
           </motion.div>
         </motion.div>
