@@ -34,7 +34,7 @@ const partnerships = [
     id: 2,
     name: "AXO",
     description: "Claim Cute Free tokens everyday!",
-    image: "/axo.png",
+    image: "/axo.jpg",
     gradient: "from-pink-600 to-purple-600",
     url: "https://worldcoin.org/mini-app?app_id=app_8aeb55d57b7be834fb8d67e2f803d258&app_mode=mini-app",
   },
