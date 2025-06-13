@@ -1,8 +1,9 @@
 "use client"
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Download, Copy, Check, QrCode } from "lucide-react"
+import { X, Download, Copy, Check, QrCode, Info } from "lucide-react"
 import { toast } from "sonner"
+import { useTranslation } from "@/hooks/use-translation"
 
 interface ReceiveTokenModalProps {
   isOpen: boolean
@@ -11,17 +12,18 @@ interface ReceiveTokenModalProps {
 }
 
 export function ReceiveTokenModal({ isOpen, onClose, walletAddress }: ReceiveTokenModalProps) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
 
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(walletAddress)
       setCopied(true)
-      toast.success("Endereço copiado!")
+      toast.success(t.wallet?.addressCopied || "Address copied!")
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error("Error copying:", err)
-      toast.error("Erro ao copiar endereço")
+      toast.error(t.receiveToken?.errorCopyingAddress || "Error copying address")
     }
   }
 
@@ -45,7 +47,7 @@ export function ReceiveTokenModal({ isOpen, onClose, walletAddress }: ReceiveTok
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-white flex items-center">
                 <Download size={20} className="mr-2 text-green-400" />
-                Receber Tokens
+                {t.receiveToken?.title || "Receive Tokens"}
               </h3>
               <button onClick={onClose} className="text-gray-400 hover:text-white">
                 <X size={20} />
@@ -59,7 +61,9 @@ export function ReceiveTokenModal({ isOpen, onClose, walletAddress }: ReceiveTok
               </div>
 
               <div>
-                <p className="text-gray-400 text-sm mb-2">Seu endereço da carteira:</p>
+                <p className="text-gray-400 text-sm mb-2">
+                  {t.receiveToken?.yourWalletAddress || "Your wallet address:"}
+                </p>
                 <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
                   <p className="text-white font-mono text-sm break-all">{walletAddress}</p>
                 </div>
@@ -72,19 +76,39 @@ export function ReceiveTokenModal({ isOpen, onClose, walletAddress }: ReceiveTok
                 {copied ? (
                   <>
                     <Check size={16} className="mr-2" />
-                    Copiado!
+                    {t.receiveToken?.copied || "Copied!"}
                   </>
                 ) : (
                   <>
                     <Copy size={16} className="mr-2" />
-                    Copiar Endereço
+                    {t.receiveToken?.copyAddress || "Copy Address"}
                   </>
                 )}
               </button>
 
-              <p className="text-gray-500 text-xs">
-                Compartilhe este endereço para receber tokens TPF e outros tokens da Worldchain
-              </p>
+              {/* Instructions */}
+              <div className="bg-blue-900/20 border border-blue-800/30 rounded-lg p-3">
+                <div className="flex items-start">
+                  <Info className="w-4 h-4 text-blue-400 mt-0.5 mr-2 flex-shrink-0" />
+                  <p className="text-blue-200/80 text-xs text-left">
+                    {t.receiveToken?.receiveInstructions ||
+                      "Share this address to receive TPF tokens and other Worldchain tokens"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Supported Networks */}
+              <div className="bg-gray-800/30 rounded-lg p-3">
+                <h4 className="text-gray-300 font-medium mb-2 text-sm">
+                  {t.receiveToken?.supportedNetworks || "Supported Networks:"}
+                </h4>
+                <div className="flex items-center space-x-2">
+                  <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">W</span>
+                  </div>
+                  <span className="text-gray-400 text-sm">Worldchain Mainnet</span>
+                </div>
+              </div>
             </div>
           </motion.div>
         </motion.div>
