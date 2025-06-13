@@ -22,7 +22,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { walletService } from "@/services/wallet-service"
 import { balanceSyncService } from "@/services/balance-sync-service"
 import { SetBalanceModal } from "@/components/set-balance-modal"
+import { SendTokenModal } from "@/components/send-token-modal"
+import { ReceiveTokenModal } from "@/components/receive-token-modal"
+import { SwapModal } from "@/components/swap-modal"
 import { TransactionHistory } from "@/components/transaction-history"
+import { toast } from "sonner"
 
 export default function WalletPage() {
   const [walletAddress, setWalletAddress] = useState<string>("")
@@ -33,7 +37,12 @@ export default function WalletPage() {
   const [error, setError] = useState<string | null>(null)
   const [copiedAddress, setCopiedAddress] = useState(false)
   const [activeTab, setActiveTab] = useState<"assets" | "activity">("assets")
+
+  // Modal states
   const [isSetBalanceModalOpen, setIsSetBalanceModalOpen] = useState(false)
+  const [isSendModalOpen, setIsSendModalOpen] = useState(false)
+  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false)
 
   const router = useRouter()
 
@@ -117,8 +126,10 @@ export default function WalletPage() {
     setIsRefreshing(true)
     try {
       await fetchWalletData(walletAddress)
+      toast.success("Saldos atualizados!")
     } catch (error) {
       console.error("Erro ao atualizar saldo:", error)
+      toast.error("Erro ao atualizar saldos")
     } finally {
       setIsRefreshing(false)
     }
@@ -134,6 +145,7 @@ export default function WalletPage() {
     if (walletAddress) {
       navigator.clipboard.writeText(walletAddress)
       setCopiedAddress(true)
+      toast.success("Endereço copiado!")
       setTimeout(() => setCopiedAddress(false), 2000)
     }
   }
@@ -163,6 +175,20 @@ export default function WalletPage() {
         currentBalance={balance}
         walletAddress={walletAddress}
       />
+
+      <SendTokenModal
+        isOpen={isSendModalOpen}
+        onClose={() => setIsSendModalOpen(false)}
+        walletAddress={walletAddress}
+      />
+
+      <ReceiveTokenModal
+        isOpen={isReceiveModalOpen}
+        onClose={() => setIsReceiveModalOpen(false)}
+        walletAddress={walletAddress}
+      />
+
+      <SwapModal isOpen={isSwapModalOpen} onClose={() => setIsSwapModalOpen(false)} walletAddress={walletAddress} />
 
       <div className="z-10 w-full max-w-md mx-auto">
         <motion.div
@@ -220,25 +246,15 @@ export default function WalletPage() {
               <CardHeader className="relative z-10 pb-0">
                 <div className="flex justify-between items-center">
                   <CardDescription className="text-gray-300">TPF Balance</CardDescription>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 rounded-full bg-gray-800/70 hover:bg-gray-700/70 p-0"
-                      onClick={() => setIsSetBalanceModalOpen(true)}
-                    >
-                      <span className="text-xs">⚙️</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 rounded-full bg-gray-800/70 hover:bg-gray-700/70 p-0"
-                      onClick={handleRefresh}
-                      disabled={isRefreshing}
-                    >
-                      <RefreshCw size={14} className={`text-gray-300 ${isRefreshing ? "animate-spin" : ""}`} />
-                    </Button>
-                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 rounded-full bg-gray-800/70 hover:bg-gray-700/70 p-0"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                  >
+                    <RefreshCw size={14} className={`text-gray-300 ${isRefreshing ? "animate-spin" : ""}`} />
+                  </Button>
                 </div>
 
                 {loading ? (
@@ -258,7 +274,7 @@ export default function WalletPage() {
                   <Button
                     variant="secondary"
                     className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
-                    onClick={() => console.log("Send clicked")}
+                    onClick={() => setIsSendModalOpen(true)}
                   >
                     <div className="rounded-full bg-gray-700 p-2 mb-1">
                       <ArrowUpRight className="w-4 h-4 text-gray-400" />
@@ -269,7 +285,7 @@ export default function WalletPage() {
                   <Button
                     variant="secondary"
                     className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
-                    onClick={() => console.log("Receive clicked")}
+                    onClick={() => setIsReceiveModalOpen(true)}
                   >
                     <div className="rounded-full bg-gray-700 p-2 mb-1">
                       <ArrowDownLeft className="w-4 h-4 text-gray-400" />
@@ -280,7 +296,7 @@ export default function WalletPage() {
                   <Button
                     variant="secondary"
                     className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
-                    onClick={() => console.log("Swap clicked")}
+                    onClick={() => setIsSwapModalOpen(true)}
                   >
                     <div className="rounded-full bg-gray-700 p-2 mb-1">
                       <ArrowUpDown className="w-4 h-4 text-gray-400" />
