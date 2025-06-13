@@ -61,10 +61,10 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   const [showSettings, setShowSettings] = useState(false)
   const [quoteData, setQuoteData] = useState<any>(null)
   const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({
-    WLD: "42.67",
-    TPF: "108567827.002",
-    DNA: "22765.884",
-    WDD: "78.32",
+    WLD: "0",
+    TPF: "0",
+    DNA: "0",
+    WDD: "0",
   })
 
   // Carregar saldos quando o modal abrir
