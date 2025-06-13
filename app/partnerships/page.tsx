@@ -47,7 +47,10 @@ export default function PartnershipsPage() {
   }
 
   const handleAxoClick = () => {
-    window.open("https://worldcoin.org/mini-app?app_id=app_axo_example&path=/claim", "_blank")
+    window.open(
+      "https://worldcoin.org/mini-app?app_id=app_8aeb55d57b7be834fb8d67e2f803d258&app_mode=mini-app",
+      "_blank",
+    )
   }
 
   return (
@@ -148,12 +151,7 @@ export default function PartnershipsPage() {
             <div className="relative z-10">
               <div className="flex items-center justify-center mb-4">
                 <div className="relative w-full h-32 rounded-lg overflow-hidden">
-                  <Image
-                    src="/axo-banner.jpg"
-                    alt="AXO - Claim Cute Free tokens everyday!"
-                    fill
-                    className="object-cover"
-                  />
+                  <Image src="/axo.png" alt="AXO - Claim Cute Free tokens everyday!" fill className="object-cover" />
                 </div>
               </div>
 
