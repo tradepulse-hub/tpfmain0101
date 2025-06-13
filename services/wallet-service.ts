@@ -1,5 +1,6 @@
 import { WORLDCHAIN_CONFIG, TOKENS_INFO } from "./constants"
 import { balanceSyncService } from "./balance-sync-service"
+import { holdstationService } from "./holdstation-service"
 import type { TokenBalance, Transaction } from "./types"
 
 class WalletService {
@@ -25,50 +26,63 @@ class WalletService {
 
       console.log(`💰 Getting token balances for: ${walletAddress}`)
 
-      // For now, return mock balances with real structure
-      const mockBalances: TokenBalance[] = [
+      // Use real Holdstation service for balances
+      const realBalances = await holdstationService.getTokenBalances(walletAddress)
+
+      // Update TPF balance with sync service if needed
+      const tpfBalance = realBalances.find((b) => b.symbol === "TPF")
+      if (tpfBalance) {
+        const syncedBalance = balanceSyncService.getCurrentTPFBalance(walletAddress)
+        if (syncedBalance > 0) {
+          tpfBalance.balance = syncedBalance.toString()
+          tpfBalance.formattedBalance = syncedBalance.toString()
+        }
+      }
+
+      return realBalances
+    } catch (error) {
+      console.error("Error getting token balances:", error)
+
+      // Fallback to sync service for TPF
+      const fallbackBalance = balanceSyncService.getCurrentTPFBalance(walletAddress)
+      return [
         {
           symbol: "TPF",
           name: "TPulseFi",
           address: TOKENS_INFO.TPF.address,
-          balance: balanceSyncService.getCurrentTPFBalance(walletAddress).toString(),
+          balance: fallbackBalance.toString(),
           decimals: 18,
           icon: "/logo-tpf.png",
-          formattedBalance: balanceSyncService.getCurrentTPFBalance(walletAddress).toString(),
+          formattedBalance: fallbackBalance.toString(),
         },
         {
           symbol: "WLD",
           name: "Worldcoin",
           address: TOKENS_INFO.WLD.address,
-          balance: "42.67",
+          balance: "0",
           decimals: 18,
           icon: "/worldcoin.jpeg",
-          formattedBalance: "42.67",
+          formattedBalance: "0",
         },
         {
           symbol: "DNA",
           name: "DNA Token",
           address: TOKENS_INFO.DNA.address,
-          balance: "22765.884",
+          balance: "0",
           decimals: 18,
           icon: "/dna-token.png",
-          formattedBalance: "22765.884",
+          formattedBalance: "0",
         },
         {
           symbol: "WDD",
           name: "Drachma Token",
           address: TOKENS_INFO.WDD.address,
-          balance: "78.32",
+          balance: "0",
           decimals: 18,
           icon: "/drachma-token.png",
-          formattedBalance: "78.32",
+          formattedBalance: "0",
         },
       ]
-
-      return mockBalances
-    } catch (error) {
-      console.error("Error getting token balances:", error)
-      return []
     }
   }
 
