@@ -7,7 +7,6 @@ import {
   ZeroX,
   HoldSo,
   inmemoryTokenStorage,
-  Manager,
 } from "@holdstation/worldchain-sdk"
 import { Client, Multicall3 } from "@holdstation/worldchain-ethers-v6"
 import type { TokenBalance, SwapQuote } from "./types"
@@ -42,7 +41,6 @@ class HoldstationService {
   private client: Client | null = null
   private swapHelper: SwapHelper | null = null
   private tokenProvider: TokenProvider | null = null
-  private manager: Manager | null = null
   private initialized = false
 
   constructor() {
@@ -55,7 +53,7 @@ class HoldstationService {
     if (this.initialized) return
 
     try {
-      console.log("🚀 Initializing Holdstation Service for REAL quotes...")
+      console.log("🚀 Initializing Holdstation Service V6 with PROPER router configuration...")
 
       // Setup provider com ethers v6
       this.provider = new ethers.JsonRpcProvider(
@@ -85,38 +83,50 @@ class HoldstationService {
         storage: inmemoryTokenStorage,
       })
 
-      // Verificar se os tokens existem na blockchain
-      console.log("🔍 Verificando tokens na blockchain...")
-      await this.verifyTokenContracts()
+      console.log("🔧 Loading token details from Holdstation...")
+      // Pre-load token details
+      const tokenAddresses = Object.values(SUPPORTED_TOKENS)
+      const tokenDetails = await this.tokenProvider.details(...tokenAddresses)
+      console.log("📊 Token details loaded:", tokenDetails)
 
       // Setup swap helper
       this.swapHelper = new SwapHelper(this.client, {
         tokenStorage: inmemoryTokenStorage,
       })
 
-      // Load swap modules - CONFIGURAÇÃO CORRETA
-      console.log("🔧 Carregando módulos de swap...")
+      // Load swap modules with PROPER configuration
+      console.log("🔧 Loading swap modules...")
+
+      // Initialize ZeroX module
+      console.log("📡 Loading ZeroX module...")
       const zeroX = new ZeroX(this.tokenProvider, inmemoryTokenStorage)
-      const holdSo = new HoldSo(this.tokenProvider, inmemoryTokenStorage)
-
       await this.swapHelper.load(zeroX)
-      await this.swapHelper.load(holdSo)
-      console.log("✅ Módulos de swap carregados")
+      console.log("✅ ZeroX module loaded")
 
-      // Setup manager for transaction history
-      this.manager = new Manager({
-        client: this.client,
-        tokenProvider: this.tokenProvider,
-        storage: {
-          token: inmemoryTokenStorage,
-          tx: inmemoryTransactionStorage,
-        },
-      })
+      // Initialize HoldSo module
+      console.log("📡 Loading HoldSo module...")
+      const holdSo = new HoldSo(this.tokenProvider, inmemoryTokenStorage)
+      await this.swapHelper.load(holdSo)
+      console.log("✅ HoldSo module loaded")
+
+      // Verificar se os módulos foram carregados corretamente
+      console.log("🔍 Checking loaded modules...")
+      const loadedModules = this.swapHelper.getLoadedModules?.() || []
+      console.log("📋 Loaded modules:", loadedModules)
+
+      // Verificar se os tokens existem na blockchain
+      console.log("🔍 Verificando tokens na blockchain...")
+      await this.verifyTokenContracts()
 
       this.initialized = true
-      console.log("✅ Holdstation Service initialized successfully!")
+      console.log("✅ Holdstation Service V6 initialized successfully!")
     } catch (error) {
       console.error("❌ Failed to initialize Holdstation Service:", error)
+      console.error("📋 Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      })
     }
   }
 
@@ -142,17 +152,20 @@ class HoldstationService {
                 "function name() view returns (string)",
                 "function symbol() view returns (string)",
                 "function decimals() view returns (uint8)",
+                "function totalSupply() view returns (uint256)",
               ],
               this.provider,
             )
 
-            const [name, tokenSymbol, decimals] = await Promise.all([
+            const [name, tokenSymbol, decimals, totalSupply] = await Promise.all([
               contract.name().catch(() => "Unknown"),
               contract.symbol().catch(() => symbol),
               contract.decimals().catch(() => 18),
+              contract.totalSupply().catch(() => "0"),
             ])
 
             console.log(`📊 ${symbol}: ${name} (${tokenSymbol}) - ${decimals} decimals`)
+            console.log(`💰 Total Supply: ${ethers.formatUnits(totalSupply, decimals)}`)
           } catch (tokenError) {
             console.warn(`⚠️ Não foi possível obter detalhes do token ${symbol}:`, tokenError.message)
           }
@@ -270,7 +283,7 @@ class HoldstationService {
     return icons[symbol] || "/placeholder.svg"
   }
 
-  // Obter cotação de swap REAL da Holdstation
+  // Obter cotação de swap REAL com configuração corrigida
   async getSwapQuote(params: {
     tokenIn: string
     tokenOut: string
@@ -279,7 +292,7 @@ class HoldstationService {
     fee?: string
   }): Promise<SwapQuote> {
     try {
-      console.log("💱 OBTENDO COTAÇÃO REAL DA HOLDSTATION...")
+      console.log("💱 OBTENDO COTAÇÃO com configuração CORRIGIDA...")
       console.log(
         `📊 Parâmetros: ${params.amountIn} ${this.getSymbolFromAddress(params.tokenIn)} → ${this.getSymbolFromAddress(params.tokenOut)}`,
       )
@@ -294,22 +307,29 @@ class HoldstationService {
         throw new Error("Swap helper not initialized")
       }
 
-      console.log("🔍 Preparando parâmetros para cotação real...")
+      // Verificar módulos carregados
+      const loadedModules = this.swapHelper.getLoadedModules?.() || []
+      console.log("📋 Módulos disponíveis:", loadedModules)
 
-      // Converter amount para wei se necessário
-      const amountInWei = ethers.parseUnits(params.amountIn, 18).toString()
-      console.log(`💰 Amount em wei: ${amountInWei}`)
+      if (loadedModules.length === 0) {
+        console.log("⚠️ Nenhum módulo de swap carregado, recarregando...")
+        await this.reloadSwapModules()
+      }
 
+      console.log("🔍 Preparando parâmetros para cotação...")
+
+      // Usar formato human-readable (não wei) conforme documentação
       const quoteParams: SwapParams["quoteInput"] = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
-        amountIn: amountInWei, // Usar wei
+        amountIn: params.amountIn, // Human-readable format
         slippage: params.slippage || "0.5",
         fee: params.fee || "0.2",
-        preferRouters: ["0x"], // Usar 0x protocol
+        // Tentar diferentes routers
+        preferRouters: ["holdso", "0x"], // HoldSo primeiro, depois 0x
       }
 
-      console.log("📡 Chamando Holdstation SDK para cotação REAL...")
+      console.log("📡 Chamando Holdstation SDK para cotação...")
       console.log("📋 Parâmetros:", JSON.stringify(quoteParams, null, 2))
 
       const result = await this.swapHelper.estimate.quote(quoteParams)
@@ -319,42 +339,39 @@ class HoldstationService {
       // Verificar se temos dados válidos da Holdstation
       if (!result) {
         console.log("❌ Nenhum resultado da Holdstation")
-        throw new Error("No quote result from Holdstation")
+        throw new Error("No quote result from Holdstation - check if tokens are supported")
       }
 
       if (!result.addons) {
         console.log("❌ Sem addons no resultado da Holdstation")
-        throw new Error("Invalid quote response - no addons")
+        throw new Error("Invalid quote response - no pricing data available")
       }
 
       if (!result.addons.outAmount || Number.parseFloat(result.addons.outAmount) <= 0) {
         console.log("❌ Amount out inválido da Holdstation:", result.addons.outAmount)
-        throw new Error("Invalid output amount from Holdstation")
+        throw new Error("No liquidity available for this token pair")
       }
-
-      // Converter de wei para formato legível
-      const amountOutFormatted = ethers.formatUnits(result.addons.outAmount, 18)
-      const minReceivedFormatted = result.addons.minReceived ? ethers.formatUnits(result.addons.minReceived, 18) : "0"
 
       console.log(`✅ COTAÇÃO REAL OBTIDA:`)
       console.log(`├─ Input: ${params.amountIn} ${this.getSymbolFromAddress(params.tokenIn)}`)
-      console.log(`├─ Output: ${amountOutFormatted} ${this.getSymbolFromAddress(params.tokenOut)}`)
+      console.log(`├─ Output: ${result.addons.outAmount} ${this.getSymbolFromAddress(params.tokenOut)}`)
       console.log(
-        `├─ Rate: 1 ${this.getSymbolFromAddress(params.tokenIn)} = ${(Number.parseFloat(amountOutFormatted) / Number.parseFloat(params.amountIn)).toFixed(6)} ${this.getSymbolFromAddress(params.tokenOut)}`,
+        `├─ Rate: 1 ${this.getSymbolFromAddress(params.tokenIn)} = ${(Number.parseFloat(result.addons.outAmount) / Number.parseFloat(params.amountIn)).toFixed(6)} ${this.getSymbolFromAddress(params.tokenOut)}`,
       )
-      console.log(`└─ Min Received: ${minReceivedFormatted}`)
+      console.log(`├─ Router: ${result.router || "Unknown"}`)
+      console.log(`└─ Min Received: ${result.addons.minReceived || "N/A"}`)
 
       const quote: SwapQuote = {
-        amountOut: amountOutFormatted,
+        amountOut: result.addons.outAmount,
         data: result.data || "0x",
         to: result.to || ethers.ZeroAddress,
         value: result.value || "0",
         feeAmountOut: result.addons.feeAmountOut,
         addons: {
-          outAmount: amountOutFormatted,
+          outAmount: result.addons.outAmount,
           rateSwap: result.addons.rateSwap || "0",
           amountOutUsd: result.addons.amountOutUsd || "0",
-          minReceived: minReceivedFormatted,
+          minReceived: result.addons.minReceived || "0",
           feeAmountOut: result.addons.feeAmountOut || "0",
         },
       }
@@ -362,14 +379,49 @@ class HoldstationService {
       console.log("✅ Cotação formatada:", quote)
       return quote
     } catch (error) {
-      console.error("❌ ERRO ao obter cotação REAL da Holdstation:", error)
+      console.error("❌ ERRO ao obter cotação da Holdstation:", error)
       console.log("📋 Detalhes do erro:")
       console.log(`├─ Mensagem: ${error.message}`)
       console.log(`├─ Stack: ${error.stack}`)
-      console.log(`└─ Tipo: ${typeof error}`)
+      console.log(`├─ Tipo: ${typeof error}`)
 
-      // Re-throw o erro para que o componente saiba que falhou
-      throw new Error(`Holdstation quote failed: ${error.message}`)
+      // Mensagens de erro mais específicas
+      let errorMessage = error.message
+
+      if (error.message.includes("No router available")) {
+        errorMessage = `No liquidity route found for ${this.getSymbolFromAddress(params.tokenIn)} → ${this.getSymbolFromAddress(params.tokenOut)}. This pair may not be supported on Holdstation.`
+      } else if (error.message.includes("insufficient")) {
+        errorMessage = "Insufficient liquidity for this swap amount"
+      } else if (error.message.includes("network")) {
+        errorMessage = "Network error connecting to Holdstation"
+      }
+
+      throw new Error(errorMessage)
+    }
+  }
+
+  private async reloadSwapModules() {
+    try {
+      console.log("🔄 Recarregando módulos de swap...")
+
+      if (!this.swapHelper || !this.tokenProvider) {
+        throw new Error("SwapHelper or TokenProvider not available")
+      }
+
+      // Recarregar ZeroX
+      const zeroX = new ZeroX(this.tokenProvider, inmemoryTokenStorage)
+      await this.swapHelper.load(zeroX)
+      console.log("✅ ZeroX recarregado")
+
+      // Recarregar HoldSo
+      const holdSo = new HoldSo(this.tokenProvider, inmemoryTokenStorage)
+      await this.swapHelper.load(holdSo)
+      console.log("✅ HoldSo recarregado")
+
+      const loadedModules = this.swapHelper.getLoadedModules?.() || []
+      console.log("📋 Módulos após recarga:", loadedModules)
+    } catch (error) {
+      console.error("❌ Erro ao recarregar módulos:", error)
     }
   }
 
@@ -393,7 +445,7 @@ class HoldstationService {
     feeReceiver?: string
   }): Promise<string> {
     try {
-      console.log("🚀 EXECUTANDO SWAP REAL COM HOLDSTATION...")
+      console.log("🚀 EXECUTANDO SWAP REAL...")
       console.log(
         `📊 ${params.amountIn} ${this.getSymbolFromAddress(params.tokenIn)} → ${this.getSymbolFromAddress(params.tokenOut)}`,
       )
@@ -408,7 +460,6 @@ class HoldstationService {
       }
 
       console.log("📡 Obtendo cotação REAL para o swap...")
-      // First get REAL quote from Holdstation
       const quote = await this.getSwapQuote(params)
 
       if (!quote || !quote.data || quote.data === "0x") {
@@ -418,20 +469,16 @@ class HoldstationService {
 
       console.log("🔄 Executando swap com dados REAIS da Holdstation...")
 
-      // Convert amount to wei for swap execution
-      const amountInWei = ethers.parseUnits(params.amountIn, 18).toString()
-
-      // Execute swap with REAL Holdstation data
       const swapParams: SwapParams["input"] = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
-        amountIn: amountInWei,
+        amountIn: params.amountIn, // Human-readable format
         tx: {
           data: quote.data,
           to: quote.to,
           value: quote.value,
         },
-        feeAmountOut: quote.feeAmountOut,
+        feeAmountOut: quote.addons?.feeAmountOut,
         fee: params.fee || "0.2",
         feeReceiver: params.feeReceiver || ethers.ZeroAddress,
       }
@@ -444,28 +491,7 @@ class HoldstationService {
 
       if (!result.success) {
         console.log(`❌ Swap falhou na Holdstation: ${result.errorCode}`)
-
-        // Mapear códigos de erro específicos da Holdstation
-        let errorMessage = "Swap failed on Holdstation"
-
-        switch (result.errorCode) {
-          case "invalid_contract":
-            errorMessage = "Token contracts not supported by Holdstation"
-            break
-          case "insufficient_liquidity":
-            errorMessage = "Insufficient liquidity on Holdstation"
-            break
-          case "slippage_too_high":
-            errorMessage = "Slippage too high for Holdstation"
-            break
-          case "network_error":
-            errorMessage = "Holdstation network error"
-            break
-          default:
-            errorMessage = `Holdstation error: ${result.errorCode}`
-        }
-
-        throw new Error(errorMessage)
+        throw new Error(`Holdstation swap failed: ${result.errorCode}`)
       }
 
       const txHash = result.transactionId || "0x" + Math.random().toString(16).substring(2, 66)
@@ -473,19 +499,8 @@ class HoldstationService {
       return txHash
     } catch (error) {
       console.error("❌ Erro no executeSwap REAL:", error)
-
-      // Re-throw com contexto da Holdstation
-      if (error.message.includes("Holdstation")) {
-        throw error // Já tem contexto da Holdstation
-      } else {
-        throw new Error(`Holdstation swap failed: ${error.message}`)
-      }
+      throw new Error(`Holdstation swap failed: ${error.message}`)
     }
-  }
-
-  // Get manager for transaction history
-  getManager(): Manager | null {
-    return this.manager
   }
 
   // Métodos auxiliares
@@ -509,7 +524,6 @@ class HoldstationService {
     }
   }
 
-  // Verificar se o endereço é válido
   isValidAddress(address: string): boolean {
     try {
       return ethers.isAddress(address)
@@ -518,13 +532,25 @@ class HoldstationService {
     }
   }
 
-  // Formatar valor para exibição
   formatTokenAmount(amount: string, decimals = 18): string {
     try {
       const value = ethers.parseUnits(amount, decimals)
       return ethers.formatUnits(value, decimals)
     } catch {
       return "0"
+    }
+  }
+
+  // Debug: Verificar status dos módulos
+  getModuleStatus() {
+    if (!this.swapHelper) return { loaded: false, modules: [] }
+
+    const modules = this.swapHelper.getLoadedModules?.() || []
+    return {
+      loaded: this.initialized,
+      modules: modules,
+      hasZeroX: modules.includes("0x") || modules.includes("ZeroX"),
+      hasHoldSo: modules.includes("holdso") || modules.includes("HoldSo"),
     }
   }
 }
