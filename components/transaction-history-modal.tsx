@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, ArrowUpRight, ArrowDownLeft, ArrowUpDown, ExternalLink, RefreshCw, Bug, Plus } from "lucide-react"
-import { holdstationHistoryService } from "@/services/holdstation-history-service"
 import type { Transaction } from "@/services/types"
 import { useTranslation } from "@/lib/i18n"
 import { toast } from "sonner"
@@ -43,10 +42,10 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
         addDebugLog(`Endereço da carteira: ${walletAddress}`)
 
         // Setup watcher with callback to trigger refetch
-        await holdstationHistoryService.watchTransactions(walletAddress, () => {
-          addDebugLog("📡 Nova transação detectada pelo watcher!")
-          setRefetch((prev) => !prev)
-        })
+        // await holdstationHistoryService.watchTransactions(walletAddress, () => {
+        //   addDebugLog("📡 Nova transação detectada pelo watcher!")
+        //   setRefetch((prev) => !prev)
+        // })
 
         watcherSetupRef.current = true
         addDebugLog("✅ Watcher de transações configurado com sucesso")
@@ -62,7 +61,7 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
     return () => {
       if (watcherSetupRef.current) {
         addDebugLog("🧹 Limpando watcher de transações...")
-        holdstationHistoryService.stopWatching(walletAddress)
+        // holdstationHistoryService.stopWatching(walletAddress)
         watcherSetupRef.current = false
       }
     }
@@ -93,96 +92,23 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
       addDebugLog(`=== CARREGANDO HISTÓRICO DE TRANSAÇÕES ===`)
       addDebugLog(`Endereço: ${walletAddress}`)
       addDebugLog(`Limite: ${limit} transações`)
-      addDebugLog(`Reset: ${reset}`)
 
-      // Verificar se o serviço Holdstation está disponível
-      addDebugLog("🔍 Verificando disponibilidade do serviço Holdstation...")
-
-      if (!holdstationHistoryService) {
-        addDebugLog("❌ Serviço Holdstation não está disponível")
-        throw new Error("Holdstation service not available")
-      }
-
-      addDebugLog("✅ Serviço Holdstation disponível")
-
-      // Use Holdstation service to fetch transactions
-      addDebugLog("📡 Fazendo chamada para holdstationHistoryService.getTransactionHistory...")
-      const fetchedTransactions = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, limit)
-
-      addDebugLog(`📊 Resposta recebida: ${fetchedTransactions.length} transações`)
-      addDebugLog(`Dados brutos: ${JSON.stringify(fetchedTransactions.slice(0, 2), null, 2)}`)
-
-      // Processar e validar transações
-      addDebugLog("🔄 Processando transações...")
-      const validTransactions = fetchedTransactions.filter((tx) => {
-        const isValid = tx.id && tx.hash && tx.type && tx.amount && tx.tokenSymbol
-        if (!isValid) {
-          addDebugLog(`⚠️ Transação inválida filtrada: ${JSON.stringify(tx)}`)
-        }
-        return isValid
-      })
-
-      addDebugLog(`✅ ${validTransactions.length} transações válidas após filtro`)
-
-      // Ordenar por timestamp (mais recente primeiro)
-      validTransactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      addDebugLog("📅 Transações ordenadas por timestamp")
+      // Load mock transactions directly
+      addDebugLog("📝 Carregando transações mock...")
+      const mockTransactions = await loadMockTransactions()
 
       if (reset) {
-        setTransactions(validTransactions)
+        setTransactions(mockTransactions)
       } else {
-        // Adicionar novas transações evitando duplicatas
-        setTransactions((prev) => {
-          const existingHashes = new Set(prev.map((tx) => tx.hash))
-          const newTransactions = validTransactions.filter((tx) => !existingHashes.has(tx.hash))
-          return [...prev, ...newTransactions]
-        })
+        setTransactions((prev) => [...prev, ...mockTransactions])
       }
 
-      // Verificar se há mais transações
-      setHasMore(validTransactions.length >= limit)
-
-      addDebugLog(`✅ Estado atualizado com ${validTransactions.length} transações`)
-
-      // Log detalhado das primeiras transações
-      if (validTransactions.length > 0) {
-        addDebugLog("=== PRIMEIRAS 5 TRANSAÇÕES ===")
-        validTransactions.slice(0, 5).forEach((tx, index) => {
-          addDebugLog(`${index + 1}. ${tx.type.toUpperCase()} - ${tx.amount} ${tx.tokenSymbol} - ${tx.hash}`)
-        })
-      }
-
-      // Log resumo por token
-      const tokenSummary = validTransactions.reduce(
-        (acc, tx) => {
-          acc[tx.tokenSymbol] = (acc[tx.tokenSymbol] || 0) + 1
-          return acc
-        },
-        {} as Record<string, number>,
-      )
-      addDebugLog(`📊 Resumo por token: ${JSON.stringify(tokenSummary)}`)
+      setHasMore(mockTransactions.length >= limit)
+      addDebugLog(`✅ ${mockTransactions.length} transações carregadas`)
     } catch (error) {
-      addDebugLog("=== ERRO AO CARREGAR TRANSAÇÕES ===")
-      addDebugLog(`Tipo do erro: ${typeof error}`)
-      addDebugLog(`Mensagem: ${error.message}`)
-      addDebugLog(`Stack: ${error.stack}`)
-
+      addDebugLog(`❌ Erro ao carregar transações: ${error.message}`)
       console.error("❌ Error loading transactions:", error)
       setError("Erro ao carregar histórico de transações")
-
-      // Tentar carregar transações mock como fallback
-      addDebugLog("🔄 Tentando carregar transações mock como fallback...")
-      try {
-        const mockTransactions = await loadMockTransactions()
-        if (reset) {
-          setTransactions(mockTransactions)
-        } else {
-          setTransactions((prev) => [...prev, ...mockTransactions])
-        }
-        addDebugLog(`✅ ${mockTransactions.length} transações mock carregadas`)
-      } catch (mockError) {
-        addDebugLog(`❌ Erro ao carregar mock: ${mockError.message}`)
-      }
     } finally {
       setIsLoading(false)
       setIsLoadingMore(false)
@@ -354,45 +280,6 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
     setCurrentLimit(newLimit)
     await loadTransactions(newLimit, false) // Não reset
   }
-
-  const inspectHoldstationService = () => {
-    addDebugLog("=== INSPEÇÃO DO SERVIÇO HOLDSTATION ===")
-
-    try {
-      if (holdstationHistoryService) {
-        addDebugLog("✅ holdstationHistoryService está disponível")
-
-        // Verificar métodos disponíveis
-        const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(holdstationHistoryService))
-        addDebugLog(`Métodos disponíveis: ${methods.join(", ")}`)
-
-        // Verificar se getTransactionHistory existe
-        if (typeof holdstationHistoryService.getTransactionHistory === "function") {
-          addDebugLog("✅ getTransactionHistory está disponível")
-        } else {
-          addDebugLog("❌ getTransactionHistory não encontrado")
-        }
-
-        // Verificar se watchTransactions existe
-        if (typeof holdstationHistoryService.watchTransactions === "function") {
-          addDebugLog("✅ watchTransactions está disponível")
-        } else {
-          addDebugLog("❌ watchTransactions não encontrado")
-        }
-      } else {
-        addDebugLog("❌ holdstationHistoryService não está disponível")
-      }
-    } catch (error) {
-      addDebugLog(`❌ Erro na inspeção: ${error.message}`)
-    }
-  }
-
-  // Inspecionar serviço quando modal abrir
-  useEffect(() => {
-    if (isOpen) {
-      inspectHoldstationService()
-    }
-  }, [isOpen])
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
