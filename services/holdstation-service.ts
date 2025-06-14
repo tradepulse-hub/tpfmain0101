@@ -1,14 +1,13 @@
 import { ethers } from "ethers"
+import { Client, Multicall3 } from "@holdstation/worldchain-ethers-v6"
 import {
   config,
+  inmemoryTokenStorage,
   SwapHelper,
   type SwapParams,
   TokenProvider,
   ZeroX,
-  HoldSo,
-  inmemoryTokenStorage,
 } from "@holdstation/worldchain-sdk"
-import { Client, Multicall3 } from "@holdstation/worldchain-ethers-v6"
 import type { TokenBalance, SwapQuote } from "./types"
 
 // Configuração para Worldchain
@@ -21,28 +20,6 @@ const SUPPORTED_TOKENS = {
   TPF: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45", // TPulseFi - VERIFICADO
   DNA: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113", // DNA Token - VERIFICADO
   WDD: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B", // Drachma Token - VERIFICADO
-}
-
-// Pool de liquidez Uniswap V3 para WLD/TPF
-const LIQUIDITY_POOLS = {
-  WLD_TPF: "0xEE08Cef6EbCe1e037fFdbDF6ab657E5C19E86FF3", // Pool Uniswap V3 WLD/TPF
-}
-
-// Configuração de pools para a Holdstation
-const POOL_CONFIG = {
-  // WLD/TPF pool configuration
-  [`${SUPPORTED_TOKENS.WLD}_${SUPPORTED_TOKENS.TPF}`]: {
-    pool: LIQUIDITY_POOLS.WLD_TPF,
-    fee: 3000, // 0.3% fee tier
-    token0: SUPPORTED_TOKENS.WLD,
-    token1: SUPPORTED_TOKENS.TPF,
-  },
-  [`${SUPPORTED_TOKENS.TPF}_${SUPPORTED_TOKENS.WLD}`]: {
-    pool: LIQUIDITY_POOLS.WLD_TPF,
-    fee: 3000, // 0.3% fee tier
-    token0: SUPPORTED_TOKENS.WLD,
-    token1: SUPPORTED_TOKENS.TPF,
-  },
 }
 
 // Mock inmemoryTransactionStorage
@@ -63,6 +40,7 @@ class HoldstationService {
   private client: Client | null = null
   private swapHelper: SwapHelper | null = null
   private tokenProvider: TokenProvider | null = null
+  private zeroX: ZeroX | null = null
   private initialized = false
 
   constructor() {
@@ -75,9 +53,9 @@ class HoldstationService {
     if (this.initialized) return
 
     try {
-      console.log("🚀 Initializing Holdstation Service V6 with PROPER router configuration...")
+      console.log("🚀 Initializing Holdstation Service following EXACT example pattern...")
 
-      // Setup provider com ethers v6
+      // Setup provider (exactly like example)
       this.provider = new ethers.JsonRpcProvider(
         RPC_URL,
         {
@@ -93,59 +71,48 @@ class HoldstationService {
       const network = await this.provider.getNetwork()
       console.log(`🌐 Connected to ${network.name} (${network.chainId})`)
 
-      // Setup client e multicall3
+      // Setup client (exactly like example)
       this.client = new Client(this.provider)
       config.client = this.client
       config.multicall3 = new Multicall3(this.provider)
 
-      // Setup token provider
-      this.tokenProvider = new TokenProvider({
-        client: this.client,
-        multicall3: config.multicall3,
-        storage: inmemoryTokenStorage,
-      })
+      console.log("✅ Client and config setup complete")
 
-      // Configure pools for Holdstation
-      console.log("🏊 Configurando pools de liquidez...")
-      await this.configureLiquidityPools()
-
-      console.log("🔧 Loading token details from Holdstation...")
-      // Pre-load token details
-      const tokenAddresses = Object.values(SUPPORTED_TOKENS)
-      const tokenDetails = await this.tokenProvider.details(...tokenAddresses)
-      console.log("📊 Token details loaded:", tokenDetails)
-
-      // Setup swap helper
+      // Setup SwapHelper (exactly like example)
       this.swapHelper = new SwapHelper(this.client, {
         tokenStorage: inmemoryTokenStorage,
       })
 
-      // Load swap modules with PROPER configuration
-      console.log("🔧 Loading swap modules...")
+      console.log("✅ SwapHelper created")
 
-      // Initialize ZeroX module
-      console.log("📡 Loading ZeroX module...")
-      const zeroX = new ZeroX(this.tokenProvider, inmemoryTokenStorage)
-      await this.swapHelper.load(zeroX)
-      console.log("✅ ZeroX module loaded")
+      // Setup TokenProvider (exactly like example)
+      this.tokenProvider = new TokenProvider({
+        client: this.client,
+        multicall3: config.multicall3,
+      })
 
-      // Initialize HoldSo module
-      console.log("📡 Loading HoldSo module...")
-      const holdSo = new HoldSo(this.tokenProvider, inmemoryTokenStorage)
-      await this.swapHelper.load(holdSo)
-      console.log("✅ HoldSo module loaded")
+      console.log("✅ TokenProvider created")
 
-      // Verificar se os módulos foram carregados corretamente
-      console.log("🔍 Checking loaded modules...")
-      const loadedModules = this.swapHelper.getLoadedModules?.() || []
-      console.log("📋 Loaded modules:", loadedModules)
+      // Setup ZeroX (exactly like example)
+      this.zeroX = new ZeroX(this.tokenProvider, inmemoryTokenStorage)
+
+      console.log("✅ ZeroX created")
+
+      // Load ZeroX into SwapHelper (exactly like example)
+      await this.swapHelper.load(this.zeroX)
+
+      console.log("✅ ZeroX loaded into SwapHelper")
 
       // Verificar se os tokens existem na blockchain
       console.log("🔍 Verificando tokens na blockchain...")
       await this.verifyTokenContracts()
 
+      // Test token details fetch
+      console.log("🔍 Testing token details fetch...")
+      await this.testTokenDetails()
+
       this.initialized = true
-      console.log("✅ Holdstation Service V6 initialized successfully!")
+      console.log("✅ Holdstation Service initialized successfully following example pattern!")
     } catch (error) {
       console.error("❌ Failed to initialize Holdstation Service:", error)
       console.error("📋 Error details:", {
@@ -156,63 +123,29 @@ class HoldstationService {
     }
   }
 
-  private async configureLiquidityPools() {
+  private async testTokenDetails() {
     try {
-      console.log("🏊 Configurando pools de liquidez Uniswap V3...")
+      if (!this.tokenProvider) return
 
-      for (const [pairKey, poolConfig] of Object.entries(POOL_CONFIG)) {
-        console.log(`📊 Configurando pool ${pairKey}:`, poolConfig)
+      console.log("🔍 Testing token details fetch for supported tokens...")
 
-        // Verificar se a pool existe
-        const poolCode = await this.provider!.getCode(poolConfig.pool)
-        if (poolCode === "0x") {
-          console.warn(`⚠️ Pool ${poolConfig.pool} não encontrada`)
-          continue
-        }
+      const tokenAddresses = Object.values(SUPPORTED_TOKENS)
+      console.log("📋 Token addresses to fetch:", tokenAddresses)
 
-        // Verificar detalhes da pool
-        const poolContract = new ethers.Contract(
-          poolConfig.pool,
-          [
-            "function token0() view returns (address)",
-            "function token1() view returns (address)",
-            "function fee() view returns (uint24)",
-            "function liquidity() view returns (uint128)",
-          ],
-          this.provider!,
-        )
+      const tokenDetails = await this.tokenProvider.details(...tokenAddresses)
+      console.log("📊 Token details fetched:", tokenDetails)
 
-        try {
-          const [token0, token1, fee, liquidity] = await Promise.all([
-            poolContract.token0(),
-            poolContract.token1(),
-            poolContract.fee(),
-            poolContract.liquidity(),
-          ])
-
-          console.log(`✅ Pool ${poolConfig.pool} verificada:`)
-          console.log(`├─ Token0: ${token0}`)
-          console.log(`├─ Token1: ${token1}`)
-          console.log(`├─ Fee: ${fee}`)
-          console.log(`└─ Liquidity: ${liquidity.toString()}`)
-
-          // Configurar a pool no tokenProvider se possível
-          if (this.tokenProvider && typeof this.tokenProvider.configurePool === "function") {
-            await this.tokenProvider.configurePool(poolConfig.pool, {
-              token0: poolConfig.token0,
-              token1: poolConfig.token1,
-              fee: poolConfig.fee,
-            })
-            console.log(`🔧 Pool ${poolConfig.pool} configurada no tokenProvider`)
-          }
-        } catch (poolError) {
-          console.warn(`⚠️ Erro ao verificar pool ${poolConfig.pool}:`, poolError.message)
+      // Log each token individually
+      for (const [symbol, address] of Object.entries(SUPPORTED_TOKENS)) {
+        const detail = tokenDetails[address]
+        if (detail) {
+          console.log(`✅ ${symbol}: ${detail.name} (${detail.symbol}) - ${detail.decimals} decimals`)
+        } else {
+          console.warn(`⚠️ No details found for ${symbol} (${address})`)
         }
       }
-
-      console.log("✅ Configuração de pools concluída")
     } catch (error) {
-      console.error("❌ Erro ao configurar pools:", error)
+      console.error("❌ Error testing token details:", error)
     }
   }
 
@@ -369,7 +302,7 @@ class HoldstationService {
     return icons[symbol] || "/placeholder.svg"
   }
 
-  // Obter cotação de swap REAL com configuração corrigida
+  // Obter cotação de swap REAL seguindo exemplo exato
   async getSwapQuote(params: {
     tokenIn: string
     tokenOut: string
@@ -378,7 +311,7 @@ class HoldstationService {
     fee?: string
   }): Promise<SwapQuote> {
     try {
-      console.log("💱 OBTENDO COTAÇÃO com configuração CORRIGIDA...")
+      console.log("💱 OBTENDO COTAÇÃO seguindo exemplo EXATO...")
       console.log(
         `📊 Parâmetros: ${params.amountIn} ${this.getSymbolFromAddress(params.tokenIn)} → ${this.getSymbolFromAddress(params.tokenOut)}`,
       )
@@ -393,43 +326,19 @@ class HoldstationService {
         throw new Error("Swap helper not initialized")
       }
 
-      // Verificar módulos carregados
-      const loadedModules = this.swapHelper.getLoadedModules?.() || []
-      console.log("📋 Módulos disponíveis:", loadedModules)
+      console.log("🔍 Preparando parâmetros seguindo exemplo...")
 
-      if (loadedModules.length === 0) {
-        console.log("⚠️ Nenhum módulo de swap carregado, recarregando...")
-        await this.reloadSwapModules()
-      }
-
-      console.log("🔍 Preparando parâmetros para cotação...")
-
-      // Usar formato human-readable (não wei) conforme documentação
+      // Usar exatamente o mesmo formato do exemplo
       const quoteParams: SwapParams["quoteInput"] = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
-        amountIn: params.amountIn, // Human-readable format
-        slippage: params.slippage || "0.5",
-        fee: params.fee || "0.2",
-        // Tentar diferentes routers
-        preferRouters: ["holdso", "0x"], // HoldSo primeiro, depois 0x
+        amountIn: params.amountIn, // Human-readable format como no exemplo
+        slippage: params.slippage || "0.3", // Usar 0.3 como no exemplo
+        fee: params.fee || "0.2", // Usar 0.2 como no exemplo
+        preferRouters: ["0x"], // Usar apenas 0x como no exemplo
       }
 
-      // Verificar se temos pool configurada para este par
-      const pairKey = `${params.tokenIn}_${params.tokenOut}`
-      const poolConfig = POOL_CONFIG[pairKey]
-
-      if (poolConfig) {
-        console.log(`🏊 Usando pool configurada: ${poolConfig.pool}`)
-        quoteParams.poolAddress = poolConfig.pool
-        quoteParams.poolFee = poolConfig.fee
-      } else {
-        console.log(
-          `⚠️ Nenhuma pool específica configurada para ${this.getSymbolFromAddress(params.tokenIn)} → ${this.getSymbolFromAddress(params.tokenOut)}`,
-        )
-      }
-
-      console.log("📡 Chamando Holdstation SDK para cotação...")
+      console.log("📡 Chamando swapHelper.estimate.quote() como no exemplo...")
       console.log("📋 Parâmetros:", JSON.stringify(quoteParams, null, 2))
 
       const result = await this.swapHelper.estimate.quote(quoteParams)
@@ -439,7 +348,7 @@ class HoldstationService {
       // Verificar se temos dados válidos da Holdstation
       if (!result) {
         console.log("❌ Nenhum resultado da Holdstation")
-        throw new Error("No quote result from Holdstation - check if tokens are supported")
+        throw new Error("No quote result from Holdstation")
       }
 
       if (!result.addons) {
@@ -500,31 +409,6 @@ class HoldstationService {
     }
   }
 
-  private async reloadSwapModules() {
-    try {
-      console.log("🔄 Recarregando módulos de swap...")
-
-      if (!this.swapHelper || !this.tokenProvider) {
-        throw new Error("SwapHelper or TokenProvider not available")
-      }
-
-      // Recarregar ZeroX
-      const zeroX = new ZeroX(this.tokenProvider, inmemoryTokenStorage)
-      await this.swapHelper.load(zeroX)
-      console.log("✅ ZeroX recarregado")
-
-      // Recarregar HoldSo
-      const holdSo = new HoldSo(this.tokenProvider, inmemoryTokenStorage)
-      await this.swapHelper.load(holdSo)
-      console.log("✅ HoldSo recarregado")
-
-      const loadedModules = this.swapHelper.getLoadedModules?.() || []
-      console.log("📋 Módulos após recarga:", loadedModules)
-    } catch (error) {
-      console.error("❌ Erro ao recarregar módulos:", error)
-    }
-  }
-
   private getSymbolFromAddress(address: string): string {
     const addressToSymbol: Record<string, string> = {
       "0x2cfc85d8e48f8eab294be644d9e25c3030863003": "WLD",
@@ -535,7 +419,7 @@ class HoldstationService {
     return addressToSymbol[address.toLowerCase()] || "UNKNOWN"
   }
 
-  // Executar swap real usando dados da Holdstation
+  // Executar swap real seguindo exemplo exato
   async executeSwap(params: {
     tokenIn: string
     tokenOut: string
@@ -545,7 +429,7 @@ class HoldstationService {
     feeReceiver?: string
   }): Promise<string> {
     try {
-      console.log("🚀 EXECUTANDO SWAP REAL...")
+      console.log("🚀 EXECUTANDO SWAP seguindo exemplo EXATO...")
       console.log(
         `📊 ${params.amountIn} ${this.getSymbolFromAddress(params.tokenIn)} → ${this.getSymbolFromAddress(params.tokenOut)}`,
       )
@@ -560,27 +444,39 @@ class HoldstationService {
       }
 
       console.log("📡 Obtendo cotação REAL para o swap...")
-      const quote = await this.getSwapQuote(params)
 
-      if (!quote || !quote.data || quote.data === "0x") {
+      // Primeiro obter cotação (como no exemplo)
+      const quoteParams: SwapParams["quoteInput"] = {
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: params.amountIn,
+        slippage: params.slippage || "0.3",
+        fee: params.fee || "0.2",
+        preferRouters: ["0x"],
+      }
+
+      const quoteResponse = await this.swapHelper.estimate.quote(quoteParams)
+
+      if (!quoteResponse || !quoteResponse.data || quoteResponse.data === "0x") {
         console.log("❌ Cotação inválida da Holdstation")
         throw new Error("Unable to get valid quote from Holdstation")
       }
 
       console.log("🔄 Executando swap com dados REAIS da Holdstation...")
 
+      // Executar swap exatamente como no exemplo
       const swapParams: SwapParams["input"] = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
-        amountIn: params.amountIn, // Human-readable format
+        amountIn: params.amountIn,
         tx: {
-          data: quote.data,
-          to: quote.to,
-          value: quote.value,
+          data: quoteResponse.data,
+          to: quoteResponse.to,
+          value: quoteResponse.value,
         },
-        feeAmountOut: quote.addons?.feeAmountOut,
+        feeAmountOut: quoteResponse.addons?.feeAmountOut,
         fee: params.fee || "0.2",
-        feeReceiver: params.feeReceiver || ethers.ZeroAddress,
+        feeReceiver: params.feeReceiver || ethers.ZeroAddress, // Como no exemplo
       }
 
       console.log("📋 Parâmetros REAIS do swap:", swapParams)
@@ -643,14 +539,13 @@ class HoldstationService {
 
   // Debug: Verificar status dos módulos
   getModuleStatus() {
-    if (!this.swapHelper) return { loaded: false, modules: [] }
-
-    const modules = this.swapHelper.getLoadedModules?.() || []
     return {
       loaded: this.initialized,
-      modules: modules,
-      hasZeroX: modules.includes("0x") || modules.includes("ZeroX"),
-      hasHoldSo: modules.includes("holdso") || modules.includes("HoldSo"),
+      hasSwapHelper: !!this.swapHelper,
+      hasTokenProvider: !!this.tokenProvider,
+      hasZeroX: !!this.zeroX,
+      hasClient: !!this.client,
+      hasProvider: !!this.provider,
     }
   }
 }
