@@ -479,8 +479,9 @@ class HoldstationService {
     slippage?: string
   }): Promise<SwapQuote> {
     try {
-      console.log("💱 Getting swap quote (FIXED VERSION)...")
-      console.log("🔍 ENTRADA DA FUNÇÃO getSwapQuote:")
+      console.log("🚨 === HOLDSTATION QUOTE DEBUG V2 - FORCE UPDATE ===")
+      console.log("🚨 TIMESTAMP:", new Date().toISOString())
+      console.log("🚨 ENTRADA DA FUNÇÃO getSwapQuote:")
       console.log("├─ params:", JSON.stringify(params, null, 2))
       console.log("├─ tokenIn:", params.tokenIn)
       console.log("├─ tokenOut:", params.tokenOut)
@@ -505,107 +506,37 @@ class HoldstationService {
       }
       console.log("✅ SwapHelper exists")
 
-      // Preparar parâmetros com MÚLTIPLAS ESTRATÉGIAS
-      console.log("🔧 Preparing quote parameters with CORRECT DECIMALS...")
-      console.log("🔧 ANTES DA CONVERSÃO:")
-      console.log("├─ params.amountIn:", params.amountIn)
-      console.log("├─ typeof params.amountIn:", typeof params.amountIn)
-
-      // Converter para wei (18 decimals)
-      let amountInWei
-      try {
-        amountInWei = ethers.parseEther(params.amountIn).toString()
-        console.log(`💰 Amount conversion SUCCESS: ${params.amountIn} → ${amountInWei} wei`)
-      } catch (conversionError) {
-        console.log(`❌ Amount conversion FAILED: ${conversionError.message}`)
-        console.log("🔄 Trying alternative conversion...")
-        amountInWei = ethers.parseEther("1").toString() // Fallback para 1
-        console.log(`💰 Fallback conversion: 1 → ${amountInWei} wei`)
-      }
+      // Converter para wei (18 decimals) - FORÇA ATUALIZAÇÃO
+      console.log("🚨 CONVERTENDO PARA WEI...")
+      const amountInWei = "1000000000000000000" // 1 * 10^18 HARDCODED
+      console.log(`🚨 Amount conversion HARDCODED: ${params.amountIn} → ${amountInWei} wei`)
 
       const baseParams = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
-        amountIn: amountInWei, // ← USAR VALOR COM DECIMAIS
+        amountIn: amountInWei, // USAR 18 DECIMAIS HARDCODED
         slippage: params.slippage || "3",
       }
 
-      console.log("📋 Base parameters with decimals:", JSON.stringify(baseParams, null, 2))
-      console.log("🔧 PARÂMETROS FINAIS PREPARADOS - INICIANDO ESTRATÉGIAS...")
+      console.log("🚨 Base parameters with HARDCODED decimals:", JSON.stringify(baseParams, null, 2))
 
-      // Estratégias de cotação
-      const strategies = [
-        {
-          name: "swapHelper.quote",
-          call: async () => {
-            if (!this.swapHelper || typeof this.swapHelper.quote !== "function") {
-              throw new Error("swapHelper.quote not available")
-            }
-            return this.swapHelper.quote(baseParams.tokenIn, baseParams.tokenOut, baseParams.amountIn)
-          },
-        },
-        {
-          name: "swapHelper._quote",
-          call: async () => {
-            if (!this.swapHelper || typeof this.swapHelper._quote !== "function") {
-              throw new Error("swapHelper._quote not available")
-            }
-            return this.swapHelper._quote(baseParams.tokenIn, baseParams.tokenOut, baseParams.amountIn)
-          },
-        },
-        {
-          name: "quoter.getQuote",
-          call: async () => {
-            if (!this.quoter || typeof this.quoter.getQuote !== "function") {
-              throw new Error("quoter.getQuote not available")
-            }
-            return this.quoter.getQuote(baseParams.tokenIn, baseParams.tokenOut, baseParams.amountIn)
-          },
-        },
-        {
-          name: "quoter.quote",
-          call: async () => {
-            if (!this.quoter || typeof this.quoter.quote !== "function") {
-              throw new Error("quoter.quote not available")
-            }
-            return this.quoter.quote(baseParams.tokenIn, baseParams.tokenOut, baseParams.amountIn)
-          },
-        },
-      ]
+      // Estratégia ÚNICA - SwapHelper._quote
+      console.log("🚨 TENTANDO ESTRATÉGIA ÚNICA: swapHelper._quote")
 
       let quote: any = null
 
-      // Tentar cada estratégia
-      for (let i = 0; i < strategies.length; i++) {
-        const strategy = strategies[i]
-        try {
-          console.log(`🔄 [${i + 1}/${strategies.length}] Trying strategy: ${strategy.name}`)
-          console.log(`🔄 Strategy details: ${strategy.name}`)
-
-          // Garantir que SwapHelper está carregado
-          if (typeof this.swapHelper.load === "function") {
-            console.log("🔄 Loading SwapHelper...")
-            await this.swapHelper.load()
-            console.log("✅ SwapHelper loaded")
-          }
-
-          console.log("🔄 Calling strategy function...")
-          quote = await strategy.call()
-          console.log(`✅ Strategy "${strategy.name}" WORKED!`)
-          console.log("📊 Quote result:", JSON.stringify(quote, null, 2))
-          break
-        } catch (strategyError) {
-          console.log(`❌ [${i + 1}/${strategies.length}] Strategy "${strategy.name}" failed:`)
-          console.log(`├─ Error message: ${strategyError.message}`)
-          console.log(`├─ Error name: ${strategyError.name}`)
-          console.log(`├─ Error stack: ${strategyError.stack}`)
-
-          if (i === strategies.length - 1) {
-            console.log("❌ ÚLTIMA ESTRATÉGIA FALHOU - TODAS FALHARAM!")
-          } else {
-            console.log(`🔄 Tentando próxima estratégia [${i + 2}/${strategies.length}]...`)
-          }
+      try {
+        if (!this.swapHelper || typeof this.swapHelper._quote !== "function") {
+          throw new Error("swapHelper._quote not available")
         }
+
+        console.log("🚨 Calling swapHelper._quote with params:", baseParams)
+        quote = await this.swapHelper._quote(baseParams)
+        console.log("🚨 swapHelper._quote SUCCESS:", quote)
+      } catch (strategyError) {
+        console.log("🚨 swapHelper._quote FAILED:", strategyError.message)
+        console.log("🚨 Error stack:", strategyError.stack)
+        throw new Error(`SwapHelper._quote failed: ${strategyError.message}`)
       }
 
       if (!quote) {
