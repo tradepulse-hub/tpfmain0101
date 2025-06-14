@@ -55,7 +55,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   const [tokenOut, setTokenOut] = useState<TokenSymbol>("TPF")
   const [amountIn, setAmountIn] = useState("")
   const [amountOut, setAmountOut] = useState("")
-  const [slippage, setSlippage] = useState("0.5")
+  const [slippage, setSlippage] = useState("3.0")
   const [isLoading, setIsLoading] = useState(false)
   const [isQuoting, setIsQuoting] = useState(false)
   const [isLoadingBalances, setIsLoadingBalances] = useState(false)
@@ -467,6 +467,16 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     }
   }
 
+  useEffect(() => {
+    // Auto-ajustar slippage para TPF
+    if (tokenIn === "TPF" || tokenOut === "TPF") {
+      if (Number.parseFloat(slippage) < 3.0) {
+        setSlippage("3.0")
+        addDebugLog(`🔧 Auto-ajustando slippage para 3% (TPF detectado)`)
+      }
+    }
+  }, [tokenIn, tokenOut])
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -570,7 +580,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-gray-400">Slippage Tolerance</span>
                       <div className="flex space-x-1">
-                        {["0.1", "0.5", "1.0"].map((value) => (
+                        {["1.0", "3.0", "5.0"].map((value) => (
                           <button
                             key={value}
                             type="button"
@@ -593,6 +603,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                       <div className="text-blue-400">⚡ Holdstation SDK</div>
                       <div className="text-green-400">✅ Real-time Quotes</div>
                       <div className="text-yellow-400">🔄 On-chain Settlement</div>
+                      <div className="text-orange-400">⚠️ TPF requires 3%+ slippage</div>
                     </div>
                   </div>
                 </motion.div>
