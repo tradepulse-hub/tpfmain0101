@@ -18,35 +18,79 @@ class HoldstationHistoryService {
 
   async getTransactionHistory(walletAddress: string, offset = 0, limit = 50): Promise<Transaction[]> {
     try {
-      this.addDebugLog(`=== HISTÓRICO APENAS - CONFORME DOCUMENTAÇÃO ===`)
+      // FORÇA LOGS EXTREMOS
+      console.log("🚨🚨🚨 === FORÇA LOGS EXTREMOS V3 ===")
+      console.log(`🚨🚨🚨 Timestamp: ${Date.now()}`)
+      console.log(`🚨🚨🚨 Endereço: ${walletAddress}`)
+      console.log(`🚨🚨🚨 Offset: ${offset}, Limit: ${limit}`)
+
+      this.addDebugLog(`🚨🚨🚨 === FORÇA LOGS EXTREMOS V3 ===`)
       this.addDebugLog(`Endereço: ${walletAddress}`)
       this.addDebugLog(`Offset: ${offset}, Limit: ${limit}`)
 
-      // Usar APENAS HoldStation para histórico - SEM FALLBACK
-      this.addDebugLog("🔍 Usando HoldStation SDK para histórico...")
+      // FORÇAR INICIALIZAÇÃO E DEBUG
+      console.log("🚨🚨🚨 Forçando debug do SDK...")
+      const sdkStatus = await holdstationService.debugSDK()
+      console.log("🚨🚨🚨 SDK Status:", sdkStatus)
+
+      // FORÇAR OBTENÇÃO DO MANAGER
+      const manager = holdstationService.getManager()
+      console.log("🚨🚨🚨 Manager obtido:", !!manager)
+      console.log("🚨🚨🚨 Manager tipo:", manager?.constructor?.name)
+
+      if (manager) {
+        // FORÇAR LISTAGEM DE MÉTODOS
+        const allMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(manager))
+        console.log("🚨🚨🚨 TODOS OS 6 MÉTODOS:", allMethods)
+
+        // TESTAR CADA MÉTODO INDIVIDUALMENTE
+        for (let i = 0; i < allMethods.length; i++) {
+          const method = allMethods[i]
+          console.log(`🚨🚨🚨 MÉTODO ${i + 1}/6: ${method}`)
+
+          if (typeof manager[method] === "function" && !method.startsWith("_")) {
+            try {
+              console.log(`🚨🚨🚨 CHAMANDO ${method}(${walletAddress})...`)
+              const result = await manager[method](walletAddress)
+              console.log(`🚨🚨🚨 RESULTADO ${method}:`, result)
+
+              if (result && (Array.isArray(result) || typeof result === "object")) {
+                console.log(`🚨🚨🚨 ✅ MÉTODO ${method} FUNCIONOU!`)
+                this.addDebugLog(`✅ Método ${method} funcionou!`)
+                return Array.isArray(result) ? this.formatTransactions(result, walletAddress) : []
+              }
+            } catch (error) {
+              console.log(`🚨🚨🚨 ❌ MÉTODO ${method} FALHOU:`, error.message)
+            }
+          } else {
+            console.log(`🚨🚨🚨 MÉTODO ${method} não é função ou é privado`)
+          }
+        }
+      }
+
+      // USAR HOLDSTATION SERVICE DIRETAMENTE
+      console.log("🚨🚨🚨 Tentando HoldStation service diretamente...")
       const rawTransactions = await holdstationService.getTransactionHistory(walletAddress, offset, limit)
 
       this.addDebugLog(`📊 HoldStation retornou: ${rawTransactions?.length || 0} transações`)
 
       if (rawTransactions && rawTransactions.length > 0) {
-        const formattedTransactions = this.formatHoldstationTransactions(rawTransactions, walletAddress)
+        const formattedTransactions = this.formatTransactions(rawTransactions, walletAddress)
         this.addDebugLog(`✅ ${formattedTransactions.length} transações formatadas`)
         return formattedTransactions
       }
 
-      this.addDebugLog("⚠️ Nenhuma transação encontrada via HoldStation")
-      return [] // Retornar array vazio, SEM FALLBACK
+      this.addDebugLog("⚠️ Nenhuma transação encontrada")
+      return []
     } catch (error) {
-      this.addDebugLog(`❌ Erro ao buscar histórico: ${error.message}`)
-      console.error("Error getting transaction history:", error)
-      throw error // SEM FALLBACK - propagar o erro
+      console.log("🚨🚨🚨 ERRO FINAL:", error.message)
+      this.addDebugLog(`❌ Erro: ${error.message}`)
+      throw error
     }
   }
 
-  private formatHoldstationTransactions(transactions: any[], walletAddress: string): Transaction[] {
+  private formatTransactions(transactions: any[], walletAddress: string): Transaction[] {
     return transactions.map((tx, index) => {
-      this.addDebugLog(`Formatando transação ${index + 1}: ${tx.hash || "sem hash"}`)
-
       return {
         id: tx.hash || `tx_${index}`,
         hash: tx.hash || "",
@@ -84,8 +128,6 @@ class HoldstationHistoryService {
 
   async watchTransactions(walletAddress: string, callback?: () => void) {
     this.addDebugLog(`🔍 Configurando watcher para: ${walletAddress}`)
-
-    // Retornar um watcher simples
     return {
       start: async () => {
         this.addDebugLog("🔄 Watcher iniciado")
