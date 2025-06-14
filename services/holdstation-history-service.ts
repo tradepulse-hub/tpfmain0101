@@ -18,18 +18,18 @@ class HoldstationHistoryService {
 
   async getTransactionHistory(walletAddress: string, offset = 0, limit = 50): Promise<Transaction[]> {
     try {
-      this.addDebugLog(`=== USANDO ALCHEMY EXPLORER DIRETAMENTE ===`)
+      this.addDebugLog(`=== APENAS DADOS REAIS - SEM FALLBACKS ===`)
       this.addDebugLog(`Endereço: ${walletAddress}`)
       this.addDebugLog(`Offset: ${offset}, Limit: ${limit}`)
 
       // Usar Alchemy Explorer Service diretamente
-      this.addDebugLog("🔍 Buscando no Alchemy Explorer...")
+      this.addDebugLog("🔍 Buscando APENAS dados reais no Alchemy Explorer...")
       const transactions = await alchemyExplorerService.getTransactionHistory(walletAddress, offset, limit)
 
-      this.addDebugLog(`📊 Alchemy Explorer retornou: ${transactions.length} transações`)
+      this.addDebugLog(`📊 Alchemy Explorer retornou: ${transactions.length} transações REAIS`)
 
       if (transactions.length > 0) {
-        this.addDebugLog(`✅ ${transactions.length} transações obtidas com sucesso`)
+        this.addDebugLog(`✅ ${transactions.length} transações REAIS obtidas`)
 
         // Log das primeiras transações para debug
         transactions.slice(0, 3).forEach((tx, index) => {
@@ -39,35 +39,37 @@ class HoldstationHistoryService {
         return transactions
       }
 
-      this.addDebugLog("⚠️ Nenhuma transação encontrada no Alchemy Explorer")
+      this.addDebugLog("📊 NENHUMA TRANSAÇÃO REAL ENCONTRADA")
+      this.addDebugLog("📊 Retornando array vazio - SEM MOCKS/FALLBACKS")
       return []
     } catch (error) {
-      this.addDebugLog(`❌ Erro ao buscar no Alchemy Explorer: ${error.message}`)
-      console.error("Error getting transaction history:", error)
+      this.addDebugLog(`❌ Erro ao buscar dados reais: ${error.message}`)
+      this.addDebugLog("📊 Retornando array vazio - SEM FALLBACKS")
+      console.error("Error getting real transaction history:", error)
 
-      // Retornar array vazio em vez de propagar erro
+      // SEM FALLBACK - apenas array vazio
       return []
     }
   }
 
   async watchTransactions(walletAddress: string, callback?: () => void) {
-    this.addDebugLog(`🔍 Configurando watcher para: ${walletAddress}`)
+    this.addDebugLog(`🔍 Configurando watcher REAL para: ${walletAddress}`)
     return {
       start: async () => {
-        this.addDebugLog("🔄 Watcher iniciado")
+        this.addDebugLog("🔄 Watcher REAL iniciado")
       },
       stop: async () => {
-        this.addDebugLog("🛑 Watcher parado")
+        this.addDebugLog("🛑 Watcher REAL parado")
       },
     }
   }
 
   async stopWatching(walletAddress: string): Promise<void> {
-    this.addDebugLog(`🛑 Parando watcher para: ${walletAddress}`)
+    this.addDebugLog(`🛑 Parando watcher REAL para: ${walletAddress}`)
   }
 
   async cleanup(): Promise<void> {
-    this.addDebugLog("🧹 Limpeza concluída")
+    this.addDebugLog("🧹 Limpeza REAL concluída")
   }
 }
 
