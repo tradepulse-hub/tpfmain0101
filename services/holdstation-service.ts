@@ -175,16 +175,44 @@ class HoldstationService {
 
       for (const [symbol, address] of Object.entries(SUPPORTED_TOKENS)) {
         try {
+          console.log(`🔍 Checking balance for ${symbol} (${address})...`)
+
           const contract = new ethers.Contract(address, ERC20_ABI, this.provider)
 
+          // Primeiro verificar se o contrato existe
+          const code = await this.provider.getCode(address)
+          if (code === "0x") {
+            console.warn(`⚠️ No contract code at ${address} for ${symbol}`)
+            continue
+          }
+
           const [name, tokenSymbol, decimals, balance] = await Promise.all([
-            contract.name().catch(() => symbol),
-            contract.symbol().catch(() => symbol),
-            contract.decimals().catch(() => 18),
-            contract.balanceOf(walletAddress).catch(() => "0"),
+            contract.name().catch((e) => {
+              console.warn(`Failed to get name for ${symbol}:`, e.message)
+              return symbol
+            }),
+            contract.symbol().catch((e) => {
+              console.warn(`Failed to get symbol for ${symbol}:`, e.message)
+              return symbol
+            }),
+            contract.decimals().catch((e) => {
+              console.warn(`Failed to get decimals for ${symbol}:`, e.message)
+              return 18
+            }),
+            contract.balanceOf(walletAddress).catch((e) => {
+              console.error(`Failed to get balance for ${symbol}:`, e.message)
+              return "0"
+            }),
           ])
 
+          console.log(`📊 ${symbol} contract details:`)
+          console.log(`├─ Name: ${name}`)
+          console.log(`├─ Symbol: ${tokenSymbol}`)
+          console.log(`├─ Decimals: ${decimals}`)
+          console.log(`├─ Raw Balance: ${balance.toString()}`)
+
           const formattedBalance = ethers.formatUnits(balance, decimals)
+          console.log(`└─ Formatted Balance: ${formattedBalance}`)
 
           tokenBalances.push({
             symbol: symbol,
@@ -195,8 +223,14 @@ class HoldstationService {
             icon: this.getTokenIcon(symbol),
             formattedBalance: Number.parseFloat(formattedBalance).toFixed(6),
           })
+
+          console.log(`✅ ${symbol}: ${formattedBalance} tokens`)
         } catch (error) {
-          console.error(`Error getting balance for ${symbol}:`, error)
+          console.error(`❌ Error getting balance for ${symbol}:`, error)
+          console.error(`├─ Error type: ${typeof error}`)
+          console.error(`├─ Error message: ${error.message}`)
+          console.error(`└─ Error stack: ${error.stack}`)
+
           // Add with 0 balance if error
           tokenBalances.push({
             symbol: symbol,
@@ -210,9 +244,10 @@ class HoldstationService {
         }
       }
 
+      console.log(`📊 Final token balances:`, tokenBalances)
       return tokenBalances
     } catch (error) {
-      console.error("Error getting token balances:", error)
+      console.error("❌ Error getting token balances:", error)
       return []
     }
   }
@@ -424,6 +459,76 @@ class HoldstationService {
       hasProvider: !!this.provider,
       approach: "Direct Pool Access",
       supportedPairs: ["WLD/TPF"],
+    }
+  }
+
+  // Método de teste para verificar um token específico
+  async testTokenBalance(walletAddress: string, tokenSymbol: string): Promise<void> {
+    try {
+      const tokenAddress = SUPPORTED_TOKENS[tokenSymbol as keyof typeof SUPPORTED_TOKENS]
+      if (!tokenAddress) {
+        console.error(`Token ${tokenSymbol} not found`)
+        return
+      }
+
+      console.log(`🧪 Testing ${tokenSymbol} balance for ${walletAddress}`)
+      console.log(`📍 Token address: ${tokenAddress}`)
+
+      if (!this.provider) {
+        console.error("Provider not initialized")
+        return
+      }
+
+      // Verificar se o contrato existe
+      const code = await this.provider.getCode(tokenAddress)
+      console.log(`📋 Contract code length: ${code.length}`)
+
+      if (code === "0x") {
+        console.error(`❌ No contract at address ${tokenAddress}`)
+        return
+      }
+
+      const contract = new ethers.Contract(tokenAddress, ERC20_ABI, this.provider)
+
+      // Testar cada método individualmente
+      try {
+        const name = await contract.name()
+        console.log(`✅ Name: ${name}`)
+      } catch (e) {
+        console.error(`❌ Failed to get name: ${e.message}`)
+      }
+
+      try {
+        const symbol = await contract.symbol()
+        console.log(`✅ Symbol: ${symbol}`)
+      } catch (e) {
+        console.error(`❌ Failed to get symbol: ${e.message}`)
+      }
+
+      try {
+        const decimals = await contract.decimals()
+        console.log(`✅ Decimals: ${decimals}`)
+      } catch (e) {
+        console.error(`❌ Failed to get decimals: ${e.message}`)
+      }
+
+      try {
+        const totalSupply = await contract.totalSupply()
+        console.log(`✅ Total Supply: ${ethers.formatUnits(totalSupply, 18)}`)
+      } catch (e) {
+        console.error(`❌ Failed to get total supply: ${e.message}`)
+      }
+
+      try {
+        const balance = await contract.balanceOf(walletAddress)
+        console.log(`✅ Balance (raw): ${balance.toString()}`)
+        console.log(`✅ Balance (formatted): ${ethers.formatUnits(balance, 18)}`)
+      } catch (e) {
+        console.error(`❌ Failed to get balance: ${e.message}`)
+        console.error(`├─ Error details:`, e)
+      }
+    } catch (error) {
+      console.error(`❌ Test failed for ${tokenSymbol}:`, error)
     }
   }
 }
