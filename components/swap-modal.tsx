@@ -270,31 +270,75 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
         // Tentar Holdstation - SEM FALLBACK
         addDebugLog("🔍 Tentando Holdstation SDK...")
-        const quote = await holdstationService.getSwapQuote(quoteParams)
-        addDebugLog("✅ Holdstation SDK funcionou!")
 
-        addDebugLog("📊 Cotação recebida:")
-        addDebugLog(`├─ Raw response: ${JSON.stringify(quote, null, 2)}`)
-        addDebugLog(`├─ Amount Out: ${quote?.amountOut}`)
+        try {
+          const quote = await holdstationService.getSwapQuote(quoteParams)
+          addDebugLog("✅ Holdstation SDK funcionou!")
 
-        if (quote && quote.amountOut && Number.parseFloat(quote.amountOut) > 0) {
-          setAmountOut(quote.amountOut)
-          setQuoteData(quote)
-          addDebugLog(`✅ Cotação aplicada: ${quote.amountOut} ${tokenOut}`)
-        } else {
-          addDebugLog("❌ Cotação inválida recebida")
+          addDebugLog("📊 Cotação recebida:")
+          addDebugLog(`├─ Raw response: ${JSON.stringify(quote, null, 2)}`)
+          addDebugLog(`├─ Amount Out: ${quote?.amountOut}`)
+
+          if (quote && quote.amountOut && Number.parseFloat(quote.amountOut) > 0) {
+            setAmountOut(quote.amountOut)
+            setQuoteData(quote)
+            addDebugLog(`✅ Cotação aplicada: ${quote.amountOut} ${tokenOut}`)
+          } else {
+            addDebugLog("❌ Cotação inválida recebida")
+            setAmountOut("0")
+            setQuoteData(null)
+            toast.error("Cotação inválida recebida")
+          }
+        } catch (holdstationError) {
+          addDebugLog("❌ ERRO DETALHADO DO HOLDSTATION:")
+          addDebugLog(`├─ Mensagem: ${holdstationError.message}`)
+          addDebugLog(`├─ Stack: ${holdstationError.stack}`)
+          addDebugLog(`├─ Nome: ${holdstationError.name}`)
+          addDebugLog(`├─ Causa: ${holdstationError.cause || "N/A"}`)
+
+          // Tentar obter mais detalhes do SDK
+          try {
+            const sdkStatus = holdstationService.getSDKStatus()
+            addDebugLog(`📊 Status do SDK: ${JSON.stringify(sdkStatus, null, 2)}`)
+
+            const quoter = holdstationService.getQuoter()
+            const swapHelper = holdstationService.getSwapHelper()
+
+            if (quoter) {
+              const quoterMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(quoter))
+              addDebugLog(`🔍 Métodos do Quoter: ${quoterMethods.join(", ")}`)
+            } else {
+              addDebugLog("❌ Quoter não disponível")
+            }
+
+            if (swapHelper) {
+              const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(swapHelper))
+              addDebugLog(`🔍 Métodos do SwapHelper: ${swapMethods.join(", ")}`)
+            } else {
+              addDebugLog("❌ SwapHelper não disponível")
+            }
+
+            // Tentar debug completo do SDK
+            addDebugLog("🔍 Executando debug completo do SDK...")
+            const debugResult = await holdstationService.debugSDK()
+            addDebugLog(`📋 Debug completo: ${JSON.stringify(debugResult, null, 2)}`)
+          } catch (debugError) {
+            addDebugLog(`❌ Erro no debug do SDK: ${debugError.message}`)
+          }
+
+          console.error("Error getting quote:", holdstationError)
           setAmountOut("0")
           setQuoteData(null)
-          toast.error("Cotação inválida recebida")
+          toast.error(`Erro real do SDK: ${holdstationError.message}`)
         }
       } catch (error) {
-        addDebugLog("❌ ERRO NA COTAÇÃO:")
+        addDebugLog("❌ ERRO GERAL NA COTAÇÃO:")
         addDebugLog(`├─ Mensagem: ${error.message}`)
         addDebugLog(`├─ Stack: ${error.stack}`)
         console.error("Error getting quote:", error)
         setAmountOut("0")
         setQuoteData(null)
-        toast.error(`Erro real do SDK: ${error.message}`)
+        toast.error(`Erro geral: ${error.message}`)
       } finally {
         setIsQuoting(false)
         addDebugLog("=== FIM DA COTAÇÃO ===")
@@ -376,45 +420,73 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
       // Tentar Holdstation - SEM FALLBACK
       addDebugLog("🔍 Tentando Holdstation SDK para swap...")
-      const txHash = await holdstationService.executeSwap(swapParams)
-      addDebugLog("✅ Holdstation SDK swap funcionou!")
 
-      addDebugLog("✅ SWAP EXECUTADO COM SUCESSO!")
-      addDebugLog(`├─ Transaction Hash: ${txHash}`)
+      try {
+        const txHash = await holdstationService.executeSwap(swapParams)
+        addDebugLog("✅ Holdstation SDK swap funcionou!")
 
-      toast.success("🎉 Swap Realizado com Sucesso!", {
-        description: `${amountIn} ${tokenIn} → ${amountOut} ${tokenOut}`,
-        action: {
-          label: "Ver TX",
-          onClick: () => {
-            window.open(`https://worldscan.org/tx/${txHash}`, "_blank")
+        addDebugLog("✅ SWAP EXECUTADO COM SUCESSO!")
+        addDebugLog(`├─ Transaction Hash: ${txHash}`)
+
+        toast.success("🎉 Swap Realizado com Sucesso!", {
+          description: `${amountIn} ${tokenIn} → ${amountOut} ${tokenOut}`,
+          action: {
+            label: "Ver TX",
+            onClick: () => {
+              window.open(`https://worldscan.org/tx/${txHash}`, "_blank")
+            },
           },
-        },
-      })
+        })
 
-      // Limpar campos
-      setAmountIn("")
-      setAmountOut("")
-      setQuoteData(null)
+        // Limpar campos
+        setAmountIn("")
+        setAmountOut("")
+        setQuoteData(null)
 
-      // Fechar modal após sucesso
-      setTimeout(() => {
-        onClose()
-      }, 1500)
+        // Fechar modal após sucesso
+        setTimeout(() => {
+          onClose()
+        }, 1500)
 
-      // Atualizar saldos
-      setTimeout(() => {
-        handleRefreshBalances()
-      }, 3000)
+        // Atualizar saldos
+        setTimeout(() => {
+          handleRefreshBalances()
+        }, 3000)
 
-      return true
+        return true
+      } catch (holdstationSwapError) {
+        addDebugLog("❌ ERRO DETALHADO DO SWAP HOLDSTATION:")
+        addDebugLog(`├─ Mensagem: ${holdstationSwapError.message}`)
+        addDebugLog(`├─ Stack: ${holdstationSwapError.stack}`)
+        addDebugLog(`├─ Nome: ${holdstationSwapError.name}`)
+        addDebugLog(`├─ Causa: ${holdstationSwapError.cause || "N/A"}`)
+
+        // Tentar obter mais detalhes do SDK para swap
+        try {
+          const swapHelper = holdstationService.getSwapHelper()
+          if (swapHelper) {
+            const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(swapHelper))
+            addDebugLog(`🔍 Métodos disponíveis no SwapHelper: ${swapMethods.join(", ")}`)
+          } else {
+            addDebugLog("❌ SwapHelper não disponível para swap")
+          }
+        } catch (swapDebugError) {
+          addDebugLog(`❌ Erro no debug do swap: ${swapDebugError.message}`)
+        }
+
+        console.error("❌ Swap failed:", holdstationSwapError)
+        toast.error("Erro real do SDK no swap", {
+          description: holdstationSwapError.message,
+        })
+        return false
+      }
     } catch (error: any) {
-      addDebugLog("❌ ERRO NO SWAP:")
+      addDebugLog("❌ ERRO GERAL NO SWAP:")
       addDebugLog(`├─ Mensagem: ${error.message}`)
       addDebugLog(`├─ Stack: ${error.stack}`)
       console.error("❌ Swap failed:", error)
 
-      toast.error("Erro real do SDK", {
+      toast.error("Erro geral no swap", {
         description: error.message,
       })
 
