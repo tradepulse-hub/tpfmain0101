@@ -32,17 +32,11 @@ class HoldstationService {
       try {
         console.log(`🔄 Tentativa ${i + 1}/${maxRetries} - testando rede...`)
 
-        // Testar múltiplas operações para garantir que a rede está pronta
-        const [network, blockNumber, balance] = await Promise.all([
-          this.provider.getNetwork(),
-          this.provider.getBlockNumber(),
-          this.provider.getBalance("0x0000000000000000000000000000000000000000"), // Endereço zero para teste
-        ])
+        const [network, blockNumber] = await Promise.all([this.provider.getNetwork(), this.provider.getBlockNumber()])
 
         console.log("✅ Rede completamente pronta!")
         console.log(`├─ Network: ${network.name} (ChainId: ${network.chainId})`)
-        console.log(`├─ Block Number: ${blockNumber}`)
-        console.log(`└─ Conexão verificada`)
+        console.log(`└─ Block Number: ${blockNumber}`)
 
         this.networkReady = true
         return
@@ -51,7 +45,6 @@ class HoldstationService {
         if (i < maxRetries - 1) {
           console.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`)
           await new Promise((resolve) => setTimeout(resolve, delay))
-          // Aumentar delay progressivamente
           delay = Math.min(delay * 1.2, 5000)
         }
       }
@@ -75,40 +68,110 @@ class HoldstationService {
         throw new Error("Manager não disponível após inicialização")
       }
 
-      console.log("📡 Chamando manager para buscar histórico...")
+      console.log("📡 Testando TODOS os métodos disponíveis no manager...")
 
-      // Tentar diferentes métodos do manager
+      // Listar TODOS os métodos disponíveis primeiro
+      const allMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.manager))
+      console.log("🔍 TODOS os métodos disponíveis no manager:", allMethods)
+
+      // Tentar TODOS os métodos que podem retornar histórico
+      const possibleMethods = [
+        // Métodos específicos de histórico
+        "getTransactionHistory",
+        "getHistory",
+        "fetchTransactions",
+        "getTransactions",
+        "fetch",
+        "fetchHistory",
+        "getWalletHistory",
+        "getAccountHistory",
+        "queryTransactions",
+        "searchTransactions",
+        // Métodos genéricos que podem funcionar
+        "get",
+        "query",
+        "search",
+        "load",
+        "retrieve",
+        "find",
+        // Métodos com parâmetros diferentes
+        "getTransactionHistoryByAddress",
+        "getHistoryByWallet",
+        "fetchByAddress",
+      ]
+
       let result = null
-      const methods = ["getTransactionHistory", "getHistory", "fetchTransactions", "getTransactions", "fetch"]
+      let workingMethod = null
 
-      for (const methodName of methods) {
+      for (const methodName of possibleMethods) {
         if (typeof this.manager[methodName] === "function") {
+          console.log(`🔄 Testando método: ${methodName}`)
+
           try {
-            console.log(`🔄 Tentando método: ${methodName}`)
-            result = await this.manager[methodName](walletAddress, { offset, limit })
-            console.log(`✅ Método ${methodName} funcionou!`)
-            break
+            // Tentar diferentes formas de chamar o método
+            const attempts = [
+              () => this.manager[methodName](walletAddress, { offset, limit }),
+              () => this.manager[methodName](walletAddress, offset, limit),
+              () => this.manager[methodName]({ address: walletAddress, offset, limit }),
+              () => this.manager[methodName]({ walletAddress, offset, limit }),
+              () => this.manager[methodName](walletAddress),
+              () => this.manager[methodName]({ address: walletAddress }),
+              () => this.manager[methodName]({ walletAddress }),
+            ]
+
+            for (let i = 0; i < attempts.length; i++) {
+              try {
+                console.log(`  └─ Tentativa ${i + 1}: ${methodName} com diferentes parâmetros`)
+                result = await attempts[i]()
+                if (result !== null && result !== undefined) {
+                  workingMethod = `${methodName} (tentativa ${i + 1})`
+                  console.log(`✅ SUCESSO! Método ${workingMethod} funcionou!`)
+                  console.log(`📊 Resultado:`, result)
+                  break
+                }
+              } catch (attemptError) {
+                console.log(`    ❌ Tentativa ${i + 1} falhou:`, attemptError.message)
+              }
+            }
+
+            if (result !== null && result !== undefined) break
           } catch (methodError) {
-            console.log(`❌ Método ${methodName} falhou:`, methodError.message)
+            console.log(`❌ Método ${methodName} falhou completamente:`, methodError.message)
           }
+        } else {
+          console.log(`⚠️ Método ${methodName} não existe`)
         }
       }
 
-      if (!result) {
-        // Listar métodos disponíveis para debug
-        const availableMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.manager))
-        console.log("🔍 Métodos disponíveis no manager:", availableMethods)
-        throw new Error("Nenhum método de histórico funcionou")
+      if (result === null || result === undefined) {
+        console.log("🔍 Tentando métodos diretos do manager...")
+
+        // Tentar chamar métodos diretamente sem parâmetros para ver o que acontece
+        for (const method of allMethods) {
+          if (typeof this.manager[method] === "function" && !method.startsWith("_")) {
+            try {
+              console.log(`🔄 Testando método direto: ${method}`)
+              const directResult = await this.manager[method]()
+              console.log(`📊 Resultado de ${method}:`, directResult)
+            } catch (error) {
+              console.log(`❌ ${method} falhou:`, error.message)
+            }
+          }
+        }
+
+        throw new Error(
+          `Nenhum método funcionou. Métodos testados: ${possibleMethods.filter((m) => typeof this.manager[m] === "function").join(", ")}`,
+        )
       }
 
-      console.log("✅ Histórico obtido via HoldStation:", result)
-      console.log(`📊 Total de transações: ${result?.length || 0}`)
+      console.log(`✅ Histórico obtido via ${workingMethod}:`, result)
+      console.log(`📊 Total de transações: ${Array.isArray(result) ? result.length : "não é array"}`)
 
-      return result || []
+      return Array.isArray(result) ? result : []
     } catch (error) {
       console.error("❌ Erro ao buscar histórico:", error.message)
       console.error("Stack:", error.stack)
-      throw error // SEM FALLBACK - falha se não funcionar
+      throw error
     }
   }
 
@@ -116,7 +179,6 @@ class HoldstationService {
     try {
       console.log("🔧 Inicializando SDK conforme documentação HoldStation...")
 
-      // Importar módulos CORRETOS conforme documentação
       const [HoldstationModule, EthersModule] = await Promise.all([
         import("@holdstation/worldchain-sdk"),
         import("@holdstation/worldchain-ethers-v6"),
@@ -126,154 +188,95 @@ class HoldstationService {
       console.log("📋 HoldstationModule exports:", Object.keys(HoldstationModule))
       console.log("📋 EthersModule exports:", Object.keys(EthersModule))
 
-      // Extrair componentes conforme documentação
       const { config } = HoldstationModule
       const { Client, Multicall3 } = EthersModule
 
-      console.log("✅ Componentes extraídos (incluindo Multicall3)")
-
-      // Criar provider com configurações mais robustas
       this.provider = new ethers.JsonRpcProvider(WORLDCHAIN_CONFIG.rpcUrl, {
         chainId: WORLDCHAIN_CONFIG.chainId,
         name: WORLDCHAIN_CONFIG.name,
       })
 
-      // Configurar timeouts mais longos
-      this.provider.pollingInterval = 4000 // 4 segundos
-      console.log("✅ Provider criado com configurações robustas")
+      this.provider.pollingInterval = 4000
+      console.log("✅ Provider criado")
 
-      // AGUARDAR REDE ESTAR COMPLETAMENTE PRONTA
       await this.waitForNetwork()
 
-      // Criar client conforme documentação APÓS rede estar pronta
-      console.log("🔧 Criando client após rede estar pronta...")
       this.client = new Client(this.provider)
-      console.log("✅ Client criado conforme docs")
+      console.log("✅ Client criado")
 
-      // Criar Multicall3 conforme documentação
-      console.log("🔧 Criando Multicall3 conforme docs...")
       this.multicall3 = new Multicall3(this.provider)
-      console.log("✅ Multicall3 criado conforme docs")
+      console.log("✅ Multicall3 criado")
 
-      // Configurar config global conforme documentação
-      console.log("🔧 Configurando config global com client E multicall3...")
       this.config = config
       this.config.client = this.client
       this.config.multicall3 = this.multicall3
-      console.log("✅ Config global definido com client E multicall3")
+      console.log("✅ Config global configurado")
 
-      // Aguardar um pouco mais para estabilizar
-      console.log("⏳ Aguardando estabilização do SDK...")
       await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      // Procurar por Manager ou WalletHistory nos módulos
-      let ManagerClass = null
-      let WalletHistoryClass = null
+      // Tentar TODAS as classes possíveis para histórico
+      const allClasses = [...Object.keys(HoldstationModule), ...Object.keys(EthersModule)]
+      console.log("🔍 TODAS as classes disponíveis:", allClasses)
 
-      // Tentar encontrar a classe correta para histórico
-      if (HoldstationModule.Manager) {
-        ManagerClass = HoldstationModule.Manager
-        console.log("✅ Encontrado HoldstationModule.Manager")
-      } else if (HoldstationModule.WalletHistory) {
-        WalletHistoryClass = HoldstationModule.WalletHistory
-        console.log("✅ Encontrado HoldstationModule.WalletHistory")
-      } else if (EthersModule.Manager) {
-        ManagerClass = EthersModule.Manager
-        console.log("✅ Encontrado EthersModule.Manager")
-      } else if (EthersModule.WalletHistory) {
-        WalletHistoryClass = EthersModule.WalletHistory
-        console.log("✅ Encontrado EthersModule.WalletHistory")
-      }
+      let managerCreated = false
 
-      // Criar manager/history conforme documentação
-      if (ManagerClass) {
-        console.log("🔧 Criando Manager com client e multicall3...")
-        // Tentar diferentes formas de criar o Manager
-        try {
-          this.manager = new ManagerClass(this.client, this.multicall3)
-          console.log("✅ Manager criado com client e multicall3")
-        } catch (error1) {
+      for (const className of allClasses) {
+        const ClassConstructor = HoldstationModule[className] || EthersModule[className]
+
+        if (typeof ClassConstructor === "function") {
+          console.log(`🔄 Tentando criar instância de: ${className}`)
+
           try {
-            this.manager = new ManagerClass({ client: this.client, multicall3: this.multicall3 })
-            console.log("✅ Manager criado com objeto de configuração")
-          } catch (error2) {
-            this.manager = new ManagerClass(this.client)
-            console.log("✅ Manager criado apenas com client")
-          }
-        }
-      } else if (WalletHistoryClass) {
-        console.log("🔧 Criando WalletHistory com client e multicall3...")
-        // Tentar diferentes formas de criar o WalletHistory
-        try {
-          this.manager = new WalletHistoryClass(this.client, this.multicall3)
-          console.log("✅ WalletHistory criado com client e multicall3")
-        } catch (error1) {
-          try {
-            this.manager = new WalletHistoryClass({ client: this.client, multicall3: this.multicall3 })
-            console.log("✅ WalletHistory criado com objeto de configuração")
-          } catch (error2) {
-            this.manager = new WalletHistoryClass(this.client)
-            console.log("✅ WalletHistory criado apenas com client")
-          }
-        }
-      } else {
-        // Listar todas as classes disponíveis para debug
-        console.log("🔍 Classes disponíveis em HoldstationModule:", Object.keys(HoldstationModule))
-        console.log("🔍 Classes disponíveis em EthersModule:", Object.keys(EthersModule))
+            // Tentar diferentes formas de criar a instância
+            const attempts = [
+              () => new ClassConstructor(this.client, this.multicall3),
+              () => new ClassConstructor({ client: this.client, multicall3: this.multicall3 }),
+              () => new ClassConstructor(this.client),
+              () => new ClassConstructor({ client: this.client }),
+              () => new ClassConstructor(),
+            ]
 
-        // Tentar usar qualquer classe que pareça relacionada a histórico
-        const possibleClasses = [
-          ...Object.keys(HoldstationModule).filter(
-            (key) => key.toLowerCase().includes("history") || key.toLowerCase().includes("transaction"),
-          ),
-          ...Object.keys(EthersModule).filter(
-            (key) => key.toLowerCase().includes("history") || key.toLowerCase().includes("transaction"),
-          ),
-        ]
+            for (let i = 0; i < attempts.length; i++) {
+              try {
+                const instance = attempts[i]()
+                if (instance) {
+                  this.manager = instance
+                  console.log(`✅ ${className} criado com sucesso (tentativa ${i + 1})!`)
 
-        if (possibleClasses.length > 0) {
-          console.log("🔍 Classes relacionadas a histórico encontradas:", possibleClasses)
-          const FirstClass = HoldstationModule[possibleClasses[0]] || EthersModule[possibleClasses[0]]
-          if (FirstClass) {
-            try {
-              this.manager = new FirstClass(this.client, this.multicall3)
-              console.log(`✅ Usando ${possibleClasses[0]} como manager com multicall3`)
-            } catch (error) {
-              this.manager = new FirstClass(this.client)
-              console.log(`✅ Usando ${possibleClasses[0]} como manager apenas com client`)
+                  // Listar métodos desta instância
+                  const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(instance))
+                  console.log(`📋 Métodos de ${className}:`, methods)
+
+                  managerCreated = true
+                  break
+                }
+              } catch (attemptError) {
+                console.log(`  ❌ Tentativa ${i + 1} para ${className} falhou:`, attemptError.message)
+              }
             }
+
+            if (managerCreated) break
+          } catch (classError) {
+            console.log(`❌ Não foi possível criar ${className}:`, classError.message)
           }
         }
-
-        if (!this.manager) {
-          throw new Error("Nenhuma classe de histórico encontrada nos módulos")
-        }
       }
 
-      // Testar se o manager tem métodos
-      if (this.manager) {
-        const managerMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.manager))
-        console.log("📋 Métodos do manager:", managerMethods)
+      if (!this.manager) {
+        throw new Error("Nenhuma classe pôde ser instanciada como manager")
       }
-
-      // Verificar se config global está correto
-      console.log("🧪 Verificando config global:")
-      console.log(`├─ config.client: ${!!this.config?.client}`)
-      console.log(`├─ config.multicall3: ${!!this.config?.multicall3}`)
-      console.log(`└─ manager: ${!!this.manager}`)
 
       this.initialized = true
-      console.log("✅ SDK inicializado APENAS para histórico com Multicall3!")
+      console.log("✅ SDK inicializado com sucesso!")
     } catch (error) {
       console.error("❌ Erro ao inicializar SDK:", error.message)
       console.error("Stack:", error.stack)
       this.initialized = false
       this.networkReady = false
-      throw error // SEM FALLBACK
+      throw error
     }
   }
 
-  // Métodos mínimos necessários
   getSupportedTokens() {
     return {}
   }
@@ -302,7 +305,6 @@ class HoldstationService {
     return this.multicall3
   }
 
-  // Métodos não usados para histórico
   async getTokenBalances(): Promise<TokenBalance[]> {
     throw new Error("getTokenBalances não implementado - apenas histórico")
   }
@@ -357,8 +359,4 @@ class HoldstationService {
   }
 }
 
-console.log("✅ HoldstationService definido - APENAS HISTÓRICO")
-
 export const holdstationService = new HoldstationService()
-
-console.log("🎯 HOLDSTATION SERVICE - APENAS HISTÓRICO CONFORME DOCS")
