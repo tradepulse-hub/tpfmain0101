@@ -47,57 +47,120 @@ class HoldstationService {
         console.log("✅ @holdstation/worldchain-sdk imported successfully!")
         console.log("Available exports:", Object.keys(HoldstationModule))
 
+        // Debug completo da estrutura do módulo
+        console.log("🔍 Debugging module structure...")
+        for (const [key, value] of Object.entries(HoldstationModule)) {
+          console.log(`Export "${key}": ${typeof value}`, value?.name || value)
+        }
+
         // Tentar diferentes formas de acessar a classe principal
         let HoldstationClass = null
+        let className = ""
 
-        if (HoldstationModule.default) {
-          HoldstationClass = HoldstationModule.default
-          console.log("📋 Using default export")
-        } else if (HoldstationModule.Holdstation) {
-          HoldstationClass = HoldstationModule.Holdstation
-          console.log("📋 Using named export 'Holdstation'")
-        } else if (HoldstationModule.HoldstationSDK) {
-          HoldstationClass = HoldstationModule.HoldstationSDK
-          console.log("📋 Using named export 'HoldstationSDK'")
-        } else if (HoldstationModule.WorldchainSDK) {
-          HoldstationClass = HoldstationModule.WorldchainSDK
-          console.log("📋 Using named export 'WorldchainSDK'")
-        } else if (HoldstationModule.SDK) {
-          HoldstationClass = HoldstationModule.SDK
-          console.log("📋 Using named export 'SDK'")
-        } else {
-          // Tentar o primeiro export disponível
-          const firstExport = Object.values(HoldstationModule)[0]
-          if (typeof firstExport === "function") {
-            HoldstationClass = firstExport
-            console.log("📋 Using first available export")
+        // Lista expandida de possíveis nomes de classe
+        const possibleClassNames = [
+          "default",
+          "Holdstation",
+          "HoldstationSDK",
+          "WorldchainSDK",
+          "SDK",
+          "Client",
+          "HoldstationClient",
+          "WorldchainClient",
+          "Manager",
+          "HoldstationManager",
+          "WorldchainManager",
+        ]
+
+        for (const name of possibleClassNames) {
+          if (HoldstationModule[name] && typeof HoldstationModule[name] === "function") {
+            HoldstationClass = HoldstationModule[name]
+            className = name
+            console.log(`📋 Found class: ${name}`)
+            break
+          }
+        }
+
+        // Se não encontrou, tentar o primeiro export que seja uma função
+        if (!HoldstationClass) {
+          const functionExports = Object.entries(HoldstationModule).filter(
+            ([key, value]) => typeof value === "function",
+          )
+
+          if (functionExports.length > 0) {
+            ;[className, HoldstationClass] = functionExports[0]
+            console.log(`📋 Using first function export: ${className}`)
           }
         }
 
         if (!HoldstationClass) {
-          throw new Error("No valid Holdstation class found in module")
+          throw new Error(
+            `No valid Holdstation class found. Available exports: ${Object.keys(HoldstationModule).join(", ")}`,
+          )
         }
 
-        // Inicializar o SDK com configuração da Worldchain
-        console.log("🔧 Initializing Holdstation SDK with Worldchain config...")
-        this.holdstation = new HoldstationClass({
-          chainId: WORLDCHAIN_CONFIG.chainId,
-          rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
-          network: "worldchain",
-        })
+        // Tentar diferentes configurações de inicialização
+        const configOptions = [
+          {
+            chainId: WORLDCHAIN_CONFIG.chainId,
+            rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
+            network: "worldchain",
+          },
+          {
+            chainId: WORLDCHAIN_CONFIG.chainId,
+            rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
+          },
+          {
+            network: "worldchain",
+            rpc: WORLDCHAIN_CONFIG.rpcUrl,
+          },
+          {
+            rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
+          },
+          // Configuração vazia como último recurso
+          {},
+        ]
 
-        console.log("✅ Holdstation SDK initialized!")
+        let initError = null
+        for (const config of configOptions) {
+          try {
+            console.log(`🔧 Trying to initialize ${className} with config:`, config)
+            this.holdstation = new HoldstationClass(config)
+            console.log(`✅ ${className} initialized successfully with config:`, config)
+            break
+          } catch (error) {
+            console.log(`❌ Failed with config:`, config, error.message)
+            initError = error
+          }
+        }
+
+        if (!this.holdstation) {
+          throw new Error(`Failed to initialize ${className}. Last error: ${initError?.message}`)
+        }
 
         // Tentar obter o manager se disponível
-        if (this.holdstation.getManager) {
-          this.manager = await this.holdstation.getManager()
-          console.log("✅ Holdstation Manager obtained!")
-        } else if (this.holdstation.manager) {
-          this.manager = this.holdstation.manager
-          console.log("✅ Holdstation Manager found as property!")
-        } else if (this.holdstation.createManager) {
-          this.manager = await this.holdstation.createManager()
-          console.log("✅ Holdstation Manager created!")
+        const managerMethods = ["getManager", "manager", "createManager", "getClient", "client"]
+
+        for (const method of managerMethods) {
+          try {
+            if (typeof this.holdstation[method] === "function") {
+              this.manager = await this.holdstation[method]()
+              console.log(`✅ Manager obtained via ${method}()`)
+              break
+            } else if (this.holdstation[method]) {
+              this.manager = this.holdstation[method]
+              console.log(`✅ Manager found as property: ${method}`)
+              break
+            }
+          } catch (error) {
+            console.log(`⚠️ Failed to get manager via ${method}:`, error.message)
+          }
+        }
+
+        // Se não conseguiu manager, usar o próprio SDK
+        if (!this.manager) {
+          this.manager = this.holdstation
+          console.log("📋 Using SDK instance as manager")
         }
       } catch (importError) {
         console.error("❌ Failed to import @holdstation/worldchain-sdk:", importError)
@@ -125,9 +188,15 @@ class HoldstationService {
 
     console.log("🧪 Testing SDK functionality...")
 
-    // Listar métodos disponíveis
-    const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.holdstation))
-    console.log("📋 Available SDK methods:", methods)
+    // Listar métodos disponíveis no SDK
+    const sdkMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.holdstation))
+    console.log("📋 Available SDK methods:", sdkMethods)
+
+    // Listar métodos disponíveis no manager
+    if (this.manager && this.manager !== this.holdstation) {
+      const managerMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.manager))
+      console.log("📋 Available Manager methods:", managerMethods)
+    }
 
     // Testar métodos comuns
     const testMethods = [
@@ -141,11 +210,17 @@ class HoldstationService {
       "swap",
       "getBalances",
       "getQuote",
+      "getHistory",
+      "getTransactionHistory",
     ]
 
+    console.log("🔍 Testing method availability...")
     for (const method of testMethods) {
-      if (typeof this.holdstation[method] === "function") {
-        console.log(`✅ Method '${method}' is available`)
+      const inSDK = typeof this.holdstation[method] === "function"
+      const inManager = this.manager && typeof this.manager[method] === "function"
+
+      if (inSDK || inManager) {
+        console.log(`✅ Method '${method}' is available ${inSDK ? "(SDK)" : ""} ${inManager ? "(Manager)" : ""}`)
       } else {
         console.log(`⚠️ Method '${method}' is NOT available`)
       }
@@ -169,17 +244,28 @@ class HoldstationService {
 
       // Tentar diferentes métodos baseados na documentação comum
       let balances = null
+      const methods = [
+        { obj: this.holdstation, name: "getTokenBalances" },
+        { obj: this.holdstation, name: "getBalances" },
+        { obj: this.manager, name: "getTokenBalances" },
+        { obj: this.manager, name: "getBalances" },
+      ]
 
-      if (typeof this.holdstation.getTokenBalances === "function") {
-        balances = await this.holdstation.getTokenBalances(walletAddress)
-      } else if (typeof this.holdstation.getBalances === "function") {
-        balances = await this.holdstation.getBalances(walletAddress)
-      } else if (this.manager && typeof this.manager.getTokenBalances === "function") {
-        balances = await this.manager.getTokenBalances(walletAddress)
-      } else if (this.manager && typeof this.manager.getBalances === "function") {
-        balances = await this.manager.getBalances(walletAddress)
-      } else {
-        throw new Error("No balance method found in SDK")
+      for (const method of methods) {
+        if (method.obj && typeof method.obj[method.name] === "function") {
+          try {
+            console.log(`🔄 Trying ${method.name}...`)
+            balances = await method.obj[method.name](walletAddress)
+            console.log(`✅ ${method.name} succeeded!`)
+            break
+          } catch (error) {
+            console.log(`❌ ${method.name} failed:`, error.message)
+          }
+        }
+      }
+
+      if (!balances) {
+        throw new Error("No balance method worked")
       }
 
       console.log("📊 Raw balances from SDK:", balances)
@@ -238,22 +324,30 @@ class HoldstationService {
       console.log("📡 Calling getSwapQuote...")
 
       let quote = null
+      const methods = [
+        { obj: this.holdstation, name: "getSwapQuote" },
+        { obj: this.holdstation, name: "getQuote" },
+        { obj: this.holdstation, name: "quote" },
+        { obj: this.manager, name: "getSwapQuote" },
+        { obj: this.manager, name: "getQuote" },
+        { obj: this.manager, name: "quote" },
+      ]
 
-      // Tentar diferentes métodos de cotação
-      if (typeof this.holdstation.getSwapQuote === "function") {
-        quote = await this.holdstation.getSwapQuote(params)
-      } else if (typeof this.holdstation.getQuote === "function") {
-        quote = await this.holdstation.getQuote(params)
-      } else if (typeof this.holdstation.quote === "function") {
-        quote = await this.holdstation.quote(params)
-      } else if (this.manager && typeof this.manager.getSwapQuote === "function") {
-        quote = await this.manager.getSwapQuote(params)
-      } else if (this.manager && typeof this.manager.getQuote === "function") {
-        quote = await this.manager.getQuote(params)
-      } else if (this.manager && typeof this.manager.quote === "function") {
-        quote = await this.manager.quote(params)
-      } else {
-        throw new Error("No quote method found in SDK")
+      for (const method of methods) {
+        if (method.obj && typeof method.obj[method.name] === "function") {
+          try {
+            console.log(`🔄 Trying ${method.name}...`)
+            quote = await method.obj[method.name](params)
+            console.log(`✅ ${method.name} succeeded!`)
+            break
+          } catch (error) {
+            console.log(`❌ ${method.name} failed:`, error.message)
+          }
+        }
+      }
+
+      if (!quote) {
+        throw new Error("No quote method worked")
       }
 
       console.log("📊 Raw quote from SDK:", quote)
@@ -312,18 +406,28 @@ class HoldstationService {
       console.log("📡 Calling executeSwap...")
 
       let txHash = null
+      const methods = [
+        { obj: this.holdstation, name: "executeSwap" },
+        { obj: this.holdstation, name: "swap" },
+        { obj: this.manager, name: "executeSwap" },
+        { obj: this.manager, name: "swap" },
+      ]
 
-      // Tentar diferentes métodos de execução
-      if (typeof this.holdstation.executeSwap === "function") {
-        txHash = await this.holdstation.executeSwap(params)
-      } else if (typeof this.holdstation.swap === "function") {
-        txHash = await this.holdstation.swap(params)
-      } else if (this.manager && typeof this.manager.executeSwap === "function") {
-        txHash = await this.manager.executeSwap(params)
-      } else if (this.manager && typeof this.manager.swap === "function") {
-        txHash = await this.manager.swap(params)
-      } else {
-        throw new Error("No swap execution method found in SDK")
+      for (const method of methods) {
+        if (method.obj && typeof method.obj[method.name] === "function") {
+          try {
+            console.log(`🔄 Trying ${method.name}...`)
+            txHash = await method.obj[method.name](params)
+            console.log(`✅ ${method.name} succeeded!`)
+            break
+          } catch (error) {
+            console.log(`❌ ${method.name} failed:`, error.message)
+          }
+        }
+      }
+
+      if (!txHash) {
+        throw new Error("No swap method worked")
       }
 
       console.log("📋 Raw transaction result:", txHash)
@@ -365,19 +469,24 @@ class HoldstationService {
       }
 
       let transactions = null
+      const methods = [
+        { obj: this.holdstation, name: "getTransactionHistory" },
+        { obj: this.holdstation, name: "getHistory" },
+        { obj: this.manager, name: "getTransactionHistory" },
+        { obj: this.manager, name: "getHistory" },
+      ]
 
-      // Tentar diferentes métodos de histórico
-      if (typeof this.holdstation.getTransactionHistory === "function") {
-        transactions = await this.holdstation.getTransactionHistory(walletAddress, offset, limit)
-      } else if (typeof this.holdstation.getHistory === "function") {
-        transactions = await this.holdstation.getHistory(walletAddress, offset, limit)
-      } else if (this.manager && typeof this.manager.getTransactionHistory === "function") {
-        transactions = await this.manager.getTransactionHistory(walletAddress, offset, limit)
-      } else if (this.manager && typeof this.manager.getHistory === "function") {
-        transactions = await this.manager.getHistory(walletAddress, offset, limit)
-      } else {
-        console.log("⚠️ No transaction history method found in SDK")
-        return []
+      for (const method of methods) {
+        if (method.obj && typeof method.obj[method.name] === "function") {
+          try {
+            console.log(`🔄 Trying ${method.name}...`)
+            transactions = await method.obj[method.name](walletAddress, offset, limit)
+            console.log(`✅ ${method.name} succeeded!`)
+            break
+          } catch (error) {
+            console.log(`❌ ${method.name} failed:`, error.message)
+          }
+        }
       }
 
       console.log("📊 Raw transactions from SDK:", transactions)
