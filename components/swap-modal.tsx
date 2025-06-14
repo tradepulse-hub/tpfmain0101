@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
-import { X, ArrowUpDown, Loader2, Settings, RefreshCw, Zap, Info } from "lucide-react"
+import { X, ArrowUpDown, Loader2, Settings, RefreshCw, Zap, Info, Bug } from "lucide-react"
 import { toast } from "sonner"
 import { holdstationService } from "@/services/holdstation-service"
 import { walletService } from "@/services/wallet-service"
@@ -59,6 +59,7 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   const [isQuoting, setIsQuoting] = useState(false)
   const [isLoadingBalances, setIsLoadingBalances] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showDebugLogs, setShowDebugLogs] = useState(false)
   const [quoteData, setQuoteData] = useState<any>(null)
   const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({
     WLD: "0",
@@ -66,39 +67,83 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     DNA: "0",
     WDD: "0",
   })
+  const [debugLogs, setDebugLogs] = useState<string[]>([])
+  const [selectedToken, setSelectedToken] = useState<TokenSymbol | null>(null)
+  const [showTokenSelector, setShowTokenSelector] = useState(false)
+  const [amount, setAmount] = useState("")
+
+  // Função helper para adicionar logs
+  const addDebugLog = (message: string) => {
+    console.log(`🔄 SWAP DEBUG: ${message}`)
+    setDebugLogs((prev) => [...prev.slice(-30), `${new Date().toLocaleTimeString()}: ${message}`])
+  }
 
   // Carregar saldos quando o modal abrir
   useEffect(() => {
     if (!isOpen) return
     if (walletAddress) {
+      addDebugLog("=== MODAL SWAP ABERTO ===")
+      addDebugLog(`Endereço da carteira: ${walletAddress}`)
       loadBalances()
     }
   }, [isOpen, walletAddress])
 
   const loadBalances = async () => {
     setIsLoadingBalances(true)
+    addDebugLog("=== CARREGANDO SALDOS DOS TOKENS ===")
+
     try {
-      console.log("Loading token balances...")
+      addDebugLog("Verificando disponibilidade do walletService...")
 
       if (walletService && typeof walletService.getTokenBalances === "function") {
+        addDebugLog("✅ walletService disponível, fazendo chamada...")
+
         const balances = await walletService.getTokenBalances(walletAddress!)
-        console.log("Real balances:", balances)
+        addDebugLog(`📊 Saldos recebidos: ${balances.length} tokens`)
+        addDebugLog(`Dados brutos: ${JSON.stringify(balances, null, 2)}`)
 
         const balanceMap: Record<string, string> = {}
         balances.forEach((balance) => {
           if (AVAILABLE_TOKENS[balance.symbol as TokenSymbol]) {
             balanceMap[balance.symbol] = balance.formattedBalance || balance.balance
+            addDebugLog(`💰 ${balance.symbol}: ${balance.formattedBalance || balance.balance}`)
           }
         })
 
         setTokenBalances(balanceMap)
-        console.log("Token balances loaded:", balanceMap)
+        addDebugLog(`✅ Saldos carregados: ${JSON.stringify(balanceMap)}`)
+      } else {
+        addDebugLog("❌ walletService não disponível")
+        throw new Error("walletService not available")
       }
     } catch (error) {
+      addDebugLog(`❌ Erro ao carregar saldos: ${error.message}`)
       console.error("Error loading balances:", error)
       toast.error("Erro ao carregar saldos")
     } finally {
       setIsLoadingBalances(false)
+      addDebugLog("=== FIM DO CARREGAMENTO DE SALDOS ===")
+    }
+  }
+
+  const handleTokenSelect = (token: TokenSymbol) => {
+    addDebugLog(`🔄 Token selecionado: ${token}`)
+    setSelectedToken(token)
+    setShowTokenSelector(false)
+    setAmount("") // Limpar amount quando trocar de token
+    addDebugLog(`✅ Token alterado para: ${token}, amount limpo`)
+  }
+
+  const handleMaxAmount = () => {
+    if (selectedToken) {
+      const maxBalance = tokenBalances[tokenIn]
+      addDebugLog(`📊 MAX clicado para ${tokenIn}: ${maxBalance}`)
+      if (maxBalance && Number.parseFloat(maxBalance) > 0) {
+        setAmountIn(maxBalance)
+        addDebugLog(`✅ Amount definido para MAX: ${maxBalance}`)
+      } else {
+        addDebugLog(`⚠️ Saldo insuficiente para MAX: ${maxBalance}`)
+      }
     }
   }
 
@@ -106,54 +151,96 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   useEffect(() => {
     const getQuote = async () => {
       if (!amountIn || Number.parseFloat(amountIn) <= 0) {
+        addDebugLog("⏭️ Pulando cotação: amount vazio ou zero")
         setAmountOut("")
         setQuoteData(null)
         return
       }
 
       if (tokenIn === tokenOut) {
+        addDebugLog("⏭️ Pulando cotação: tokens iguais")
         setAmountOut(amountIn)
         return
       }
 
       setIsQuoting(true)
+      addDebugLog("=== OBTENDO COTAÇÃO ===")
+      addDebugLog(`📊 Parâmetros:`)
+      addDebugLog(`├─ Token IN: ${tokenIn} (${AVAILABLE_TOKENS[tokenIn].address})`)
+      addDebugLog(`├─ Token OUT: ${tokenOut} (${AVAILABLE_TOKENS[tokenOut].address})`)
+      addDebugLog(`├─ Amount IN: ${amountIn}`)
+      addDebugLog(`└─ Slippage: ${slippage}%`)
+
       try {
-        console.log(`Getting quote: ${amountIn} ${tokenIn} → ${tokenOut}`)
-        console.log(`Token addresses: ${AVAILABLE_TOKENS[tokenIn].address} → ${AVAILABLE_TOKENS[tokenOut].address}`)
+        addDebugLog("🔍 Verificando disponibilidade do holdstationService...")
 
         if (holdstationService && typeof holdstationService.getSwapQuote === "function") {
-          const quote = await holdstationService.getSwapQuote({
+          addDebugLog("✅ holdstationService disponível")
+          addDebugLog("📡 Fazendo chamada para getSwapQuote...")
+
+          const quoteParams = {
             tokenIn: AVAILABLE_TOKENS[tokenIn].address,
             tokenOut: AVAILABLE_TOKENS[tokenOut].address,
             amountIn: amountIn,
             slippage: slippage,
-          })
+          }
 
-          console.log("Received quote:", quote)
+          addDebugLog(`📋 Parâmetros da cotação: ${JSON.stringify(quoteParams, null, 2)}`)
+
+          const quote = await holdstationService.getSwapQuote(quoteParams)
+
+          addDebugLog("📊 Cotação recebida:")
+          addDebugLog(`├─ Raw response: ${JSON.stringify(quote, null, 2)}`)
+          addDebugLog(`├─ Amount Out: ${quote?.amountOut}`)
+          addDebugLog(`├─ Data: ${quote?.data?.substring(0, 20)}...`)
+          addDebugLog(`└─ To: ${quote?.to}`)
 
           if (quote && quote.amountOut && Number.parseFloat(quote.amountOut) > 0) {
             setAmountOut(quote.amountOut)
             setQuoteData(quote)
-            console.log(`Quote success: ${quote.amountOut} ${tokenOut}`)
+            addDebugLog(`✅ Cotação aplicada: ${quote.amountOut} ${tokenOut}`)
+
+            // Log detalhado dos addons se disponível
+            if (quote.addons) {
+              addDebugLog("📈 Detalhes da cotação:")
+              addDebugLog(`├─ Rate Swap: ${quote.addons.rateSwap}`)
+              addDebugLog(`├─ Min Received: ${quote.addons.minReceived}`)
+              addDebugLog(`├─ Fee Amount: ${quote.addons.feeAmountOut}`)
+              addDebugLog(`└─ USD Value: ${quote.addons.amountOutUsd}`)
+            }
           } else {
-            console.warn("Quote returned invalid data:", quote)
+            addDebugLog("❌ Cotação inválida recebida")
+            addDebugLog(`├─ Quote object: ${!!quote}`)
+            addDebugLog(`├─ Amount out: ${quote?.amountOut}`)
+            addDebugLog(`└─ Amount parsed: ${Number.parseFloat(quote?.amountOut || "0")}`)
+
             setAmountOut("0")
             setQuoteData(null)
             toast.error("Cotação inválida recebida")
           }
         } else {
-          console.warn("Holdstation service not available")
+          addDebugLog("❌ holdstationService não disponível")
+          addDebugLog(`├─ Service exists: ${!!holdstationService}`)
+          addDebugLog(`└─ getSwapQuote function: ${typeof holdstationService?.getSwapQuote}`)
+
           setAmountOut("0")
           setQuoteData(null)
           toast.error("Serviço de cotação não disponível")
         }
       } catch (error) {
+        addDebugLog("❌ ERRO NA COTAÇÃO:")
+        addDebugLog(`├─ Tipo: ${typeof error}`)
+        addDebugLog(`├─ Mensagem: ${error.message}`)
+        addDebugLog(`├─ Stack: ${error.stack}`)
+        addDebugLog(`└─ Objeto completo: ${JSON.stringify(error, null, 2)}`)
+
         console.error("Error getting quote:", error)
         setAmountOut("0")
         setQuoteData(null)
         toast.error(`Erro ao obter cotação: ${error.message}`)
       } finally {
         setIsQuoting(false)
+        addDebugLog("=== FIM DA COTAÇÃO ===")
       }
     }
 
@@ -162,6 +249,9 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   }, [amountIn, tokenIn, tokenOut, slippage])
 
   const handleSwapTokens = () => {
+    addDebugLog("🔄 INVERTENDO TOKENS")
+    addDebugLog(`├─ Antes: ${tokenIn} → ${tokenOut}`)
+
     const tempToken = tokenIn
     const tempAmount = amountIn
 
@@ -170,17 +260,14 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     setAmountIn(amountOut)
     setAmountOut(tempAmount)
     setQuoteData(null)
-  }
 
-  const handleMaxAmount = () => {
-    const maxBalance = tokenBalances[tokenIn]
-    if (maxBalance && Number.parseFloat(maxBalance) > 0) {
-      setAmountIn(maxBalance)
-    }
+    addDebugLog(`├─ Depois: ${tokenOut} → ${tempToken}`)
+    addDebugLog(`└─ Amounts: ${amountOut} → ${tempAmount}`)
   }
 
   const handleRefreshBalances = async () => {
     if (!walletAddress || isLoadingBalances) return
+    addDebugLog("🔄 REFRESH MANUAL DE SALDOS")
     await loadBalances()
   }
 
@@ -188,12 +275,22 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
   const handleSwap = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    addDebugLog("=== INICIANDO SWAP ===")
+    addDebugLog(`📊 Parâmetros iniciais:`)
+    addDebugLog(`├─ Amount IN: ${amountIn}`)
+    addDebugLog(`├─ Token IN: ${tokenIn}`)
+    addDebugLog(`├─ Token OUT: ${tokenOut}`)
+    addDebugLog(`├─ Wallet: ${walletAddress}`)
+    addDebugLog(`└─ Quote Data: ${!!quoteData}`)
+
     if (!amountIn || Number.parseFloat(amountIn) <= 0) {
+      addDebugLog("❌ Validação falhou: Amount inválido")
       toast.error("Digite o valor para swap")
       return
     }
 
     if (!walletAddress) {
+      addDebugLog("❌ Validação falhou: Wallet não conectada")
       toast.error("Conecte sua carteira")
       return
     }
@@ -202,71 +299,120 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     const balance = Number.parseFloat(tokenBalances[tokenIn] || "0")
     const amount = Number.parseFloat(amountIn)
 
+    addDebugLog("💰 VERIFICAÇÃO DE SALDO:")
+    addDebugLog(`├─ Saldo disponível: ${balance} ${tokenIn}`)
+    addDebugLog(`├─ Quantidade solicitada: ${amount} ${tokenIn}`)
+    addDebugLog(`└─ Suficiente: ${amount <= balance}`)
+
     if (amount > balance) {
+      addDebugLog("❌ Validação falhou: Saldo insuficiente")
       toast.error(`Saldo insuficiente. Você tem ${balance} ${tokenIn}`)
       return
     }
 
     if (!quoteData) {
+      addDebugLog("❌ Validação falhou: Sem cotação")
       toast.error("Obtenha uma cotação primeiro")
       return
     }
 
     setIsLoading(true)
-    try {
-      console.log("🚀 Executing swap:")
-      console.log(`├─ ${amountIn} ${tokenIn} -> ${tokenOut}`)
-      console.log(`├─ Expected out: ${amountOut}`)
-      console.log(`├─ Slippage: ${slippage}%`)
+    addDebugLog("🚀 EXECUTANDO SWAP...")
 
+    try {
+      addDebugLog("📋 Parâmetros do swap:")
+      addDebugLog(`├─ Token IN: ${AVAILABLE_TOKENS[tokenIn].address}`)
+      addDebugLog(`├─ Token OUT: ${AVAILABLE_TOKENS[tokenOut].address}`)
+      addDebugLog(`├─ Amount IN: ${amountIn}`)
+      addDebugLog(`├─ Expected OUT: ${amountOut}`)
+      addDebugLog(`└─ Slippage: ${slippage}%`)
+
+      addDebugLog("🔍 Verificando holdstationService...")
       if (holdstationService && typeof holdstationService.executeSwap === "function") {
-        const txHash = await holdstationService.executeSwap({
+        addDebugLog("✅ holdstationService.executeSwap disponível")
+
+        const swapParams = {
           tokenIn: AVAILABLE_TOKENS[tokenIn].address,
           tokenOut: AVAILABLE_TOKENS[tokenOut].address,
           amountIn: amountIn,
           slippage: slippage,
-        })
+        }
 
-        console.log("✅ Swap completed successfully!")
-        console.log(`└─ Transaction hash: ${txHash}`)
+        addDebugLog(`📡 Chamando executeSwap com: ${JSON.stringify(swapParams, null, 2)}`)
+
+        const txHash = await holdstationService.executeSwap(swapParams)
+
+        addDebugLog("✅ SWAP EXECUTADO COM SUCESSO!")
+        addDebugLog(`├─ Transaction Hash: ${txHash}`)
+        addDebugLog(`├─ Amount IN: ${amountIn} ${tokenIn}`)
+        addDebugLog(`├─ Amount OUT: ${amountOut} ${tokenOut}`)
+        addDebugLog(`└─ Slippage: ${slippage}%`)
 
         toast.success("🎉 Swap Realizado com Sucesso!", {
           description: `${amountIn} ${tokenIn} → ${amountOut} ${tokenOut}`,
           action: {
             label: "Ver TX",
-            onClick: () => window.open(`https://worldscan.org/tx/${txHash}`, "_blank"),
+            onClick: () => {
+              addDebugLog(`🔗 Abrindo explorer: https://worldscan.org/tx/${txHash}`)
+              window.open(`https://worldscan.org/tx/${txHash}`, "_blank")
+            },
           },
         })
 
         // Limpar campos e fechar modal
+        addDebugLog("🧹 Limpando campos...")
         setAmountIn("")
         setAmountOut("")
         setQuoteData(null)
         onClose()
 
         // Atualizar saldos após o swap
+        addDebugLog("🔄 Agendando atualização de saldos em 3s...")
         setTimeout(() => {
+          addDebugLog("🔄 Atualizando saldos pós-swap...")
           handleRefreshBalances()
         }, 3000)
       } else {
+        addDebugLog("❌ holdstationService.executeSwap não disponível")
+        addDebugLog(`├─ Service exists: ${!!holdstationService}`)
+        addDebugLog(`└─ executeSwap function: ${typeof holdstationService?.executeSwap}`)
         throw new Error("Serviço de swap não disponível")
       }
     } catch (error: any) {
+      addDebugLog("❌ ERRO NO SWAP:")
+      addDebugLog(`├─ Tipo: ${typeof error}`)
+      addDebugLog(`├─ Mensagem: ${error.message}`)
+      addDebugLog(`├─ Stack: ${error.stack}`)
+      addDebugLog(`├─ Code: ${error.code}`)
+      addDebugLog(`├─ Reason: ${error.reason}`)
+      addDebugLog(`└─ Objeto completo: ${JSON.stringify(error, null, 2)}`)
+
       console.error("❌ Swap failed:", error)
 
       let errorMessage = "Falha no swap. Tente novamente."
 
-      if (error.message.includes("insufficient")) {
+      if (error.message?.includes("insufficient")) {
         errorMessage = "Saldo insuficiente para o swap."
-      } else if (error.message.includes("slippage")) {
+        addDebugLog("🔍 Erro identificado: Saldo insuficiente")
+      } else if (error.message?.includes("slippage")) {
         errorMessage = "Slippage muito alto. Tente aumentar a tolerância."
+        addDebugLog("🔍 Erro identificado: Slippage alto")
+      } else if (error.message?.includes("rejected")) {
+        errorMessage = "Transação rejeitada pelo usuário."
+        addDebugLog("🔍 Erro identificado: Rejeitada pelo usuário")
+      } else if (error.message?.includes("network")) {
+        errorMessage = "Erro de rede. Tente novamente."
+        addDebugLog("🔍 Erro identificado: Problema de rede")
       }
+
+      addDebugLog(`💬 Mensagem de erro final: ${errorMessage}`)
 
       toast.error(errorMessage, {
         description: error.message,
       })
     } finally {
       setIsLoading(false)
+      addDebugLog("=== FIM DO SWAP ===")
     }
   }
 
@@ -301,6 +447,13 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
               </h2>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => setShowDebugLogs(!showDebugLogs)}
+                  className="text-gray-400 hover:text-white p-1"
+                  title="Toggle Debug Logs"
+                >
+                  <Bug size={16} />
+                </button>
+                <button
                   onClick={handleRefreshBalances}
                   disabled={isLoadingBalances}
                   className="text-gray-400 hover:text-white p-1"
@@ -321,6 +474,38 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
               </div>
             </div>
 
+            {/* Debug Logs Panel */}
+            {showDebugLogs && debugLogs.length > 0 && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="border-b border-gray-800 bg-gray-800/30 max-h-40 overflow-y-auto"
+              >
+                <div className="p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-400">Debug Logs ({debugLogs.length})</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(debugLogs.join("\n"))
+                        toast.success("Logs copiados!")
+                      }}
+                      className="text-xs text-blue-400 hover:text-blue-300"
+                    >
+                      📋 Copiar
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {debugLogs.map((log, index) => (
+                      <div key={index} className="text-xs font-mono text-gray-300">
+                        {log}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {/* Settings Panel */}
             <AnimatePresence>
               {showSettings && (
@@ -338,7 +523,10 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                           <button
                             key={value}
                             type="button"
-                            onClick={() => setSlippage(value)}
+                            onClick={() => {
+                              addDebugLog(`⚙️ Slippage alterado: ${slippage}% → ${value}%`)
+                              setSlippage(value)
+                            }}
                             className={`px-2 py-1 rounded text-xs ${
                               slippage === value
                                 ? "bg-blue-600 text-white"
@@ -367,7 +555,11 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                   <span className="text-xs text-gray-400">From</span>
                   <select
                     value={tokenIn}
-                    onChange={(e) => setTokenIn(e.target.value as TokenSymbol)}
+                    onChange={(e) => {
+                      const newToken = e.target.value as TokenSymbol
+                      addDebugLog(`🔄 Token IN alterado: ${tokenIn} → ${newToken}`)
+                      setTokenIn(newToken)
+                    }}
                     className="bg-gray-700 text-white text-sm rounded px-2 py-1 border border-gray-600"
                   >
                     {Object.entries(AVAILABLE_TOKENS).map(([symbol, token]) => (
@@ -381,7 +573,10 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                   <input
                     type="number"
                     value={amountIn}
-                    onChange={(e) => setAmountIn(e.target.value)}
+                    onChange={(e) => {
+                      addDebugLog(`💰 Amount IN alterado: ${amountIn} → ${e.target.value}`)
+                      setAmountIn(e.target.value)
+                    }}
                     placeholder="0.00"
                     step="0.000001"
                     min="0"
@@ -433,7 +628,11 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                   <span className="text-xs text-gray-400">To</span>
                   <select
                     value={tokenOut}
-                    onChange={(e) => setTokenOut(e.target.value as TokenSymbol)}
+                    onChange={(e) => {
+                      const newToken = e.target.value as TokenSymbol
+                      addDebugLog(`🔄 Token OUT alterado: ${tokenOut} → ${newToken}`)
+                      setTokenOut(newToken)
+                    }}
                     className="bg-gray-700 text-white text-sm rounded px-2 py-1 border border-gray-600"
                   >
                     {Object.entries(AVAILABLE_TOKENS).map(([symbol, token]) => (
