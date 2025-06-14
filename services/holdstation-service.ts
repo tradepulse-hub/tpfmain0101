@@ -87,7 +87,7 @@ class HoldstationService {
 
   private async _doInitialize() {
     try {
-      console.log("🚀 Initializing Holdstation SDK (BACK TO WORKING VERSION)...")
+      console.log("🚀 Initializing Holdstation SDK (FIXED VERSION)...")
 
       // Importar os módulos (volta para a forma que funcionava)
       const [HoldstationModule, EthersModule] = await Promise.all([
@@ -138,6 +138,7 @@ class HoldstationService {
       console.log("🔧 Setting global config...")
       this.config.client = this.client
       this.config.multicall3 = new Multicall3(this.provider)
+      this.multicall3 = this.config.multicall3
       console.log("✅ Global config set!")
 
       // 5. Aguardar estabilização
@@ -149,35 +150,73 @@ class HoldstationService {
       this.tokenProvider = new TokenProvider()
       console.log("✅ TokenProvider created!")
 
-      // 7. Criar Quoter (CORREÇÃO CRÍTICA)
-      console.log("🔧 Creating Quoter (CRITICAL FIX)...")
+      // 7. Criar Quoter (CORREÇÃO CRÍTICA - FORÇAR CRIAÇÃO)
+      console.log("🔧 Creating Quoter (CRITICAL FIX - FORCE CREATION)...")
       try {
-        // Tentar todas as possibilidades
-        if (EthersModule.Quoter) {
-          console.log("🔄 Trying EthersModule.Quoter...")
-          this.quoter = new EthersModule.Quoter(this.client)
-          console.log("✅ Quoter created from EthersModule!")
-        } else if (HoldstationModule.Quoter) {
-          console.log("🔄 Trying HoldstationModule.Quoter...")
-          this.quoter = new HoldstationModule.Quoter(this.client)
-          console.log("✅ Quoter created from HoldstationModule!")
-        } else if (Quoter) {
-          console.log("🔄 Trying direct Quoter import...")
-          this.quoter = new Quoter(this.client)
-          console.log("✅ Quoter created from direct import!")
-        } else {
-          console.log("⚠️ No Quoter class found in any module")
-          console.log("├─ EthersModule.Quoter:", !!EthersModule.Quoter)
-          console.log("├─ HoldstationModule.Quoter:", !!HoldstationModule.Quoter)
-          console.log("├─ Direct Quoter:", !!Quoter)
+        // Tentar TODAS as possibilidades com mais detalhes
+        console.log("🔄 Attempting Quoter creation with multiple strategies...")
+
+        if (Quoter && typeof Quoter === "function") {
+          console.log("🔄 Strategy 1: Direct Quoter constructor...")
+          try {
+            this.quoter = new Quoter(this.client)
+            console.log("✅ Quoter created with direct constructor!")
+          } catch (directError) {
+            console.log(`❌ Direct constructor failed: ${directError.message}`)
+          }
+        }
+
+        if (!this.quoter && EthersModule.Quoter && typeof EthersModule.Quoter === "function") {
+          console.log("🔄 Strategy 2: EthersModule.Quoter...")
+          try {
+            this.quoter = new EthersModule.Quoter(this.client)
+            console.log("✅ Quoter created from EthersModule!")
+          } catch (ethersError) {
+            console.log(`❌ EthersModule.Quoter failed: ${ethersError.message}`)
+          }
+        }
+
+        if (!this.quoter && HoldstationModule.Quoter && typeof HoldstationModule.Quoter === "function") {
+          console.log("🔄 Strategy 3: HoldstationModule.Quoter...")
+          try {
+            this.quoter = new HoldstationModule.Quoter(this.client)
+            console.log("✅ Quoter created from HoldstationModule!")
+          } catch (holdstationError) {
+            console.log(`❌ HoldstationModule.Quoter failed: ${holdstationError.message}`)
+          }
+        }
+
+        // Se ainda não temos quoter, tentar com diferentes parâmetros
+        if (!this.quoter && Quoter) {
+          console.log("🔄 Strategy 4: Quoter with different parameters...")
+          const alternativeParams = [
+            [this.provider],
+            [this.config],
+            [this.client, this.config],
+            [this.provider, this.config],
+            [],
+          ]
+
+          for (const params of alternativeParams) {
+            try {
+              console.log(`🔄 Trying Quoter with params: ${params.length} arguments`)
+              this.quoter = new Quoter(...params)
+              console.log("✅ Quoter created with alternative parameters!")
+              break
+            } catch (altError) {
+              console.log(`❌ Alternative params failed: ${altError.message}`)
+            }
+          }
         }
 
         if (this.quoter) {
           const quoterMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.quoter))
           console.log(`📋 Quoter methods: ${quoterMethods.join(", ")}`)
+        } else {
+          console.log("⚠️ QUOTER CREATION FAILED - Will use SwapHelper._quote instead")
         }
       } catch (quoterError) {
-        console.log(`❌ Quoter creation failed: ${quoterError.message}`)
+        console.log(`❌ Quoter creation completely failed: ${quoterError.message}`)
         console.log(`❌ Quoter error stack: ${quoterError.stack}`)
       }
 
@@ -205,6 +244,13 @@ class HoldstationService {
         if (this.swapHelper) {
           const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
           console.log(`📋 SwapHelper methods: ${swapMethods.join(", ")}`)
+
+          // CARREGAR O SWAPHELPER IMEDIATAMENTE
+          console.log("🔄 Loading SwapHelper immediately...")
+          if (typeof this.swapHelper.load === "function") {
+            await this.swapHelper.load()
+            console.log("✅ SwapHelper loaded successfully!")
+          }
         }
       } catch (swapError) {
         console.log(`❌ SwapHelper creation failed: ${swapError.message}`)
@@ -222,6 +268,10 @@ class HoldstationService {
 
       if (!this.tokenProvider) {
         throw new Error("Failed to create TokenProvider")
+      }
+
+      if (!this.swapHelper) {
+        throw new Error("Failed to create SwapHelper - this is critical for quotes!")
       }
 
       // 10. Testar se o SDK está funcionando
@@ -385,7 +435,7 @@ class HoldstationService {
       await this.initialize()
       await this.ensureNetworkReady()
 
-      console.log("💱 Getting swap quote (FOUNDER DEBUG MODE)...")
+      console.log("💱 Getting swap quote (FIXED VERSION)...")
 
       if (!this.config?.client) {
         throw new Error("Global config.client not set")
@@ -395,170 +445,118 @@ class HoldstationService {
         throw new Error("SwapHelper not available - this is critical!")
       }
 
-      // ===== FOUNDER DEBUG: EXACT REQUEST PARAMETERS =====
-      console.log("🚨 === TRUNG HUYNH (FOUNDER) - EXACT REQUEST DEBUG ===")
-      console.log("📡 REAL WORLD EXAMPLE REQUEST:")
-      console.log("├─ User wants to swap: 1 WLD → TPF")
-      console.log("├─ Wallet has balance: 50.009789489971346823 WLD")
-      console.log("├─ User selected amount: 1 WLD")
-      console.log("├─ User selected slippage: 3.0%")
-      console.log("")
+      // Preparar parâmetros com MÚLTIPLAS ESTRATÉGIAS
+      console.log("🔧 Preparing quote parameters with multiple strategies...")
 
-      // Preparar parâmetros EXATOS
-      const quoteParams = {
+      const baseParams = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
-        amountIn: ethers.parseEther(params.amountIn).toString(), // 1 * 1e18
+        amountIn: params.amountIn,
         slippage: params.slippage || "3",
-        fee: "0.2",
       }
 
-      console.log("📋 Quote params for HOLDSTATION FOUNDER (WITH DECIMALS):")
-      console.log("├─ tokenIn:", quoteParams.tokenIn)
-      console.log("├─ tokenOut:", quoteParams.tokenOut)
-      console.log("├─ amountIn (with decimals):", quoteParams.amountIn)
-      console.log("├─ amountIn calculation: 1 * 1e18 =", quoteParams.amountIn)
-      console.log("├─ slippage:", quoteParams.slippage)
-      console.log("├─ fee:", quoteParams.fee)
-      console.log("📋 Full object:", JSON.stringify(quoteParams, null, 2))
+      console.log("📋 Base parameters:", JSON.stringify(baseParams, null, 2))
 
-      // Preparar parâmetros EXATOS
-      const exactParams = {
-        tokenIn: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003", // WLD
-        tokenOut: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45", // TPF
-        amountIn: "1", // 1 WLD
-        slippage: "3", // 3%
-        fee: "0.2", // 0.2%
-      }
+      // ESTRATÉGIA 1: Usar SwapHelper._quote (método disponível)
+      let quote = null
+      const strategies = [
+        {
+          name: "SwapHelper._quote with string amountIn",
+          call: () => this.swapHelper._quote(baseParams),
+        },
+        {
+          name: "SwapHelper._quote with BigNumber amountIn",
+          call: () =>
+            this.swapHelper._quote({
+              ...baseParams,
+              amountIn: ethers.parseEther(baseParams.amountIn).toString(),
+            }),
+        },
+        {
+          name: "SwapHelper._quote with minimal params",
+          call: () =>
+            this.swapHelper._quote({
+              tokenIn: baseParams.tokenIn,
+              tokenOut: baseParams.tokenOut,
+              amountIn: baseParams.amountIn,
+            }),
+        },
+        {
+          name: "SwapHelper._quote with fee",
+          call: () =>
+            this.swapHelper._quote({
+              ...baseParams,
+              fee: "0.2",
+            }),
+        },
+        {
+          name: "SwapHelper.submitSwapTokensForTokens",
+          call: () =>
+            this.swapHelper.submitSwapTokensForTokens({
+              tokenIn: baseParams.tokenIn,
+              tokenOut: baseParams.tokenOut,
+              amountIn: ethers.parseEther(baseParams.amountIn).toString(),
+              slippage: baseParams.slippage,
+            }),
+        },
+      ]
 
-      console.log("📋 EXACT PARAMETERS BEING SENT TO SDK:")
-      console.log("├─ tokenIn (WLD):", exactParams.tokenIn)
-      console.log("├─ tokenOut (TPF):", exactParams.tokenOut)
-      console.log("├─ amountIn:", exactParams.amountIn, "(type:", typeof exactParams.amountIn, ")")
-      console.log("├─ slippage:", exactParams.slippage, "(type:", typeof exactParams.slippage, ")")
-      console.log("├─ fee:", exactParams.fee, "(type:", typeof exactParams.fee, ")")
-      console.log("")
+      // Se temos Quoter, adicionar estratégias do Quoter
+      if (this.quoter) {
+        console.log("✅ Quoter available - adding Quoter strategies...")
+        const quoterMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.quoter))
+        console.log(`📋 Available Quoter methods: ${quoterMethods.join(", ")}`)
 
-      console.log("📋 FULL OBJECT AS JSON:")
-      console.log(JSON.stringify(exactParams, null, 2))
-      console.log("")
-
-      console.log("📋 OBJECT DETAILS:")
-      console.log("├─ Object.keys():", Object.keys(exactParams))
-      console.log("├─ Object.values():", Object.values(exactParams))
-      console.log("├─ Object.entries():", Object.entries(exactParams))
-      console.log("├─ typeof params:", typeof exactParams)
-      console.log("├─ params instanceof Object:", exactParams instanceof Object)
-      console.log("├─ Array.isArray(params):", Array.isArray(exactParams))
-      console.log("")
-
-      // Debug do método que vamos chamar
-      console.log("📋 METHOD CALL DEBUG:")
-      console.log("├─ SwapHelper exists:", !!this.swapHelper)
-      console.log("├─ SwapHelper constructor:", this.swapHelper.constructor.name)
-      console.log("├─ quote method exists:", typeof this.swapHelper.quote === "function")
-      console.log("├─ quote method type:", typeof this.swapHelper.quote)
-
-      // Listar TODOS os métodos disponíveis
-      const allMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
-      console.log("├─ ALL SwapHelper methods:", allMethods.join(", "))
-
-      if (typeof this.swapHelper.quote === "function") {
-        console.log("├─ quote method length:", this.swapHelper.quote.length)
-        console.log("├─ quote method string:", this.swapHelper.quote.toString().substring(0, 500) + "...")
-      }
-
-      // Testar se o SwapHelper está realmente funcional
-      try {
-        console.log("🧪 Testing SwapHelper basic functionality...")
-        if (typeof this.swapHelper.load === "function") {
-          console.log("├─ SwapHelper.load exists - calling it...")
-          await this.swapHelper.load()
-          console.log("├─ SwapHelper.load completed successfully!")
-        }
-      } catch (loadError) {
-        console.log("⚠️ SwapHelper.load failed:", loadError.message)
-      }
-
-      console.log("")
-
-      // MÉTODO ESPECÍFICO: Tentar diferentes abordagens baseadas nos métodos disponíveis
-      let quote
-      try {
-        console.log("🔄 CALLING: swapHelper._quote(exactParams) - MÉTODO DISPONÍVEL...")
-        console.log("📋 Exact params being passed:", JSON.stringify(exactParams, null, 2))
-
-        // Primeiro tentar carregar o SwapHelper se necessário
-        if (typeof this.swapHelper.load === "function") {
-          console.log("🔄 Loading SwapHelper first...")
-          await this.swapHelper.load()
-          console.log("✅ SwapHelper loaded!")
-        }
-
-        // Agora tentar o _quote com parâmetros corretos
-        quote = await this.swapHelper._quote(exactParams)
-        console.log("✅ swapHelper._quote() SUCCESS!")
-        console.log("📊 FOUNDER - Quote result:", JSON.stringify(quote, null, 2))
-      } catch (quoteError) {
-        console.log("❌ swapHelper._quote() FAILED:")
-        console.log("├─ Error message:", quoteError.message)
-        console.log("├─ Error stack:", quoteError.stack)
-
-        // Tentar métodos alternativos baseados nos métodos disponíveis
-        console.log("🔄 Trying alternative methods based on available methods...")
-
-        const alternativeMethods = [
+        strategies.unshift(
           {
-            name: "submitSwapTokensForTokens",
-            call: () =>
-              this.swapHelper.submitSwapTokensForTokens({
-                tokenIn: exactParams.tokenIn,
-                tokenOut: exactParams.tokenOut,
-                amountIn: ethers.parseEther(exactParams.amountIn).toString(),
-                slippage: exactParams.slippage,
-              }),
+            name: "Quoter.quote",
+            call: () => this.quoter.quote(baseParams),
           },
           {
-            name: "_quote with BigNumber amountIn",
-            call: () =>
-              this.swapHelper._quote({
-                tokenIn: exactParams.tokenIn,
-                tokenOut: exactParams.tokenOut,
-                amountIn: ethers.parseEther(exactParams.amountIn).toString(),
-                slippage: exactParams.slippage,
-              }),
+            name: "Quoter.getQuote",
+            call: () => this.quoter.getQuote(baseParams),
           },
           {
-            name: "_quote minimal params",
-            call: () =>
-              this.swapHelper._quote({
-                tokenIn: exactParams.tokenIn,
-                tokenOut: exactParams.tokenOut,
-                amountIn: exactParams.amountIn,
-              }),
+            name: "Quoter._quote",
+            call: () => this.quoter._quote(baseParams),
           },
-        ]
+        )
+      }
 
-        for (const method of alternativeMethods) {
-          try {
-            console.log(`🔄 Trying: ${method.name}`)
-            quote = await method.call()
-            console.log(`✅ ${method.name} WORKED!`)
-            console.log("📊 Quote result:", JSON.stringify(quote, null, 2))
-            break
-          } catch (altError) {
-            console.log(`❌ ${method.name} failed:`, altError.message)
+      // Tentar cada estratégia
+      for (const strategy of strategies) {
+        try {
+          console.log(`🔄 Trying strategy: ${strategy.name}`)
+
+          // Garantir que SwapHelper está carregado
+          if (typeof this.swapHelper.load === "function") {
+            await this.swapHelper.load()
           }
+
+          quote = await strategy.call()
+          console.log(`✅ Strategy "${strategy.name}" WORKED!`)
+          console.log("📊 Quote result:", JSON.stringify(quote, null, 2))
+          break
+        } catch (strategyError) {
+          console.log(`❌ Strategy "${strategy.name}" failed: ${strategyError.message}`)
+          console.log(`❌ Error details: ${strategyError.stack}`)
         }
       }
 
       if (!quote) {
-        // Listar todos os métodos disponíveis para debug
+        // Debug final - mostrar tudo que temos
+        console.log("❌ ALL STRATEGIES FAILED - Final debug:")
+        console.log(`├─ SwapHelper exists: ${!!this.swapHelper}`)
+        console.log(`├─ Quoter exists: ${!!this.quoter}`)
+        console.log(`├─ Client exists: ${!!this.client}`)
+        console.log(`├─ Config exists: ${!!this.config}`)
+
         if (this.swapHelper) {
           const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
-          console.log(`🔍 Available SwapHelper methods: ${swapMethods.join(", ")}`)
+          console.log(`├─ SwapHelper methods: ${swapMethods.join(", ")}`)
         }
-        throw new Error("No quote method worked")
+
+        throw new Error("All quote strategies failed")
       }
 
       console.log("📊 Raw quote from SDK:", quote)
