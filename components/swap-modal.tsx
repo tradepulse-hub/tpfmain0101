@@ -10,6 +10,15 @@ import { holdstationService } from "@/services/holdstation-service"
 import { walletService } from "@/services/wallet-service"
 import { balanceSyncService } from "@/services/balance-sync-service"
 
+// Adicionar verificação de segurança:
+console.log("🔍 holdstationService imported:", !!holdstationService)
+console.log("🔍 holdstationService type:", typeof holdstationService)
+if (holdstationService) {
+  console.log("🔍 holdstationService methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(holdstationService)))
+} else {
+  console.error("❌ holdstationService is undefined!")
+}
+
 interface SwapModalProps {
   isOpen: boolean
   onClose: () => void
@@ -75,6 +84,55 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     console.log(`🔄 SWAP DEBUG: ${message}`)
     setDebugLogs((prev) => [...prev.slice(-30), `${new Date().toLocaleTimeString()}: ${message}`])
   }
+
+  // Verificação completa do serviço no início do componente
+  useEffect(() => {
+    if (isOpen) {
+      // Verificar holdstationService imediatamente quando o modal abrir
+      addDebugLog("=== VERIFICAÇÃO DO HOLDSTATION SERVICE ===")
+      addDebugLog(`holdstationService exists: ${!!holdstationService}`)
+      addDebugLog(`holdstationService type: ${typeof holdstationService}`)
+
+      if (holdstationService) {
+        addDebugLog("✅ holdstationService importado com sucesso!")
+
+        // Verificar métodos disponíveis
+        try {
+          const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(holdstationService))
+          addDebugLog(`📋 Métodos disponíveis: ${methods.join(", ")}`)
+
+          // Verificar métodos específicos
+          addDebugLog(`getSwapQuote exists: ${typeof holdstationService.getSwapQuote === "function"}`)
+          addDebugLog(`getSDKStatus exists: ${typeof holdstationService.getSDKStatus === "function"}`)
+          addDebugLog(`debugSDK exists: ${typeof holdstationService.debugSDK === "function"}`)
+
+          // Tentar obter status do SDK
+          if (typeof holdstationService.getSDKStatus === "function") {
+            const status = holdstationService.getSDKStatus()
+            addDebugLog(`📊 SDK Status: ${JSON.stringify(status, null, 2)}`)
+          }
+        } catch (error) {
+          addDebugLog(`❌ Erro ao verificar métodos: ${error.message}`)
+        }
+      } else {
+        addDebugLog("❌ holdstationService é undefined!")
+        addDebugLog("❌ PROBLEMA CRÍTICO: Serviço não foi importado!")
+
+        // Tentar importar dinamicamente para debug
+        addDebugLog("🔄 Tentando importação dinâmica para debug...")
+        import("@/services/holdstation-service")
+          .then((module) => {
+            addDebugLog(`📦 Módulo importado: ${!!module}`)
+            addDebugLog(`📦 holdstationService no módulo: ${!!module.holdstationService}`)
+            addDebugLog(`📦 Exports do módulo: ${Object.keys(module).join(", ")}`)
+          })
+          .catch((importError) => {
+            addDebugLog(`❌ Erro na importação dinâmica: ${importError.message}`)
+          })
+      }
+      addDebugLog("=== FIM DA VERIFICAÇÃO ===")
+    }
+  }, [isOpen])
 
   // Carregar saldos quando o modal abrir
   useEffect(() => {
@@ -269,9 +327,25 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
         addDebugLog(`📋 Parâmetros da cotação: ${JSON.stringify(quoteParams, null, 2)}`)
 
         // Tentar Holdstation - SEM FALLBACK
-        addDebugLog("🔍 Tentando Holdstation SDK...")
-
         try {
+          addDebugLog("🔍 Tentando Holdstation SDK...")
+
+          // VERIFICAÇÃO CRÍTICA ANTES DE USAR
+          addDebugLog("=== VERIFICAÇÃO PRÉ-COTAÇÃO ===")
+          addDebugLog(`holdstationService exists: ${!!holdstationService}`)
+          addDebugLog(`holdstationService type: ${typeof holdstationService}`)
+
+          if (!holdstationService) {
+            throw new Error("❌ CRÍTICO: holdstationService é undefined - import falhou!")
+          }
+
+          if (typeof holdstationService.getSwapQuote !== "function") {
+            addDebugLog(`holdstationService object: ${JSON.stringify(Object.keys(holdstationService))}`)
+            throw new Error("❌ CRÍTICO: getSwapQuote não é uma função!")
+          }
+
+          addDebugLog("✅ Verificações passaram - chamando getSwapQuote...")
+
           const quote = await holdstationService.getSwapQuote(quoteParams)
           addDebugLog("✅ Holdstation SDK funcionou!")
 
