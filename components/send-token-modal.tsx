@@ -32,54 +32,11 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
     "idle",
   )
   const [txHash, setTxHash] = useState<string>("")
-  const [debugLogs, setDebugLogs] = useState<string[]>([])
-  const [showDebugLogs, setShowDebugLogs] = useState(false)
-
-  // Função helper para adicionar logs
-  const addDebugLog = (message: string) => {
-    console.log(message)
-    setDebugLogs((prev) => [...prev.slice(-10), `${new Date().toLocaleTimeString()}: ${message}`])
-  }
-
-  // Função para inspecionar MiniKit
-  const inspectMiniKit = () => {
-    addDebugLog("=== INSPEÇÃO DO MINIKIT ===")
-
-    if (typeof window !== "undefined" && window.MiniKit) {
-      addDebugLog("✅ MiniKit está disponível")
-
-      // Verificar se tem commandsAsync
-      if (window.MiniKit.commandsAsync) {
-        addDebugLog("✅ MiniKit.commandsAsync está disponível")
-
-        // Verificar sendTransaction
-        if (typeof window.MiniKit.commandsAsync.sendTransaction === "function") {
-          addDebugLog("✅ MiniKit.commandsAsync.sendTransaction está disponível")
-        } else {
-          addDebugLog("❌ MiniKit.commandsAsync.sendTransaction não encontrado")
-        }
-      } else {
-        addDebugLog("❌ MiniKit.commandsAsync não está disponível")
-      }
-
-      // Listar todas as propriedades disponíveis
-      const miniKitKeys = Object.keys(window.MiniKit)
-      addDebugLog(`Propriedades do MiniKit: ${miniKitKeys.join(", ")}`)
-
-      // Verificar se é conectado
-      if (typeof window.MiniKit.isConnected === "function") {
-        addDebugLog(`Conectado: ${window.MiniKit.isConnected()}`)
-      }
-    } else {
-      addDebugLog("❌ MiniKit não está disponível")
-    }
-  }
 
   // Carregar tokens disponíveis quando o modal abrir
   useEffect(() => {
     if (isOpen && walletAddress) {
       loadAvailableTokens()
-      inspectMiniKit() // Inspecionar MiniKit quando abrir o modal
       // Reset states when modal opens
       setTransactionStatus("idle")
       setTxHash("")
@@ -123,15 +80,6 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Limpar logs anteriores
-    setDebugLogs([])
-
-    addDebugLog("=== INICIANDO ENVIO DE TOKEN (API NOVA) ===")
-    addDebugLog(`Destinatário: ${recipient}`)
-    addDebugLog(`Quantidade: ${amount}`)
-    addDebugLog(`Token: ${selectedToken?.symbol}`)
-    addDebugLog(`Endereço do token: ${selectedToken?.address}`)
-
     if (!recipient || !amount || !selectedToken) {
       console.error("❌ Missing required fields:", {
         recipient: !!recipient,
@@ -163,9 +111,6 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
       return
     }
 
-    // Re-inspecionar MiniKit antes de usar
-    inspectMiniKit()
-
     if (!window.MiniKit || !window.MiniKit.commandsAsync) {
       console.error("❌ MiniKit.commandsAsync not available")
       toast.error("MiniKit não está disponível ou é uma versão antiga")
@@ -176,17 +121,13 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
     setTransactionStatus("pending")
 
     try {
-      addDebugLog("🚀 Usando a nova API do MiniKit...")
-      addDebugLog(`Token: ${selectedToken.symbol} (${selectedToken.address})`)
-      addDebugLog(`Quantidade: ${amount} (${selectedToken.decimals} decimais)`)
-
       // Converter amount para wei
-      addDebugLog("Convertendo quantidade para wei...")
+      console.log("Convertendo quantidade para wei...")
       const amountInWei = ethers.parseUnits(amount, selectedToken.decimals || 18)
-      addDebugLog(`Quantidade em wei: ${amountInWei.toString()}`)
+      console.log(`Quantidade em wei: ${amountInWei.toString()}`)
 
       // Preparar transação usando a nova API
-      addDebugLog("Preparando transação com a nova API...")
+      console.log("Preparando transação com a nova API...")
 
       const transactionPayload = {
         transaction: [
@@ -199,26 +140,20 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
         ],
       }
 
-      addDebugLog(`Payload da transação: ${JSON.stringify(transactionPayload, null, 2)}`)
-      addDebugLog("Chamando MiniKit.commandsAsync.sendTransaction...")
-
       // Enviar transação usando a nova API
       const result = await window.MiniKit.commandsAsync.sendTransaction(transactionPayload)
 
-      addDebugLog(`Resultado da transação: ${JSON.stringify(result)}`)
-
       if (result.finalPayload?.status === "error") {
-        addDebugLog(`❌ Erro na transação: ${result.finalPayload.error}`)
+        console.log(`❌ Erro na transação: ${result.finalPayload.error}`)
         throw new Error(`Transaction failed: ${result.finalPayload.error}`)
       }
 
       const transactionId = result.finalPayload?.transaction_id
       if (!transactionId) {
-        addDebugLog("❌ Nenhum transaction_id recebido")
+        console.log("❌ Nenhum transaction_id recebido")
         throw new Error("No transaction ID received")
       }
 
-      addDebugLog(`✅ Transação enviada! ID: ${transactionId}`)
       setTransactionStatus("success") // Marcar como sucesso imediatamente
 
       // Definir o hash da transação (usar o transaction_id como fallback)
@@ -233,11 +168,10 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
       })
 
       console.log("🎉 Transaction completed successfully!")
-      addDebugLog("🎉 Transação concluída com sucesso!")
 
       // Tentar verificar a transação em background (opcional)
       try {
-        addDebugLog("🔍 Tentando verificar transação em background...")
+        console.log("🔍 Tentando verificar transação em background...")
         const verificationPayload = { transaction_id: transactionId }
 
         const verificationResult = await fetch("/api/transaction-verify", {
@@ -250,18 +184,18 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
 
         if (verificationResult.ok) {
           const txData = await verificationResult.json()
-          addDebugLog(`✅ Verificação bem-sucedida: ${JSON.stringify(txData)}`)
+          console.log(`✅ Verificação bem-sucedida: ${JSON.stringify(txData)}`)
 
           // Atualizar hash se disponível
           if (txData.hash && txData.hash !== transactionId) {
             setTxHash(txData.hash)
-            addDebugLog(`Hash atualizado: ${txData.hash}`)
+            console.log(`Hash atualizado: ${txData.hash}`)
           }
         } else {
-          addDebugLog(`⚠️ Verificação falhou (não crítico): ${verificationResult.status}`)
+          console.log(`⚠️ Verificação falhou (não crítico): ${verificationResult.status}`)
         }
-      } catch (verificationError) {
-        addDebugLog(`⚠️ Erro na verificação (não crítico): ${verificationError.message}`)
+      } catch (verificationError: any) {
+        console.log(`⚠️ Erro na verificação (não crítico): ${verificationError.message}`)
         // Não falhar a transação por causa da verificação
       }
 
@@ -271,21 +205,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
         onClose()
       }, 3000)
     } catch (error: any) {
-      addDebugLog("=== ERRO NA TRANSAÇÃO ===")
-      addDebugLog(`Tipo do erro: ${typeof error}`)
-      addDebugLog(`Mensagem: ${error.message}`)
-      addDebugLog(`Stack: ${error.stack}`)
-
-      if (error.code) {
-        addDebugLog(`Código: ${error.code}`)
-      }
-
-      if (error.reason) {
-        addDebugLog(`Razão: ${error.reason}`)
-      }
-
       setTransactionStatus("error")
-      setShowDebugLogs(true) // Mostrar logs quando há erro
 
       let errorMessage = t.sendToken?.errorSendingTokens || "Error sending tokens"
 
@@ -302,7 +222,6 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
       console.error("Final error message:", errorMessage)
       toast.error(errorMessage)
     } finally {
-      addDebugLog("=== FIM DO PROCESSO ===")
       setIsLoading(false)
     }
   }
@@ -392,41 +311,6 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
                     )}
                   </div>
                 </div>
-              </motion.div>
-            )}
-
-            {/* Debug Logs */}
-            {debugLogs.length > 0 && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mb-4">
-                <button
-                  type="button"
-                  onClick={() => setShowDebugLogs(!showDebugLogs)}
-                  className="w-full text-left text-xs text-gray-400 hover:text-gray-300 mb-2"
-                >
-                  {showDebugLogs ? "🔽" : "▶️"} Debug Logs ({debugLogs.length})
-                </button>
-
-                {showDebugLogs && (
-                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 max-h-40 overflow-y-auto">
-                    <div className="space-y-1">
-                      {debugLogs.map((log, index) => (
-                        <div key={index} className="text-xs font-mono text-gray-300">
-                          {log}
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(debugLogs.join("\n"))
-                        toast.success("Logs copiados!")
-                      }}
-                      className="mt-2 text-xs text-blue-400 hover:text-blue-300"
-                    >
-                      📋 Copiar logs
-                    </button>
-                  </div>
-                )}
               </motion.div>
             )}
 
