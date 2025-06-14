@@ -1,5 +1,6 @@
 import type { TokenBalance, SwapQuote } from "./types"
 import { ethers } from "ethers"
+import { HoldstationDebugger } from "./holdstation-debug"
 
 // Configuração para Worldchain
 const WORLDCHAIN_CONFIG = {
@@ -406,8 +407,7 @@ class HoldstationService {
       await this.initialize()
       await this.ensureNetworkReady()
 
-      console.log("💱 Getting swap quote (using swapHelper.quote)...")
-      console.log("📊 Quote parameters:", params)
+      console.log("💱 Getting swap quote (FOUNDER DEBUG MODE)...")
 
       if (!this.config?.client) {
         throw new Error("Global config.client not set")
@@ -417,63 +417,168 @@ class HoldstationService {
         throw new Error("SwapHelper not available - this is critical!")
       }
 
-      console.log("📡 Using swapHelper._quote() method (available in SwapHelper)...")
+      // ===== FOUNDER DEBUG: EXACT REQUEST PARAMETERS =====
+      console.log("🚨 === TRUNG HUYNH (FOUNDER) - EXACT REQUEST DEBUG ===")
+      console.log("📡 REAL WORLD EXAMPLE REQUEST:")
+      console.log("├─ User wants to swap: 1 WLD → TPF")
+      console.log("├─ Wallet has balance: 50.009789489971346823 WLD")
+      console.log("├─ User selected amount: 1 WLD")
+      console.log("├─ User selected slippage: 3.0%")
+      console.log("")
 
-      // Preparar parâmetros exatamente como na documentação
+      // Preparar parâmetros EXATOS
       const quoteParams = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
-        amountIn: params.amountIn,
+        amountIn: ethers.parseEther(params.amountIn).toString(), // 1 * 1e18
         slippage: params.slippage || "3",
-        fee: "0.2", // Como mostrado na documentação
+        fee: "0.2",
       }
 
-      console.log("📋 Quote params for HOLDSTATION FOUNDER:", JSON.stringify(quoteParams, null, 2))
+      console.log("📋 Quote params for HOLDSTATION FOUNDER (WITH DECIMALS):")
+      console.log("├─ tokenIn:", quoteParams.tokenIn)
+      console.log("├─ tokenOut:", quoteParams.tokenOut)
+      console.log("├─ amountIn (with decimals):", quoteParams.amountIn)
+      console.log("├─ amountIn calculation: 1 * 1e18 =", quoteParams.amountIn)
+      console.log("├─ slippage:", quoteParams.slippage)
+      console.log("├─ fee:", quoteParams.fee)
+      console.log("📋 Full object:", JSON.stringify(quoteParams, null, 2))
+
+      // Preparar parâmetros EXATOS
+      const exactParams = {
+        tokenIn: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003", // WLD
+        tokenOut: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45", // TPF
+        amountIn: "1", // 1 WLD
+        slippage: "3", // 3%
+        fee: "0.2", // 0.2%
+      }
+
+      console.log("📋 EXACT PARAMETERS BEING SENT TO SDK:")
+      console.log("├─ tokenIn (WLD):", exactParams.tokenIn)
+      console.log("├─ tokenOut (TPF):", exactParams.tokenOut)
+      console.log("├─ amountIn:", exactParams.amountIn, "(type:", typeof exactParams.amountIn, ")")
+      console.log("├─ slippage:", exactParams.slippage, "(type:", typeof exactParams.slippage, ")")
+      console.log("├─ fee:", exactParams.fee, "(type:", typeof exactParams.fee, ")")
+      console.log("")
+
+      console.log("📋 FULL OBJECT AS JSON:")
+      console.log(JSON.stringify(exactParams, null, 2))
+      console.log("")
+
+      console.log("📋 OBJECT DETAILS:")
+      console.log("├─ Object.keys():", Object.keys(exactParams))
+      console.log("├─ Object.values():", Object.values(exactParams))
+      console.log("├─ Object.entries():", Object.entries(exactParams))
+      console.log("├─ typeof params:", typeof exactParams)
+      console.log("├─ params instanceof Object:", exactParams instanceof Object)
+      console.log("├─ Array.isArray(params):", Array.isArray(exactParams))
+      console.log("")
+
+      // Debug do método que vamos chamar
+      console.log("📋 METHOD CALL DEBUG:")
+      console.log("├─ SwapHelper exists:", !!this.swapHelper)
+      console.log("├─ SwapHelper constructor:", this.swapHelper.constructor.name)
+      console.log("├─ _quote method exists:", typeof this.swapHelper._quote === "function")
+      console.log("├─ _quote method type:", typeof this.swapHelper._quote)
+
+      if (typeof this.swapHelper._quote === "function") {
+        console.log("├─ _quote method length:", this.swapHelper._quote.length)
+        console.log("├─ _quote method string:", this.swapHelper._quote.toString().substring(0, 300) + "...")
+      }
+      console.log("")
+
+      console.log("📋 EXACT METHOD CALL BEING MADE:")
+      console.log(`swapHelper._quote(${JSON.stringify(exactParams)})`)
+      console.log("🚨 === END FOUNDER DEBUG ===")
 
       let quote = null
 
       // MÉTODO ESPECÍFICO: swapHelper._quote (que sabemos que existe)
       try {
-        console.log("🔄 Calling swapHelper._quote(params) - EXACT METHOD AVAILABLE...")
-        console.log("📋 FOUNDER DEBUG - Params being sent to _quote:")
-        console.log("├─ Type of params:", typeof quoteParams)
-        console.log("├─ Params keys:", Object.keys(quoteParams))
-        console.log("├─ Full params:", JSON.stringify(quoteParams, null, 2))
+        console.log("🔄 CALLING: swapHelper._quote(exactParams)...")
 
-        quote = await this.swapHelper._quote(quoteParams)
-        console.log("✅ swapHelper._quote() succeeded!")
-        console.log("📊 Quote result for FOUNDER:", JSON.stringify(quote, null, 2))
+        // Log the exact call
+        HoldstationDebugger.logExactRequest(exactParams, "swapHelper._quote")
+        HoldstationDebugger.logMethodCall(this.swapHelper, "_quote", exactParams)
+
+        quote = await this.swapHelper._quote(exactParams)
+        console.log("✅ swapHelper._quote() SUCCESS!")
+        console.log("📊 FOUNDER - Quote result:", JSON.stringify(quote, null, 2))
       } catch (quoteError) {
-        console.log("❌ swapHelper._quote() failed for FOUNDER:")
+        console.log("❌ swapHelper._quote() FAILED for FOUNDER:")
         console.log("├─ Error message:", quoteError.message)
         console.log("├─ Error stack:", quoteError.stack)
         console.log("├─ Error name:", quoteError.name)
         console.log("├─ Error cause:", quoteError.cause || "N/A")
+        console.log("├─ Error constructor:", quoteError.constructor.name)
 
-        // Tentar diferentes formatos de parâmetros
+        // Tentar diferentes formatos de parâmetros para o FOUNDER
+        console.log("")
+        console.log("🔄 FOUNDER DEBUG - TRYING ALTERNATIVE FORMATS:")
+
         const alternativeFormats = [
           {
-            name: "Individual parameters",
-            params: [params.tokenIn, params.tokenOut, params.amountIn, params.slippage || "3"],
+            name: "Individual string parameters",
+            call: () =>
+              this.swapHelper._quote(
+                exactParams.tokenIn,
+                exactParams.tokenOut,
+                exactParams.amountIn,
+                exactParams.slippage,
+              ),
+            params: [exactParams.tokenIn, exactParams.tokenOut, exactParams.amountIn, exactParams.slippage],
           },
           {
-            name: "Minimal object",
+            name: "Minimal object (no fee)",
+            call: () =>
+              this.swapHelper._quote({
+                tokenIn: exactParams.tokenIn,
+                tokenOut: exactParams.tokenOut,
+                amountIn: exactParams.amountIn,
+                slippage: exactParams.slippage,
+              }),
             params: [
               {
-                tokenIn: params.tokenIn,
-                tokenOut: params.tokenOut,
-                amountIn: params.amountIn,
+                tokenIn: exactParams.tokenIn,
+                tokenOut: exactParams.tokenOut,
+                amountIn: exactParams.amountIn,
+                slippage: exactParams.slippage,
               },
             ],
           },
           {
-            name: "With numeric slippage",
+            name: "Numeric slippage",
+            call: () =>
+              this.swapHelper._quote({
+                tokenIn: exactParams.tokenIn,
+                tokenOut: exactParams.tokenOut,
+                amountIn: exactParams.amountIn,
+                slippage: 3,
+              }),
             params: [
               {
-                tokenIn: params.tokenIn,
-                tokenOut: params.tokenOut,
-                amountIn: params.amountIn,
-                slippage: Number.parseFloat(params.slippage || "3"),
+                tokenIn: exactParams.tokenIn,
+                tokenOut: exactParams.tokenOut,
+                amountIn: exactParams.amountIn,
+                slippage: 3,
+              },
+            ],
+          },
+          {
+            name: "BigNumber amountIn",
+            call: () =>
+              this.swapHelper._quote({
+                tokenIn: exactParams.tokenIn,
+                tokenOut: exactParams.tokenOut,
+                amountIn: ethers.parseEther("1").toString(),
+                slippage: exactParams.slippage,
+              }),
+            params: [
+              {
+                tokenIn: exactParams.tokenIn,
+                tokenOut: exactParams.tokenOut,
+                amountIn: ethers.parseEther("1").toString(),
+                slippage: exactParams.slippage,
               },
             ],
           },
@@ -481,14 +586,17 @@ class HoldstationService {
 
         for (const format of alternativeFormats) {
           try {
-            console.log(`🔄 FOUNDER DEBUG - Trying ${format.name}:`)
-            console.log("├─ Params:", JSON.stringify(format.params, null, 2))
-            quote = await this.swapHelper._quote(...format.params)
-            console.log(`✅ ${format.name} worked!`)
+            console.log(`🔄 FOUNDER - Trying: ${format.name}`)
+            console.log(`├─ Params:`, JSON.stringify(format.params, null, 2))
+
+            HoldstationDebugger.logExactRequest(format.params[0] || format.params, `swapHelper._quote (${format.name})`)
+
+            quote = await format.call()
+            console.log(`✅ FOUNDER - ${format.name} WORKED!`)
             console.log("📊 Quote result:", JSON.stringify(quote, null, 2))
             break
           } catch (altError) {
-            console.log(`❌ ${format.name} failed:`, altError.message)
+            console.log(`❌ FOUNDER - ${format.name} failed:`, altError.message)
           }
         }
       }
