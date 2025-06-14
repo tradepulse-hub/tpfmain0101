@@ -1,3 +1,4 @@
+
 import type { TokenBalance, SwapQuote } from "./types"
 import { ethers } from "ethers"
 
@@ -490,9 +491,19 @@ class HoldstationService {
         throw new Error("SwapHelper not available")
       }
 
-      // Converter para wei (18 decimals)
-      const amountInWei = "1000000000000000000" // 1 * 10^18 HARDCODED
-      console.log(`🚨 Amount: ${params.amountIn} → ${amountInWei} wei`)
+      // Converter para wei (18 decimals) - CORREÇÃO CRÍTICA
+      console.log("🚨 CONVERTENDO PARA WEI...")
+      const amountInWei = ethers.parseEther(params.amountIn).toString() // USAR parseEther!
+      console.log(`🚨 Amount conversion CORRECTED: ${params.amountIn} → ${amountInWei} wei`)
+
+      const baseParams = {
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: amountInWei, // AGORA COM DECIMAIS CORRETOS
+        slippage: params.slippage || "3",
+      }
+
+      console.log("🚨 Base parameters with CORRECT decimals:", JSON.stringify(baseParams, null, 2))
 
       // ESTRATÉGIA 1: Usar submitSwapTokensForTokens diretamente (não precisa de módulos)
       console.log("🚨 ESTRATÉGIA 1: submitSwapTokensForTokens (DIRECT)")
