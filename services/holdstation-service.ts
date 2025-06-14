@@ -479,9 +479,9 @@ class HoldstationService {
     slippage?: string
   }): Promise<SwapQuote> {
     try {
-      console.log("🚨 === HOLDSTATION QUOTE V3 - DIRECT APPROACH ===")
+      console.log("🚨 === HOLDSTATION REAL QUOTE V4 - NO SIMULATION ===")
       console.log("🚨 TIMESTAMP:", new Date().toISOString())
-      console.log("🚨 Usando abordagem DIRETA sem módulos")
+      console.log("🚨 ONLY REAL BLOCKCHAIN DATA!")
 
       await this.initialize()
       await this.ensureNetworkReady()
@@ -490,164 +490,181 @@ class HoldstationService {
         throw new Error("SwapHelper not available")
       }
 
-      // Converter para wei (18 decimals)
-      const amountInWei = "1000000000000000000" // 1 * 10^18 HARDCODED
-      console.log(`🚨 Amount: ${params.amountIn} → ${amountInWei} wei`)
+      // Converter para wei (18 decimals) - REAL AMOUNT
+      const amountInWei = ethers.parseEther(params.amountIn).toString()
+      console.log(`🚨 Real amount conversion: ${params.amountIn} → ${amountInWei} wei`)
 
-      // ESTRATÉGIA 1: Usar submitSwapTokensForTokens diretamente (não precisa de módulos)
-      console.log("🚨 ESTRATÉGIA 1: submitSwapTokensForTokens (DIRECT)")
-
-      try {
-        // Criar dados de transação fake para simular
-        const fakeQuoteData = {
-          tokenIn: params.tokenIn,
-          tokenOut: params.tokenOut,
-          amountIn: amountInWei,
-          slippage: params.slippage || "3",
-          tx: {
-            data: "0x", // Dados vazios para simulação
-            to: "0x0000000000000000000000000000000000000000", // Endereço zero para simulação
-          },
-        }
-
-        console.log("🚨 Calling submitSwapTokensForTokens with:", fakeQuoteData)
-
-        // Tentar usar o método direto
-        const result = await this.swapHelper.submitSwapTokensForTokens(fakeQuoteData)
-        console.log("🚨 submitSwapTokensForTokens result:", result)
-
-        // Se chegou aqui, simular uma cotação
-        const simulatedQuote: SwapQuote = {
-          amountOut: "1000", // Simular 1000 TPF por 1 WLD
-          data: "0x",
-          to: "0x0000000000000000000000000000000000000000",
-          value: "0",
-          feeAmountOut: "0",
-          addons: {
-            outAmount: "1000",
-            rateSwap: "1000",
-            amountOutUsd: "0",
-            minReceived: "950", // 95% do valor (5% slippage)
-            feeAmountOut: "0",
-          },
-        }
-
-        console.log("✅ Simulated quote created:", simulatedQuote)
-        return simulatedQuote
-      } catch (directError) {
-        console.log("🚨 submitSwapTokensForTokens failed:", directError.message)
+      const baseParams = {
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: amountInWei,
+        slippage: params.slippage || "3",
       }
 
-      // ESTRATÉGIA 2: Usar contrato Uniswap diretamente
-      console.log("🚨 ESTRATÉGIA 2: Direct Uniswap Contract")
+      console.log("🚨 Real parameters:", JSON.stringify(baseParams, null, 2))
+
+      // ESTRATÉGIA 1: Forçar carregamento de módulos ANTES da cotação
+      console.log("🚨 STEP 1: Loading ALL available modules...")
 
       try {
-        // Endereço CORRETO do Quoter V3 na Worldchain
-        const quoterAddress = "0x10158D43e6cc414deE1Bd1eB0EfC6a5cBCfF244c"
+        // Importar módulos novamente para garantir
+        const [HoldstationModule, EthersModule] = await Promise.all([
+          import("@holdstation/worldchain-sdk"),
+          import("@holdstation/worldchain-ethers-v6"),
+        ])
 
-        const quoterContract = new ethers.Contract(
-          quoterAddress,
-          [
-            {
-              inputs: [
-                { name: "tokenIn", type: "address" },
-                { name: "tokenOut", type: "address" },
-                { name: "fee", type: "uint24" },
-                { name: "amountIn", type: "uint256" },
-                { name: "sqrtPriceLimitX96", type: "uint160" },
-              ],
-              name: "quoteExactInputSingle",
-              outputs: [
-                { name: "amountOut", type: "uint256" },
-                { name: "sqrtPriceX96After", type: "uint160" },
-                { name: "initializedTicksCrossed", type: "uint32" },
-                { name: "gasEstimate", type: "uint256" },
-              ],
-              type: "function",
-            },
-          ],
-          this.provider,
-        )
+        console.log("🔄 Checking available modules...")
+        console.log(`├─ EthersModule.UniswapV3Module: ${!!EthersModule.UniswapV3Module}`)
+        console.log(`├─ EthersModule.UniswapV2Module: ${!!EthersModule.UniswapV2Module}`)
+        console.log(`├─ HoldstationModule.UniswapV3Module: ${!!HoldstationModule.UniswapV3Module}`)
+        console.log(`├─ HoldstationModule.UniswapV2Module: ${!!HoldstationModule.UniswapV2Module}`)
 
-        // Tentar múltiplas taxas (0.05%, 0.3%, 1%)
-        const fees = [500, 3000, 10000] // 0.05%, 0.3%, 1%
-        let bestQuote = null
-        let bestAmountOut = "0"
+        // Tentar carregar TODOS os módulos disponíveis
+        const moduleLoadPromises = []
 
-        for (const fee of fees) {
-          try {
-            console.log(`🚨 Trying fee tier: ${fee / 10000}%`)
-
-            const result = await quoterContract.quoteExactInputSingle({
-              tokenIn: params.tokenIn,
-              tokenOut: params.tokenOut,
-              fee: fee,
-              amountIn: amountInWei,
-              sqrtPriceLimitX96: 0,
-            })
-
-            const amountOut = result[0] // First element is amountOut
-            console.log(`🚨 Fee ${fee / 10000}% result: ${ethers.formatEther(amountOut)} ${params.tokenOut}`)
-
-            if (ethers.toBigInt(amountOut) > ethers.toBigInt(bestAmountOut)) {
-              bestAmountOut = amountOut.toString()
-              bestQuote = result
-              console.log(`🚨 New best quote found with fee ${fee / 10000}%`)
-            }
-          } catch (feeError) {
-            console.log(`🚨 Fee ${fee / 10000}% failed: ${feeError.message}`)
-          }
+        if (EthersModule.UniswapV3Module) {
+          console.log("🔄 Loading EthersModule.UniswapV3Module...")
+          const uniV3Module = new EthersModule.UniswapV3Module(this.client)
+          moduleLoadPromises.push(
+            this.swapHelper
+              .load(uniV3Module)
+              .then(() => {
+                console.log("✅ EthersModule.UniswapV3Module loaded!")
+                return "UniswapV3-Ethers"
+              })
+              .catch((err) => {
+                console.log(`❌ EthersModule.UniswapV3Module failed: ${err.message}`)
+                return null
+              }),
+          )
         }
 
-        if (bestQuote && ethers.toBigInt(bestAmountOut) > 0) {
-          const directQuote: SwapQuote = {
-            amountOut: ethers.formatEther(bestAmountOut),
-            data: "0x",
-            to: quoterAddress,
-            value: "0",
-            feeAmountOut: "0",
-            addons: {
-              outAmount: ethers.formatEther(bestAmountOut),
-              rateSwap: ethers.formatEther(bestAmountOut),
-              amountOutUsd: "0",
-              minReceived: (Number.parseFloat(ethers.formatEther(bestAmountOut)) * 0.97).toString(), // 3% slippage
-              feeAmountOut: "0",
-            },
-          }
+        if (EthersModule.UniswapV2Module) {
+          console.log("🔄 Loading EthersModule.UniswapV2Module...")
+          const uniV2Module = new EthersModule.UniswapV2Module(this.client)
+          moduleLoadPromises.push(
+            this.swapHelper
+              .load(uniV2Module)
+              .then(() => {
+                console.log("✅ EthersModule.UniswapV2Module loaded!")
+                return "UniswapV2-Ethers"
+              })
+              .catch((err) => {
+                console.log(`❌ EthersModule.UniswapV2Module failed: ${err.message}`)
+                return null
+              }),
+          )
+        }
 
-          console.log("✅ Direct Uniswap quote SUCCESS:", directQuote)
-          return directQuote
+        if (HoldstationModule.UniswapV3Module) {
+          console.log("🔄 Loading HoldstationModule.UniswapV3Module...")
+          const uniV3Module = new HoldstationModule.UniswapV3Module(this.client)
+          moduleLoadPromises.push(
+            this.swapHelper
+              .load(uniV3Module)
+              .then(() => {
+                console.log("✅ HoldstationModule.UniswapV3Module loaded!")
+                return "UniswapV3-Holdstation"
+              })
+              .catch((err) => {
+                console.log(`❌ HoldstationModule.UniswapV3Module failed: ${err.message}`)
+                return null
+              }),
+          )
+        }
+
+        if (HoldstationModule.UniswapV2Module) {
+          console.log("🔄 Loading HoldstationModule.UniswapV2Module...")
+          const uniV2Module = new HoldstationModule.UniswapV2Module(this.client)
+          moduleLoadPromises.push(
+            this.swapHelper
+              .load(uniV2Module)
+              .then(() => {
+                console.log("✅ HoldstationModule.UniswapV2Module loaded!")
+                return "UniswapV2-Holdstation"
+              })
+              .catch((err) => {
+                console.log(`❌ HoldstationModule.UniswapV2Module failed: ${err.message}`)
+                return null
+              }),
+          )
+        }
+
+        // Aguardar todos os módulos
+        const loadedModules = await Promise.all(moduleLoadPromises)
+        const successfulModules = loadedModules.filter(Boolean)
+
+        console.log(`📊 Modules loaded: ${successfulModules.join(", ")}`)
+
+        if (successfulModules.length === 0) {
+          console.log("❌ NO MODULES LOADED - This will cause 'No router available'")
+          throw new Error("Failed to load any Uniswap modules")
         } else {
-          throw new Error("No valid quotes found across all fee tiers")
+          console.log(`✅ ${successfulModules.length} modules loaded successfully!`)
         }
-      } catch (uniswapError) {
-        console.log("🚨 Direct Uniswap failed:", uniswapError.message)
+      } catch (moduleError) {
+        console.log(`❌ Module loading failed: ${moduleError.message}`)
+        throw new Error(`Module loading failed: ${moduleError.message}`)
       }
 
-      // ESTRATÉGIA 3: Cotação simulada baseada em preços conhecidos
-      console.log("🚨 ESTRATÉGIA 3: Simulated Quote")
+      // ESTRATÉGIA 2: Agora tentar _quote com módulos carregados
+      console.log("🚨 STEP 2: Calling _quote with loaded modules...")
 
-      // Simular cotação baseada em dados conhecidos
-      const simulatedQuote: SwapQuote = {
-        amountOut: "1500", // Simular 1500 TPF por 1 WLD (taxa aproximada)
-        data: "0x",
-        to: "0x0000000000000000000000000000000000000000",
-        value: "0",
-        feeAmountOut: "0",
+      let quote: any = null
+
+      try {
+        console.log("🔄 Calling swapHelper._quote with real parameters...")
+        quote = await this.swapHelper._quote(baseParams)
+        console.log("✅ swapHelper._quote SUCCESS with real data!")
+        console.log("📊 Raw quote:", JSON.stringify(quote, null, 2))
+      } catch (quoteError) {
+        console.log(`❌ swapHelper._quote failed: ${quoteError.message}`)
+        console.log(`❌ Quote error stack: ${quoteError.stack}`)
+        throw new Error(`Real quote failed: ${quoteError.message}`)
+      }
+
+      if (!quote) {
+        throw new Error("No real quote received")
+      }
+
+      // ESTRATÉGIA 3: Validar que os dados são REAIS (não simulados)
+      console.log("🚨 STEP 3: Validating real data...")
+
+      if (!quote.amountOut || quote.amountOut === "0") {
+        throw new Error("Invalid real quote - amountOut is zero")
+      }
+
+      if (quote.to === "0x0000000000000000000000000000000000000000") {
+        throw new Error("Invalid real quote - router address is zero")
+      }
+
+      if (!quote.data || quote.data === "0x") {
+        throw new Error("Invalid real quote - no transaction data")
+      }
+
+      // Normalizar formato da cotação REAL
+      const realQuote: SwapQuote = {
+        amountOut: quote.amountOut || "0",
+        data: quote.data || "0x",
+        to: quote.to || "",
+        value: quote.value || "0",
+        feeAmountOut: quote.feeAmountOut || "0",
         addons: {
-          outAmount: "1500",
-          rateSwap: "1500",
-          amountOutUsd: "0",
-          minReceived: "1455", // 97% do valor (3% slippage)
-          feeAmountOut: "0",
+          outAmount: quote.amountOut || "0",
+          rateSwap: quote.rate || quote.exchangeRate || "1",
+          amountOutUsd: quote.amountOutUsd || "0",
+          minReceived: quote.minReceived || quote.minimumAmountOut || "0",
+          feeAmountOut: quote.feeAmountOut || "0",
         },
       }
 
-      console.log("✅ Fallback simulated quote:", simulatedQuote)
-      return simulatedQuote
+      console.log("✅ REAL quote validated and formatted:", realQuote)
+      console.log(`📊 Real rate: 1 ${params.tokenIn} = ${ethers.formatEther(realQuote.amountOut)} tokens`)
+
+      return realQuote
     } catch (error) {
-      console.error("❌ Error getting swap quote:", error)
-      throw new Error(`Quote fetch failed: ${error.message}`)
+      console.error("❌ REAL quote completely failed:", error)
+      throw new Error(`Real quote failed: ${error.message}`)
     }
   }
 
