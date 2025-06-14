@@ -1,4 +1,3 @@
-
 import type { TokenBalance, SwapQuote } from "./types"
 import { ethers } from "ethers"
 
@@ -472,7 +471,7 @@ class HoldstationService {
     }
   }
 
-  // Obter cotação de swap - NOVA ABORDAGEM SEM MÓDULOS
+  // Obter cotação de swap - APENAS ESTRATÉGIAS REAIS
   async getSwapQuote(params: {
     tokenIn: string
     tokenOut: string
@@ -480,9 +479,9 @@ class HoldstationService {
     slippage?: string
   }): Promise<SwapQuote> {
     try {
-      console.log("🚨 === HOLDSTATION QUOTE V3 - DIRECT APPROACH ===")
+      console.log("🚨 === HOLDSTATION QUOTE V4 - REAL ONLY ===")
       console.log("🚨 TIMESTAMP:", new Date().toISOString())
-      console.log("🚨 Usando abordagem DIRETA sem módulos")
+      console.log("🚨 SEM SIMULAÇÕES - APENAS COTAÇÕES REAIS")
 
       await this.initialize()
       await this.ensureNetworkReady()
@@ -493,139 +492,151 @@ class HoldstationService {
 
       // Converter para wei (18 decimals) - CORREÇÃO CRÍTICA
       console.log("🚨 CONVERTENDO PARA WEI...")
-      const amountInWei = ethers.parseEther(params.amountIn).toString() // USAR parseEther!
-      console.log(`🚨 Amount conversion CORRECTED: ${params.amountIn} → ${amountInWei} wei`)
+      const amountInWei = ethers.parseEther(params.amountIn).toString()
+      console.log(`🚨 Amount conversion: ${params.amountIn} → ${amountInWei} wei`)
 
       const baseParams = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
-        amountIn: amountInWei, // AGORA COM DECIMAIS CORRETOS
+        amountIn: amountInWei,
         slippage: params.slippage || "3",
       }
 
-      console.log("🚨 Base parameters with CORRECT decimals:", JSON.stringify(baseParams, null, 2))
+      console.log("🚨 Base parameters:", JSON.stringify(baseParams, null, 2))
 
-      // ESTRATÉGIA 1: Usar submitSwapTokensForTokens diretamente (não precisa de módulos)
-      console.log("🚨 ESTRATÉGIA 1: submitSwapTokensForTokens (DIRECT)")
+      // ESTRATÉGIA 1: SwapHelper._quote (REAL)
+      console.log("🚨 ESTRATÉGIA 1: SwapHelper._quote (REAL)")
 
-      try {
-        // Criar dados de transação fake para simular
-        const fakeQuoteData = {
-          tokenIn: params.tokenIn,
-          tokenOut: params.tokenOut,
-          amountIn: amountInWei,
-          slippage: params.slippage || "3",
-          tx: {
-            data: "0x", // Dados vazios para simulação
-            to: "0x0000000000000000000000000000000000000000", // Endereço zero para simulação
-          },
+      if (this.swapHelper && typeof this.swapHelper._quote === "function") {
+        try {
+          console.log("🚨 Calling swapHelper._quote with WEI params...")
+          const quote = await this.swapHelper._quote(baseParams)
+          console.log("🚨 swapHelper._quote SUCCESS:", quote)
+
+          if (quote && quote.amountOut && Number.parseFloat(quote.amountOut) > 0) {
+            // Normalizar formato da cotação REAL
+            const realQuote: SwapQuote = {
+              amountOut: quote.amountOut || quote.outputAmount || quote.toAmount,
+              data: quote.data || quote.calldata || "0x",
+              to: quote.to || quote.target || quote.router || "",
+              value: quote.value || quote.ethValue || "0",
+              feeAmountOut: quote.feeAmountOut || quote.fee || "0",
+              addons: {
+                outAmount: quote.amountOut || quote.outputAmount || "0",
+                rateSwap: quote.rate || quote.exchangeRate || "1",
+                amountOutUsd: quote.amountOutUsd || "0",
+                minReceived: quote.minReceived || quote.minimumAmountOut || "0",
+                feeAmountOut: quote.feeAmountOut || quote.fee || "0",
+              },
+            }
+
+            console.log("✅ REAL quote from SwapHelper:", realQuote)
+            return realQuote
+          }
+        } catch (swapHelperError) {
+          console.log("🚨 swapHelper._quote FAILED:", swapHelperError.message)
+          console.log("🚨 Error details:", swapHelperError.stack)
         }
-
-        console.log("🚨 Calling submitSwapTokensForTokens with:", fakeQuoteData)
-
-        // Tentar usar o método direto
-        const result = await this.swapHelper.submitSwapTokensForTokens(fakeQuoteData)
-        console.log("🚨 submitSwapTokensForTokens result:", result)
-
-        // Se chegou aqui, simular uma cotação
-        const simulatedQuote: SwapQuote = {
-          amountOut: "1000", // Simular 1000 TPF por 1 WLD
-          data: "0x",
-          to: "0x0000000000000000000000000000000000000000",
-          value: "0",
-          feeAmountOut: "0",
-          addons: {
-            outAmount: "1000",
-            rateSwap: "1000",
-            amountOutUsd: "0",
-            minReceived: "950", // 95% do valor (5% slippage)
-            feeAmountOut: "0",
-          },
-        }
-
-        console.log("✅ Simulated quote created:", simulatedQuote)
-        return simulatedQuote
-      } catch (directError) {
-        console.log("🚨 submitSwapTokensForTokens failed:", directError.message)
+      } else {
+        console.log("🚨 swapHelper._quote not available")
       }
 
-      // ESTRATÉGIA 2: Usar contrato Uniswap diretamente
-      console.log("🚨 ESTRATÉGIA 2: Direct Uniswap Contract")
+      // ESTRATÉGIA 2: Contrato Uniswap direto (REAL)
+      console.log("🚨 ESTRATÉGIA 2: Direct Uniswap Contract (REAL)")
 
       try {
-        // Endereço do Quoter V3 na Worldchain (se existir)
-        const quoterAddress = "0x61fFE014bA17989E743c5F6cB21bF9697530B21e"
+        // Endereços conhecidos do Uniswap V3 na Worldchain
+        const quoterAddresses = [
+          "0x61fFE014bA17989E743c5F6cB21bF9697530B21e", // Quoter V2
+          "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6", // Quoter V1
+        ]
 
-        const quoterContract = new ethers.Contract(
-          quoterAddress,
-          [
-            {
-              inputs: [
-                { name: "tokenIn", type: "address" },
-                { name: "tokenOut", type: "address" },
-                { name: "fee", type: "uint24" },
-                { name: "amountIn", type: "uint256" },
-                { name: "sqrtPriceLimitX96", type: "uint160" },
+        for (const quoterAddress of quoterAddresses) {
+          try {
+            console.log(`🚨 Trying Uniswap quoter: ${quoterAddress}`)
+
+            const quoterContract = new ethers.Contract(
+              quoterAddress,
+              [
+                {
+                  inputs: [
+                    { name: "tokenIn", type: "address" },
+                    { name: "tokenOut", type: "address" },
+                    { name: "fee", type: "uint24" },
+                    { name: "amountIn", type: "uint256" },
+                    { name: "sqrtPriceLimitX96", type: "uint160" },
+                  ],
+                  name: "quoteExactInputSingle",
+                  outputs: [{ name: "amountOut", type: "uint256" }],
+                  type: "function",
+                },
               ],
-              name: "quoteExactInputSingle",
-              outputs: [{ name: "amountOut", type: "uint256" }],
-              type: "function",
-            },
-          ],
-          this.provider,
-        )
+              this.provider,
+            )
 
-        const fee = 3000 // 0.3%
-        const amountOut = await quoterContract.quoteExactInputSingle(
-          params.tokenIn,
-          params.tokenOut,
-          fee,
-          amountInWei,
-          0,
-        )
+            const fees = [3000, 500, 10000] // 0.3%, 0.05%, 1%
 
-        const directQuote: SwapQuote = {
-          amountOut: ethers.formatEther(amountOut),
-          data: "0x",
-          to: quoterAddress,
-          value: "0",
-          feeAmountOut: "0",
-          addons: {
-            outAmount: ethers.formatEther(amountOut),
-            rateSwap: ethers.formatEther(amountOut),
-            amountOutUsd: "0",
-            minReceived: (Number.parseFloat(ethers.formatEther(amountOut)) * 0.97).toString(), // 3% slippage
-            feeAmountOut: "0",
-          },
+            for (const fee of fees) {
+              try {
+                console.log(`🚨 Trying fee tier: ${fee}`)
+
+                const amountOut = await quoterContract.quoteExactInputSingle(
+                  params.tokenIn,
+                  params.tokenOut,
+                  fee,
+                  amountInWei,
+                  0,
+                )
+
+                if (amountOut && amountOut > 0) {
+                  const directQuote: SwapQuote = {
+                    amountOut: ethers.formatEther(amountOut),
+                    data: "0x", // Will be filled by router
+                    to: quoterAddress,
+                    value: "0",
+                    feeAmountOut: "0",
+                    addons: {
+                      outAmount: ethers.formatEther(amountOut),
+                      rateSwap: ethers.formatEther(amountOut),
+                      amountOutUsd: "0",
+                      minReceived: (Number.parseFloat(ethers.formatEther(amountOut)) * 0.97).toString(),
+                      feeAmountOut: "0",
+                    },
+                  }
+
+                  console.log("✅ REAL Uniswap quote:", directQuote)
+                  return directQuote
+                }
+              } catch (feeError) {
+                console.log(`🚨 Fee ${fee} failed:`, feeError.message)
+              }
+            }
+          } catch (quoterError) {
+            console.log(`🚨 Quoter ${quoterAddress} failed:`, quoterError.message)
+          }
         }
-
-        console.log("✅ Direct Uniswap quote:", directQuote)
-        return directQuote
       } catch (uniswapError) {
-        console.log("🚨 Direct Uniswap failed:", uniswapError.message)
+        console.log("🚨 All Uniswap strategies failed:", uniswapError.message)
       }
 
-      // ESTRATÉGIA 3: Cotação simulada baseada em preços conhecidos
-      console.log("🚨 ESTRATÉGIA 3: Simulated Quote")
+      // Se chegou aqui, TODAS as estratégias reais falharam
+      console.log("❌ ALL REAL STRATEGIES FAILED")
+      console.log("❌ SwapHelper._quote: Failed or not available")
+      console.log("❌ Direct Uniswap: Failed or not available")
 
-      // Simular cotação baseada em dados conhecidos
-      const simulatedQuote: SwapQuote = {
-        amountOut: "1500", // Simular 1500 TPF por 1 WLD (taxa aproximada)
-        data: "0x",
-        to: "0x0000000000000000000000000000000000000000",
-        value: "0",
-        feeAmountOut: "0",
-        addons: {
-          outAmount: "1500",
-          rateSwap: "1500",
-          amountOutUsd: "0",
-          minReceived: "1455", // 97% do valor (3% slippage)
-          feeAmountOut: "0",
-        },
+      // Debug final - mostrar o que temos
+      console.log("🔍 Final debug:")
+      console.log(`├─ SwapHelper exists: ${!!this.swapHelper}`)
+      console.log(`├─ SwapHelper._quote exists: ${!!(this.swapHelper && typeof this.swapHelper._quote === "function")}`)
+      console.log(`├─ Provider exists: ${!!this.provider}`)
+      console.log(`├─ Network ready: ${this.networkReady}`)
+
+      if (this.swapHelper) {
+        const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
+        console.log(`├─ SwapHelper methods: ${swapMethods.join(", ")}`)
       }
 
-      console.log("✅ Fallback simulated quote:", simulatedQuote)
-      return simulatedQuote
+      throw new Error("No real quote method worked - all strategies failed")
     } catch (error) {
       console.error("❌ Error getting swap quote:", error)
       throw new Error(`Quote fetch failed: ${error.message}`)
