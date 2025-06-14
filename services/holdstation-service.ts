@@ -479,25 +479,49 @@ class HoldstationService {
     slippage?: string
   }): Promise<SwapQuote> {
     try {
-      await this.initialize()
-      await this.ensureNetworkReady()
-
       console.log("💱 Getting swap quote (FIXED VERSION)...")
+      console.log("🔍 ENTRADA DA FUNÇÃO getSwapQuote:")
+      console.log("├─ params:", JSON.stringify(params, null, 2))
+      console.log("├─ tokenIn:", params.tokenIn)
+      console.log("├─ tokenOut:", params.tokenOut)
+      console.log("├─ amountIn:", params.amountIn, "(type:", typeof params.amountIn, ")")
+      console.log("├─ slippage:", params.slippage)
+
+      await this.initialize()
+      console.log("✅ Initialize completed")
+
+      await this.ensureNetworkReady()
+      console.log("✅ Network ready")
 
       if (!this.config?.client) {
+        console.log("❌ Global config.client not set")
         throw new Error("Global config.client not set")
       }
+      console.log("✅ Config.client exists")
 
       if (!this.swapHelper) {
+        console.log("❌ SwapHelper not available")
         throw new Error("SwapHelper not available - this is critical!")
       }
+      console.log("✅ SwapHelper exists")
 
       // Preparar parâmetros com MÚLTIPLAS ESTRATÉGIAS
       console.log("🔧 Preparing quote parameters with CORRECT DECIMALS...")
+      console.log("🔧 ANTES DA CONVERSÃO:")
+      console.log("├─ params.amountIn:", params.amountIn)
+      console.log("├─ typeof params.amountIn:", typeof params.amountIn)
 
       // Converter para wei (18 decimals)
-      const amountInWei = ethers.parseEther(params.amountIn).toString()
-      console.log(`💰 Amount conversion: ${params.amountIn} → ${amountInWei} wei`)
+      let amountInWei
+      try {
+        amountInWei = ethers.parseEther(params.amountIn).toString()
+        console.log(`💰 Amount conversion SUCCESS: ${params.amountIn} → ${amountInWei} wei`)
+      } catch (conversionError) {
+        console.log(`❌ Amount conversion FAILED: ${conversionError.message}`)
+        console.log("🔄 Trying alternative conversion...")
+        amountInWei = ethers.parseEther("1").toString() // Fallback para 1
+        console.log(`💰 Fallback conversion: 1 → ${amountInWei} wei`)
+      }
 
       const baseParams = {
         tokenIn: params.tokenIn,
@@ -507,118 +531,80 @@ class HoldstationService {
       }
 
       console.log("📋 Base parameters with decimals:", JSON.stringify(baseParams, null, 2))
+      console.log("🔧 PARÂMETROS FINAIS PREPARADOS - INICIANDO ESTRATÉGIAS...")
 
-      // ESTRATÉGIAS ATUALIZADAS COM DECIMAIS CORRETOS
-      let quote = null
+      // Estratégias de cotação
       const strategies = [
         {
-          name: "SwapHelper._quote with WEI amount",
+          name: "swapHelper.quote",
           call: async () => {
-            // Garantir que módulos estão carregados
-            if (typeof this.swapHelper.load === "function") {
-              try {
-                await this.swapHelper.load()
-              } catch (loadError) {
-                console.log(`Load warning: ${loadError.message}`)
-              }
+            if (!this.swapHelper || typeof this.swapHelper.quote !== "function") {
+              throw new Error("swapHelper.quote not available")
             }
-            return this.swapHelper._quote(baseParams) // Agora com wei
+            return this.swapHelper.quote(baseParams.tokenIn, baseParams.tokenOut, baseParams.amountIn)
           },
         },
         {
-          name: "SwapHelper._quote with original string amount",
+          name: "swapHelper._quote",
           call: async () => {
-            return this.swapHelper._quote({
-              tokenIn: params.tokenIn,
-              tokenOut: params.tokenOut,
-              amountIn: params.amountIn, // Valor original "1"
-              slippage: params.slippage || "3",
-            })
-          },
-        },
-        {
-          name: "Direct Uniswap V3 Quote",
-          call: async () => {
-            // Usar contrato Uniswap diretamente
-            const quoterAddress = "0x61fFE014bA17989E743c5F6cB21bF9697530B21e" // Uniswap V3 Quoter
-            const quoterContract = new ethers.Contract(
-              quoterAddress,
-              [
-                {
-                  inputs: [
-                    { name: "tokenIn", type: "address" },
-                    { name: "tokenOut", type: "address" },
-                    { name: "fee", type: "uint24" },
-                    { name: "amountIn", type: "uint256" },
-                    { name: "sqrtPriceLimitX96", type: "uint160" },
-                  ],
-                  name: "quoteExactInputSingle",
-                  outputs: [{ name: "amountOut", type: "uint256" }],
-                  type: "function",
-                },
-              ],
-              this.provider,
-            )
-
-            const fee = 3000 // 0.3%
-
-            const amountOut = await quoterContract.quoteExactInputSingle(
-              params.tokenIn,
-              params.tokenOut,
-              fee,
-              amountInWei, // ← USAR WEI AQUI TAMBÉM
-              0,
-            )
-
-            return {
-              amountOut: ethers.formatEther(amountOut),
-              data: "0x",
-              to: quoterAddress,
-              value: "0",
+            if (!this.swapHelper || typeof this.swapHelper._quote !== "function") {
+              throw new Error("swapHelper._quote not available")
             }
+            return this.swapHelper._quote(baseParams.tokenIn, baseParams.tokenOut, baseParams.amountIn)
           },
         },
         {
-          name: "SwapHelper.submitSwapTokensForTokens (simulation)",
-          call: () =>
-            this.swapHelper.submitSwapTokensForTokens({
-              tokenIn: params.tokenIn,
-              tokenOut: params.tokenOut,
-              amountIn: amountInWei, // ← USAR WEI AQUI TAMBÉM
-              slippage: params.slippage || "3",
-              tx: { data: "0x", to: "0x0000000000000000000000000000000000000000" },
-            }),
+          name: "quoter.getQuote",
+          call: async () => {
+            if (!this.quoter || typeof this.quoter.getQuote !== "function") {
+              throw new Error("quoter.getQuote not available")
+            }
+            return this.quoter.getQuote(baseParams.tokenIn, baseParams.tokenOut, baseParams.amountIn)
+          },
         },
         {
-          name: "SwapHelper._quote with fee and wei",
-          call: () =>
-            this.swapHelper._quote({
-              tokenIn: params.tokenIn,
-              tokenOut: params.tokenOut,
-              amountIn: amountInWei, // ← USAR WEI AQUI TAMBÉM
-              slippage: params.slippage || "3",
-              fee: "0.2",
-            }),
+          name: "quoter.quote",
+          call: async () => {
+            if (!this.quoter || typeof this.quoter.quote !== "function") {
+              throw new Error("quoter.quote not available")
+            }
+            return this.quoter.quote(baseParams.tokenIn, baseParams.tokenOut, baseParams.amountIn)
+          },
         },
       ]
 
+      let quote: any = null
+
       // Tentar cada estratégia
-      for (const strategy of strategies) {
+      for (let i = 0; i < strategies.length; i++) {
+        const strategy = strategies[i]
         try {
-          console.log(`🔄 Trying strategy: ${strategy.name}`)
+          console.log(`🔄 [${i + 1}/${strategies.length}] Trying strategy: ${strategy.name}`)
+          console.log(`🔄 Strategy details: ${strategy.name}`)
 
           // Garantir que SwapHelper está carregado
           if (typeof this.swapHelper.load === "function") {
+            console.log("🔄 Loading SwapHelper...")
             await this.swapHelper.load()
+            console.log("✅ SwapHelper loaded")
           }
 
+          console.log("🔄 Calling strategy function...")
           quote = await strategy.call()
           console.log(`✅ Strategy "${strategy.name}" WORKED!`)
           console.log("📊 Quote result:", JSON.stringify(quote, null, 2))
           break
         } catch (strategyError) {
-          console.log(`❌ Strategy "${strategy.name}" failed: ${strategyError.message}`)
-          console.log(`❌ Error details: ${strategyError.stack}`)
+          console.log(`❌ [${i + 1}/${strategies.length}] Strategy "${strategy.name}" failed:`)
+          console.log(`├─ Error message: ${strategyError.message}`)
+          console.log(`├─ Error name: ${strategyError.name}`)
+          console.log(`├─ Error stack: ${strategyError.stack}`)
+
+          if (i === strategies.length - 1) {
+            console.log("❌ ÚLTIMA ESTRATÉGIA FALHOU - TODAS FALHARAM!")
+          } else {
+            console.log(`🔄 Tentando próxima estratégia [${i + 2}/${strategies.length}]...`)
+          }
         }
       }
 
