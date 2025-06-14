@@ -23,6 +23,7 @@ class HoldstationService {
   private quoter: any = null
   private swapHelper: any = null
   private provider: any = null
+  private config: any = null
   private networkReady = false
   private initialized = false
   private initializationPromise: Promise<void> | null = null
@@ -33,7 +34,7 @@ class HoldstationService {
     }
   }
 
-  private async waitForNetwork(maxRetries = 15, delay = 2000): Promise<void> {
+  private async waitForNetwork(maxRetries = 10, delay = 1500): Promise<void> {
     if (this.networkReady) return
 
     console.log("🔄 Starting network readiness check...")
@@ -43,11 +44,7 @@ class HoldstationService {
         console.log(`🔄 Network check attempt ${i + 1}/${maxRetries}...`)
 
         // Teste múltiplas operações para garantir que a rede está realmente pronta
-        const [network, blockNumber, balance] = await Promise.all([
-          this.provider.getNetwork(),
-          this.provider.getBlockNumber(),
-          this.provider.getBalance("0x0000000000000000000000000000000000000000"),
-        ])
+        const [network, blockNumber] = await Promise.all([this.provider.getNetwork(), this.provider.getBlockNumber()])
 
         console.log("✅ Network fully ready!")
         console.log(`├─ Network: ${network.name} (ChainId: ${network.chainId})`)
@@ -78,7 +75,7 @@ class HoldstationService {
 
   private async _doInitialize() {
     try {
-      console.log("🚀 Initializing Holdstation SDK (Enhanced Network Setup)...")
+      console.log("🚀 Initializing Holdstation SDK (Fixed Client Setup)...")
 
       // Importar os módulos
       const [HoldstationModule, EthersModule] = await Promise.all([
@@ -94,142 +91,103 @@ class HoldstationService {
       const { config, inmemoryTokenStorage, TokenProvider } = HoldstationModule
       const { Client, Multicall3 } = EthersModule
 
-      console.log("🔧 Setting up enhanced provider...")
+      // Guardar referência do config
+      this.config = config
 
-      // 1. Criar o provider com configurações mais robustas
-      this.provider = new ethers.JsonRpcProvider(
-        WORLDCHAIN_CONFIG.rpcUrl,
-        {
-          chainId: WORLDCHAIN_CONFIG.chainId,
-          name: WORLDCHAIN_CONFIG.name,
-        },
-        {
-          // Configurações de polling mais agressivas
-          pollingInterval: 1000,
-          staticNetwork: ethers.Network.from({
-            chainId: WORLDCHAIN_CONFIG.chainId,
-            name: WORLDCHAIN_CONFIG.name,
-          }),
-        },
-      )
+      console.log("🔧 Setting up provider...")
 
-      console.log("✅ Enhanced provider created!")
+      // 1. Criar o provider do ethers v6
+      this.provider = new ethers.JsonRpcProvider(WORLDCHAIN_CONFIG.rpcUrl, {
+        chainId: WORLDCHAIN_CONFIG.chainId,
+        name: WORLDCHAIN_CONFIG.name,
+      })
 
-      // 2. Aguardar a rede estar completamente pronta
+      console.log("✅ Provider created!")
+
+      // 2. Aguardar a rede estar pronta
       await this.waitForNetwork()
 
-      // 3. Configurar o config ANTES de criar o Client
-      console.log("🔧 Pre-configuring SDK...")
-
-      // Limpar configuração anterior se existir
-      if (config.client) {
-        console.log("🧹 Clearing previous config...")
-        config.client = null
-        config.multicall3 = null
-      }
-
-      // 4. Criar o Client da Holdstation
+      // 3. Criar o Client da Holdstation
       console.log("🔧 Creating Holdstation Client...")
       this.client = new Client(this.provider)
       console.log("✅ Client created!")
 
-      // 5. Configurar o config global
-      config.client = this.client
-      console.log("✅ Client set in global config!")
+      // 4. IMPORTANTE: Configurar o config GLOBALMENTE
+      console.log("🔧 Setting global config...")
+      this.config.client = this.client
+      console.log("✅ Global config.client set!")
 
-      // 6. Criar Multicall3
+      // 5. Criar Multicall3
       if (Multicall3) {
         console.log("🔧 Creating Multicall3...")
         this.multicall3 = new Multicall3(this.provider)
-        config.multicall3 = this.multicall3
+        this.config.multicall3 = this.multicall3
         console.log("✅ Multicall3 configured!")
       }
 
-      // 7. Aguardar um pouco para garantir que tudo está estável
-      console.log("⏳ Stabilizing connections...")
+      // 6. Aguardar estabilização
+      console.log("⏳ Stabilizing SDK configuration...")
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      // 8. Criar TokenProvider
+      // 7. Criar TokenProvider (SEM PARÂMETROS)
       console.log("🔧 Creating TokenProvider...")
       this.tokenProvider = new TokenProvider()
       console.log("✅ TokenProvider created!")
 
-      // 9. Tentar criar Quoter com retry
+      // 8. Criar Quoter (PASSANDO O CLIENT)
       console.log("🔧 Creating Quoter...")
-      let quoterCreated = false
-      const quoterAttempts = [
-        () => (HoldstationModule.Quoter ? new HoldstationModule.Quoter(this.client) : null),
-        () => (EthersModule.Quoter ? new EthersModule.Quoter(this.client) : null),
-      ]
-
-      for (const attempt of quoterAttempts) {
-        try {
-          const quoter = attempt()
-          if (quoter) {
-            this.quoter = quoter
-            console.log("✅ Quoter created successfully!")
-            quoterCreated = true
-            break
-          }
-        } catch (error) {
-          console.log("⚠️ Quoter attempt failed:", error.message)
+      try {
+        if (HoldstationModule.Quoter) {
+          this.quoter = new HoldstationModule.Quoter(this.client)
+          console.log("✅ Quoter created from SDK!")
+        } else if (EthersModule.Quoter) {
+          this.quoter = new EthersModule.Quoter(this.client)
+          console.log("✅ Quoter created from Ethers module!")
+        } else {
+          console.log("⚠️ Quoter not found in either module")
         }
+      } catch (error) {
+        console.log("⚠️ Quoter creation failed:", error.message)
       }
 
-      if (!quoterCreated) {
-        console.log("⚠️ No Quoter could be created")
-      }
-
-      // 10. Criar SwapHelper com retry
+      // 9. Criar SwapHelper (PASSANDO CLIENT E TOKEN STORAGE)
       console.log("🔧 Creating SwapHelper...")
-      let swapHelperCreated = false
-      const swapHelperAttempts = [
-        () =>
-          HoldstationModule.SwapHelper
-            ? new HoldstationModule.SwapHelper(this.client, {
-                tokenStorage: inmemoryTokenStorage,
-              })
-            : null,
-        () =>
-          EthersModule.SwapHelper
-            ? new EthersModule.SwapHelper(this.client, {
-                tokenStorage: inmemoryTokenStorage,
-              })
-            : null,
-      ]
-
-      for (const attempt of swapHelperAttempts) {
-        try {
-          const swapHelper = attempt()
-          if (swapHelper) {
-            this.swapHelper = swapHelper
-            console.log("✅ SwapHelper created successfully!")
-            swapHelperCreated = true
-            break
-          }
-        } catch (error) {
-          console.log("⚠️ SwapHelper attempt failed:", error.message)
+      try {
+        if (HoldstationModule.SwapHelper) {
+          this.swapHelper = new HoldstationModule.SwapHelper(this.client, {
+            tokenStorage: inmemoryTokenStorage,
+          })
+          console.log("✅ SwapHelper created from SDK!")
+        } else if (EthersModule.SwapHelper) {
+          this.swapHelper = new EthersModule.SwapHelper(this.client, {
+            tokenStorage: inmemoryTokenStorage,
+          })
+          console.log("✅ SwapHelper created from Ethers module!")
+        } else {
+          console.log("⚠️ SwapHelper not found in either module")
         }
+      } catch (error) {
+        console.log("⚠️ SwapHelper creation failed:", error.message)
       }
 
-      if (!swapHelperCreated) {
-        console.log("⚠️ No SwapHelper could be created")
-      }
-
-      // Verificar se temos pelo menos o essencial
+      // 10. Verificar se temos pelo menos o essencial
       if (!this.client) {
         throw new Error("Failed to create Client")
+      }
+
+      if (!this.config.client) {
+        throw new Error("Failed to set global config.client")
       }
 
       if (!this.tokenProvider) {
         throw new Error("Failed to create TokenProvider")
       }
 
-      // Testar se o SDK está funcionando
+      // 11. Testar se o SDK está funcionando
       await this.testSDKFunctionality()
 
       this.initialized = true
-      console.log("✅ Holdstation SDK fully initialized and tested!")
+      console.log("✅ Holdstation SDK fully initialized!")
       console.log("📊 Final SDK Status:", this.getSDKStatus())
     } catch (error) {
       console.error("❌ Failed to initialize Holdstation SDK:", error)
@@ -240,6 +198,7 @@ class HoldstationService {
       this.quoter = null
       this.swapHelper = null
       this.provider = null
+      this.config = null
       this.networkReady = false
       throw error
     }
@@ -248,7 +207,7 @@ class HoldstationService {
   private async testSDKFunctionality() {
     console.log("🧪 Testing SDK functionality...")
 
-    // Testar Provider com operações reais
+    // Testar Provider
     if (this.provider) {
       try {
         console.log("🔄 Testing provider operations...")
@@ -259,6 +218,30 @@ class HoldstationService {
       } catch (error) {
         console.log("⚠️ Provider test failed:", error.message)
       }
+    }
+
+    // Testar Client
+    if (this.client) {
+      try {
+        console.log("🔄 Testing client operations...")
+        const clientName = this.client.name()
+        const chainId = this.client.getChainId()
+        const blockNumber = await this.client.getBlockNumber()
+        console.log("✅ Client fully operational!")
+        console.log(`├─ Client Name: ${clientName}`)
+        console.log(`├─ Chain ID: ${chainId}`)
+        console.log(`└─ Block Number: ${blockNumber}`)
+      } catch (error) {
+        console.log("⚠️ Client test failed:", error.message)
+      }
+    }
+
+    // Testar Config Global
+    if (this.config) {
+      console.log("🔄 Testing global config...")
+      console.log(`├─ config.client exists: ${!!this.config.client}`)
+      console.log(`├─ config.multicall3 exists: ${!!this.config.multicall3}`)
+      console.log("✅ Global config verified!")
     }
 
     // Listar métodos disponíveis
@@ -298,6 +281,10 @@ class HoldstationService {
 
       if (!this.tokenProvider) {
         throw new Error("TokenProvider not available")
+      }
+
+      if (!this.config?.client) {
+        throw new Error("Global config.client not set")
       }
 
       console.log("📡 Calling getTokenBalances...")
@@ -373,24 +360,18 @@ class HoldstationService {
       await this.initialize()
       await this.ensureNetworkReady()
 
-      console.log("💱 Getting swap quote with enhanced network...")
+      console.log("💱 Getting swap quote...")
       console.log("📊 Quote parameters:", params)
+
+      if (!this.config?.client) {
+        throw new Error("Global config.client not set")
+      }
 
       if (!this.quoter && !this.swapHelper) {
         throw new Error("No quote provider available")
       }
 
-      console.log("📡 Calling getSwapQuote with network verification...")
-
-      // Verificar se a rede ainda está funcionando
-      try {
-        await this.provider.getBlockNumber()
-        console.log("✅ Network verified before quote")
-      } catch (error) {
-        console.log("⚠️ Network issue detected, re-initializing...")
-        this.networkReady = false
-        await this.ensureNetworkReady()
-      }
+      console.log("📡 Calling getSwapQuote...")
 
       let quote = null
       const methods = [
@@ -464,9 +445,13 @@ class HoldstationService {
       await this.initialize()
       await this.ensureNetworkReady()
 
-      console.log("🚀 Executing swap with enhanced network...")
+      console.log("🚀 Executing swap...")
       console.log("📊 Swap parameters:", params)
       console.log("⚠️ This will execute a REAL transaction!")
+
+      if (!this.config?.client) {
+        throw new Error("Global config.client not set")
+      }
 
       if (!this.swapHelper) {
         throw new Error("SwapHelper not available")
@@ -474,16 +459,6 @@ class HoldstationService {
 
       if (!this.client) {
         throw new Error("Client not available")
-      }
-
-      // Verificar se a rede ainda está funcionando
-      try {
-        await this.provider.getBlockNumber()
-        console.log("✅ Network verified before swap")
-      } catch (error) {
-        console.log("⚠️ Network issue detected, re-initializing...")
-        this.networkReady = false
-        await this.ensureNetworkReady()
       }
 
       console.log("📡 Calling executeSwap...")
@@ -605,6 +580,7 @@ class HoldstationService {
       hasQuoter: !!this.quoter,
       hasSwapHelper: !!this.swapHelper,
       hasMulticall3: !!this.multicall3,
+      hasGlobalConfig: !!this.config?.client,
       sdkType: "NPM @holdstation/worldchain-sdk + ethers-v6",
       chainId: WORLDCHAIN_CONFIG.chainId,
       rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
