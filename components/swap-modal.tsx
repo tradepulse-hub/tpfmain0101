@@ -441,12 +441,16 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
           },
         })
 
-        // Limpar campos e fechar modal
+        // Limpar campos
         addDebugLog("🧹 Limpando campos...")
         setAmountIn("")
         setAmountOut("")
         setQuoteData(null)
-        onClose()
+
+        // AGORA SIM fechar o modal após sucesso
+        setTimeout(() => {
+          onClose()
+        }, 1000) // Dar 1 segundo para o usuário ver o toast de sucesso
 
         // Atualizar saldos após o swap
         addDebugLog("🔄 Agendando atualização de saldos em 3s...")
@@ -791,15 +795,21 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
                 disabled={
                   isLoading || !amountIn || !amountOut || isLoadingBalances || isQuoting || tokenIn === tokenOut
                 }
-                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
                     <Loader2 size={16} className="animate-spin mr-2" />
-                    Executando Swap...
+                    Processando Swap...
                   </div>
+                ) : !amountIn || Number.parseFloat(amountIn) <= 0 ? (
+                  "Digite o valor"
+                ) : !amountOut || Number.parseFloat(amountOut) <= 0 ? (
+                  "Aguardando cotação..."
+                ) : tokenIn === tokenOut ? (
+                  "Selecione tokens diferentes"
                 ) : (
-                  `⚡ Swap ${tokenIn} → ${tokenOut}`
+                  `⚡ Swap ${amountIn} ${tokenIn} → ${Number.parseFloat(amountOut).toFixed(2)} ${tokenOut}`
                 )}
               </button>
             </form>
