@@ -12,6 +12,7 @@ console.log("🚀 HOLDSTATION SERVICE - APENAS HISTÓRICO")
 
 class HoldstationService {
   private client: any = null
+  private multicall3: any = null
   private manager: any = null
   private provider: any = null
   private config: any = null
@@ -127,9 +128,9 @@ class HoldstationService {
 
       // Extrair componentes conforme documentação
       const { config } = HoldstationModule
-      const { Client } = EthersModule
+      const { Client, Multicall3 } = EthersModule
 
-      console.log("✅ Componentes extraídos")
+      console.log("✅ Componentes extraídos (incluindo Multicall3)")
 
       // Criar provider com configurações mais robustas
       this.provider = new ethers.JsonRpcProvider(WORLDCHAIN_CONFIG.rpcUrl, {
@@ -149,10 +150,17 @@ class HoldstationService {
       this.client = new Client(this.provider)
       console.log("✅ Client criado conforme docs")
 
+      // Criar Multicall3 conforme documentação
+      console.log("🔧 Criando Multicall3 conforme docs...")
+      this.multicall3 = new Multicall3(this.provider)
+      console.log("✅ Multicall3 criado conforme docs")
+
       // Configurar config global conforme documentação
+      console.log("🔧 Configurando config global com client E multicall3...")
       this.config = config
       this.config.client = this.client
-      console.log("✅ Config global definido")
+      this.config.multicall3 = this.multicall3
+      console.log("✅ Config global definido com client E multicall3")
 
       // Aguardar um pouco mais para estabilizar
       console.log("⏳ Aguardando estabilização do SDK...")
@@ -179,13 +187,35 @@ class HoldstationService {
 
       // Criar manager/history conforme documentação
       if (ManagerClass) {
-        console.log("🔧 Criando Manager...")
-        this.manager = new ManagerClass(this.client)
-        console.log("✅ Manager criado conforme documentação")
+        console.log("🔧 Criando Manager com client e multicall3...")
+        // Tentar diferentes formas de criar o Manager
+        try {
+          this.manager = new ManagerClass(this.client, this.multicall3)
+          console.log("✅ Manager criado com client e multicall3")
+        } catch (error1) {
+          try {
+            this.manager = new ManagerClass({ client: this.client, multicall3: this.multicall3 })
+            console.log("✅ Manager criado com objeto de configuração")
+          } catch (error2) {
+            this.manager = new ManagerClass(this.client)
+            console.log("✅ Manager criado apenas com client")
+          }
+        }
       } else if (WalletHistoryClass) {
-        console.log("🔧 Criando WalletHistory...")
-        this.manager = new WalletHistoryClass(this.client)
-        console.log("✅ WalletHistory criado conforme documentação")
+        console.log("🔧 Criando WalletHistory com client e multicall3...")
+        // Tentar diferentes formas de criar o WalletHistory
+        try {
+          this.manager = new WalletHistoryClass(this.client, this.multicall3)
+          console.log("✅ WalletHistory criado com client e multicall3")
+        } catch (error1) {
+          try {
+            this.manager = new WalletHistoryClass({ client: this.client, multicall3: this.multicall3 })
+            console.log("✅ WalletHistory criado com objeto de configuração")
+          } catch (error2) {
+            this.manager = new WalletHistoryClass(this.client)
+            console.log("✅ WalletHistory criado apenas com client")
+          }
+        }
       } else {
         // Listar todas as classes disponíveis para debug
         console.log("🔍 Classes disponíveis em HoldstationModule:", Object.keys(HoldstationModule))
@@ -205,8 +235,13 @@ class HoldstationService {
           console.log("🔍 Classes relacionadas a histórico encontradas:", possibleClasses)
           const FirstClass = HoldstationModule[possibleClasses[0]] || EthersModule[possibleClasses[0]]
           if (FirstClass) {
-            this.manager = new FirstClass(this.client)
-            console.log(`✅ Usando ${possibleClasses[0]} como manager`)
+            try {
+              this.manager = new FirstClass(this.client, this.multicall3)
+              console.log(`✅ Usando ${possibleClasses[0]} como manager com multicall3`)
+            } catch (error) {
+              this.manager = new FirstClass(this.client)
+              console.log(`✅ Usando ${possibleClasses[0]} como manager apenas com client`)
+            }
           }
         }
 
@@ -221,8 +256,14 @@ class HoldstationService {
         console.log("📋 Métodos do manager:", managerMethods)
       }
 
+      // Verificar se config global está correto
+      console.log("🧪 Verificando config global:")
+      console.log(`├─ config.client: ${!!this.config?.client}`)
+      console.log(`├─ config.multicall3: ${!!this.config?.multicall3}`)
+      console.log(`└─ manager: ${!!this.manager}`)
+
       this.initialized = true
-      console.log("✅ SDK inicializado APENAS para histórico!")
+      console.log("✅ SDK inicializado APENAS para histórico com Multicall3!")
     } catch (error) {
       console.error("❌ Erro ao inicializar SDK:", error.message)
       console.error("Stack:", error.stack)
@@ -257,6 +298,10 @@ class HoldstationService {
     return this.provider
   }
 
+  getMulticall3() {
+    return this.multicall3
+  }
+
   // Métodos não usados para histórico
   async getTokenBalances(): Promise<TokenBalance[]> {
     throw new Error("getTokenBalances não implementado - apenas histórico")
@@ -288,7 +333,9 @@ class HoldstationService {
       networkReady: this.networkReady,
       hasProvider: !!this.provider,
       hasClient: !!this.client,
+      hasMulticall3: !!this.multicall3,
       hasManager: !!this.manager,
+      hasGlobalConfig: !!this.config?.client && !!this.config?.multicall3,
       sdkType: "APENAS HISTÓRICO - Conforme documentação HoldStation",
       chainId: WORLDCHAIN_CONFIG.chainId,
       rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
