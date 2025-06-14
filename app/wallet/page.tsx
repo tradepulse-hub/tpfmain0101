@@ -10,6 +10,7 @@ import {
   ArrowDownLeft,
   AlertCircle,
   RefreshCw,
+  ArrowUpDown,
   ChevronRight,
   Copy,
   TrendingUp,
@@ -24,6 +25,7 @@ import { balanceSyncService } from "@/services/balance-sync-service"
 import { SetBalanceModal } from "@/components/set-balance-modal"
 import { SendTokenModal } from "@/components/send-token-modal"
 import { ReceiveTokenModal } from "@/components/receive-token-modal"
+import { SwapModal } from "@/components/swap-modal"
 import { TransactionHistoryModal } from "@/components/transaction-history-modal"
 import { toast } from "sonner"
 import { useTranslation } from "@/lib/i18n"
@@ -41,6 +43,7 @@ export default function WalletPage() {
   const [isSetBalanceModalOpen, setIsSetBalanceModalOpen] = useState(false)
   const [isSendModalOpen, setIsSendModalOpen] = useState(false)
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false)
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
 
   const router = useRouter()
@@ -166,7 +169,7 @@ export default function WalletPage() {
     }))
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-4 relative overflow-hidden pb-20 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <main className="flex min-h-screen flex-col items-center p-4 relative overflow-hidden pb-24 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Background Effect */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-900/10 via-purple-900/5 to-gray-900/10" />
 
@@ -189,6 +192,8 @@ export default function WalletPage() {
         onClose={() => setIsReceiveModalOpen(false)}
         walletAddress={walletAddress}
       />
+
+      <SwapModal isOpen={isSwapModalOpen} onClose={() => setIsSwapModalOpen(false)} walletAddress={walletAddress} />
 
       <TransactionHistoryModal
         isOpen={isHistoryModalOpen}
@@ -306,7 +311,7 @@ export default function WalletPage() {
 
               <CardContent className="relative z-10 pt-6 pb-4">
                 {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <Button
                     variant="secondary"
                     className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
@@ -327,6 +332,17 @@ export default function WalletPage() {
                       <ArrowDownLeft className="w-4 h-4 text-gray-400" />
                     </div>
                     <span className="text-xs font-medium">{t.wallet?.receive || "Receive"}</span>
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
+                    onClick={() => setIsSwapModalOpen(true)}
+                  >
+                    <div className="rounded-full bg-gray-700 p-2 mb-1">
+                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <span className="text-xs font-medium">{t.wallet?.swap || "Swap"}</span>
                   </Button>
                 </div>
               </CardContent>
@@ -473,6 +489,22 @@ export default function WalletPage() {
             </motion.div>
           )}
         </motion.div>
+      </div>
+      {/* Navigation Bar - Fixed Bottom */}
+      <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 z-50">
+        <div className="flex justify-around items-center py-3 px-4 max-w-md mx-auto">
+          <button onClick={() => router.push("/wallet")} className="flex flex-col items-center space-y-1 text-blue-400">
+            <Wallet className="w-5 h-5" />
+            <span className="text-xs">Wallet</span>
+          </button>
+          <button
+            onClick={() => router.push("/profile")}
+            className="flex flex-col items-center space-y-1 text-gray-400 hover:text-white"
+          >
+            <div className="w-5 h-5 rounded-full bg-gray-600"></div>
+            <span className="text-xs">Profile</span>
+          </button>
+        </div>
       </div>
     </main>
   )
