@@ -1,6 +1,5 @@
 import { WORLDCHAIN_CONFIG, TOKENS_INFO } from "./constants"
 import { balanceSyncService } from "./balance-sync-service"
-import { holdstationService } from "./holdstation-service"
 import type { TokenBalance, Transaction } from "./types"
 import { ethers } from "ethers"
 
@@ -222,22 +221,10 @@ class WalletService {
 
   async getTransactionHistory(walletAddress: string, limit = 20): Promise<Transaction[]> {
     try {
-      console.log(`📜 Getting REAL transaction history for: ${walletAddress}`)
-      console.log("🚫 NO MOCK TRANSACTIONS - Only real blockchain data")
+      console.log(`📜 Getting transaction history for: ${walletAddress}`)
 
-      // Tentar usar Holdstation para histórico real
-      try {
-        const holdstationTransactions = await holdstationService.getTransactionHistory?.(walletAddress, 0, limit)
-        if (holdstationTransactions && holdstationTransactions.length > 0) {
-          console.log(`✅ Got ${holdstationTransactions.length} real transactions from Holdstation`)
-          return holdstationTransactions
-        }
-      } catch (holdstationError) {
-        console.log("⚠️ Holdstation history failed:", holdstationError.message)
-      }
-
-      // Se não conseguir dados reais, retornar array vazio
-      console.log("📊 No real transaction history available")
+      // Return empty array - transactions will be handled by the modal
+      console.log("📊 No transaction history service available")
       return []
     } catch (error) {
       console.error("❌ Error getting transaction history:", error)
