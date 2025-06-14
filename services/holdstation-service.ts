@@ -16,8 +16,9 @@ const SUPPORTED_TOKENS = {
 }
 
 class HoldstationService {
-  private holdstation: any = null
   private manager: any = null
+  private swapHelper: any = null
+  private tokenProvider: any = null
   private initialized = false
   private initializationPromise: Promise<void> | null = null
 
@@ -39,128 +40,80 @@ class HoldstationService {
     try {
       console.log("🚀 Initializing Holdstation SDK (Worldchain)...")
 
-      // Importação dinâmica do SDK correto da Holdstation
+      // Importação dinâmica do SDK da Holdstation
       try {
-        console.log("📦 Trying dynamic import from @holdstation/worldchain-sdk...")
+        console.log("📦 Importing @holdstation/worldchain-sdk...")
         const HoldstationModule = await import("@holdstation/worldchain-sdk")
 
         console.log("✅ @holdstation/worldchain-sdk imported successfully!")
         console.log("Available exports:", Object.keys(HoldstationModule))
 
-        // Debug completo da estrutura do módulo
-        console.log("🔍 Debugging module structure...")
-        for (const [key, value] of Object.entries(HoldstationModule)) {
-          console.log(`Export "${key}": ${typeof value}`, value?.name || value)
+        // Extrair as classes principais
+        const { Manager, SwapHelper, TokenProvider, HoldSo, defaultWorldchainConfig } = HoldstationModule
+
+        console.log("🔧 Initializing Holdstation components...")
+
+        // Usar a configuração padrão da Worldchain se disponível
+        const config = defaultWorldchainConfig || {
+          chainId: WORLDCHAIN_CONFIG.chainId,
+          rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
         }
 
-        // Tentar diferentes formas de acessar a classe principal
-        let HoldstationClass = null
-        let className = ""
+        console.log("📋 Using config:", config)
 
-        // Lista expandida de possíveis nomes de classe
-        const possibleClassNames = [
-          "default",
-          "Holdstation",
-          "HoldstationSDK",
-          "WorldchainSDK",
-          "SDK",
-          "Client",
-          "HoldstationClient",
-          "WorldchainClient",
-          "Manager",
-          "HoldstationManager",
-          "WorldchainManager",
-        ]
-
-        for (const name of possibleClassNames) {
-          if (HoldstationModule[name] && typeof HoldstationModule[name] === "function") {
-            HoldstationClass = HoldstationModule[name]
-            className = name
-            console.log(`📋 Found class: ${name}`)
-            break
-          }
-        }
-
-        // Se não encontrou, tentar o primeiro export que seja uma função
-        if (!HoldstationClass) {
-          const functionExports = Object.entries(HoldstationModule).filter(
-            ([key, value]) => typeof value === "function",
-          )
-
-          if (functionExports.length > 0) {
-            ;[className, HoldstationClass] = functionExports[0]
-            console.log(`📋 Using first function export: ${className}`)
-          }
-        }
-
-        if (!HoldstationClass) {
-          throw new Error(
-            `No valid Holdstation class found. Available exports: ${Object.keys(HoldstationModule).join(", ")}`,
-          )
-        }
-
-        // Tentar diferentes configurações de inicialização
-        const configOptions = [
-          {
-            chainId: WORLDCHAIN_CONFIG.chainId,
-            rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
-            network: "worldchain",
-          },
-          {
-            chainId: WORLDCHAIN_CONFIG.chainId,
-            rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
-          },
-          {
-            network: "worldchain",
-            rpc: WORLDCHAIN_CONFIG.rpcUrl,
-          },
-          {
-            rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
-          },
-          // Configuração vazia como último recurso
-          {},
-        ]
-
-        let initError = null
-        for (const config of configOptions) {
+        // Inicializar Manager
+        if (Manager) {
           try {
-            console.log(`🔧 Trying to initialize ${className} with config:`, config)
-            this.holdstation = new HoldstationClass(config)
-            console.log(`✅ ${className} initialized successfully with config:`, config)
-            break
+            this.manager = new Manager(config)
+            console.log("✅ Manager initialized!")
           } catch (error) {
-            console.log(`❌ Failed with config:`, config, error.message)
-            initError = error
+            console.log("⚠️ Manager initialization failed:", error.message)
+            // Tentar sem configuração
+            this.manager = new Manager()
+            console.log("✅ Manager initialized without config!")
           }
         }
 
-        if (!this.holdstation) {
-          throw new Error(`Failed to initialize ${className}. Last error: ${initError?.message}`)
-        }
-
-        // Tentar obter o manager se disponível
-        const managerMethods = ["getManager", "manager", "createManager", "getClient", "client"]
-
-        for (const method of managerMethods) {
+        // Inicializar SwapHelper
+        if (SwapHelper) {
           try {
-            if (typeof this.holdstation[method] === "function") {
-              this.manager = await this.holdstation[method]()
-              console.log(`✅ Manager obtained via ${method}()`)
-              break
-            } else if (this.holdstation[method]) {
-              this.manager = this.holdstation[method]
-              console.log(`✅ Manager found as property: ${method}`)
-              break
-            }
+            this.swapHelper = new SwapHelper(config)
+            console.log("✅ SwapHelper initialized!")
           } catch (error) {
-            console.log(`⚠️ Failed to get manager via ${method}:`, error.message)
+            console.log("⚠️ SwapHelper initialization failed:", error.message)
+            // Tentar sem configuração
+            this.swapHelper = new SwapHelper()
+            console.log("✅ SwapHelper initialized without config!")
           }
         }
 
-        // Se não conseguiu manager, usar o próprio SDK
-        if (!this.manager) {
-          this.manager = this.holdstation
-          console.log("📋 Using SDK instance as manager")
+        // Inicializar TokenProvider
+        if (TokenProvider) {
+          try {
+            this.tokenProvider = new TokenProvider(config)
+            console.log("✅ TokenProvider initialized!")
+          } catch (error) {
+            console.log("⚠️ TokenProvider initialization failed:", error.message)
+            // Tentar sem configuração
+            this.tokenProvider = new TokenProvider()
+            console.log("✅ TokenProvider initialized without config!")
+          }
+        }
+
+        // Se não conseguiu nenhum, tentar HoldSo como fallback
+        if (!this.manager && !this.swapHelper && HoldSo) {
+          try {
+            const holdSo = new HoldSo(config)
+            this.manager = holdSo
+            this.swapHelper = holdSo
+            console.log("✅ HoldSo initialized as fallback!")
+          } catch (error) {
+            console.log("⚠️ HoldSo initialization failed:", error.message)
+          }
+        }
+
+        if (!this.manager && !this.swapHelper) {
+          throw new Error("Failed to initialize any Holdstation component")
         }
       } catch (importError) {
         console.error("❌ Failed to import @holdstation/worldchain-sdk:", importError)
@@ -175,55 +128,32 @@ class HoldstationService {
     } catch (error) {
       console.error("❌ Failed to initialize Holdstation SDK:", error)
       this.initialized = false
-      this.holdstation = null
       this.manager = null
+      this.swapHelper = null
+      this.tokenProvider = null
       throw error
     }
   }
 
   private async testSDKFunctionality() {
-    if (!this.holdstation) {
-      throw new Error("No SDK to test")
-    }
-
     console.log("🧪 Testing SDK functionality...")
 
-    // Listar métodos disponíveis no SDK
-    const sdkMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.holdstation))
-    console.log("📋 Available SDK methods:", sdkMethods)
-
-    // Listar métodos disponíveis no manager
-    if (this.manager && this.manager !== this.holdstation) {
+    // Testar Manager
+    if (this.manager) {
       const managerMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.manager))
-      console.log("📋 Available Manager methods:", managerMethods)
+      console.log("📋 Manager methods:", managerMethods)
     }
 
-    // Testar métodos comuns
-    const testMethods = [
-      "getTokenBalances",
-      "getSwapQuote",
-      "executeSwap",
-      "getManager",
-      "isConnected",
-      "getNetworkInfo",
-      "quote",
-      "swap",
-      "getBalances",
-      "getQuote",
-      "getHistory",
-      "getTransactionHistory",
-    ]
+    // Testar SwapHelper
+    if (this.swapHelper) {
+      const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
+      console.log("📋 SwapHelper methods:", swapMethods)
+    }
 
-    console.log("🔍 Testing method availability...")
-    for (const method of testMethods) {
-      const inSDK = typeof this.holdstation[method] === "function"
-      const inManager = this.manager && typeof this.manager[method] === "function"
-
-      if (inSDK || inManager) {
-        console.log(`✅ Method '${method}' is available ${inSDK ? "(SDK)" : ""} ${inManager ? "(Manager)" : ""}`)
-      } else {
-        console.log(`⚠️ Method '${method}' is NOT available`)
-      }
+    // Testar TokenProvider
+    if (this.tokenProvider) {
+      const tokenMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.tokenProvider))
+      console.log("📋 TokenProvider methods:", tokenMethods)
     }
 
     console.log("✅ SDK functionality test completed")
@@ -236,19 +166,20 @@ class HoldstationService {
 
       console.log(`💰 Getting token balances for: ${walletAddress}`)
 
-      if (!this.holdstation) {
-        throw new Error("Holdstation SDK not initialized")
+      if (!this.manager && !this.tokenProvider) {
+        throw new Error("No balance provider available")
       }
 
       console.log("📡 Calling getTokenBalances...")
 
-      // Tentar diferentes métodos baseados na documentação comum
       let balances = null
       const methods = [
-        { obj: this.holdstation, name: "getTokenBalances" },
-        { obj: this.holdstation, name: "getBalances" },
+        { obj: this.tokenProvider, name: "getTokenBalances" },
+        { obj: this.tokenProvider, name: "getBalances" },
+        { obj: this.tokenProvider, name: "getTokens" },
         { obj: this.manager, name: "getTokenBalances" },
         { obj: this.manager, name: "getBalances" },
+        { obj: this.manager, name: "getTokens" },
       ]
 
       for (const method of methods) {
@@ -317,19 +248,19 @@ class HoldstationService {
       console.log("💱 Getting swap quote...")
       console.log("📊 Quote parameters:", params)
 
-      if (!this.holdstation) {
-        throw new Error("Holdstation SDK not initialized")
+      if (!this.swapHelper && !this.manager) {
+        throw new Error("No swap provider available")
       }
 
       console.log("📡 Calling getSwapQuote...")
 
       let quote = null
       const methods = [
-        { obj: this.holdstation, name: "getSwapQuote" },
-        { obj: this.holdstation, name: "getQuote" },
-        { obj: this.holdstation, name: "quote" },
-        { obj: this.manager, name: "getSwapQuote" },
+        { obj: this.swapHelper, name: "getQuote" },
+        { obj: this.swapHelper, name: "getSwapQuote" },
+        { obj: this.swapHelper, name: "quote" },
         { obj: this.manager, name: "getQuote" },
+        { obj: this.manager, name: "getSwapQuote" },
         { obj: this.manager, name: "quote" },
       ]
 
@@ -399,16 +330,16 @@ class HoldstationService {
       console.log("📊 Swap parameters:", params)
       console.log("⚠️ This will execute a REAL transaction!")
 
-      if (!this.holdstation) {
-        throw new Error("Holdstation SDK not initialized")
+      if (!this.swapHelper && !this.manager) {
+        throw new Error("No swap provider available")
       }
 
       console.log("📡 Calling executeSwap...")
 
       let txHash = null
       const methods = [
-        { obj: this.holdstation, name: "executeSwap" },
-        { obj: this.holdstation, name: "swap" },
+        { obj: this.swapHelper, name: "executeSwap" },
+        { obj: this.swapHelper, name: "swap" },
         { obj: this.manager, name: "executeSwap" },
         { obj: this.manager, name: "swap" },
       ]
@@ -464,16 +395,16 @@ class HoldstationService {
 
       console.log(`📜 Getting transaction history for: ${walletAddress}`)
 
-      if (!this.holdstation) {
-        throw new Error("Holdstation SDK not initialized")
+      if (!this.manager) {
+        console.log("⚠️ No transaction history provider available")
+        return []
       }
 
       let transactions = null
       const methods = [
-        { obj: this.holdstation, name: "getTransactionHistory" },
-        { obj: this.holdstation, name: "getHistory" },
         { obj: this.manager, name: "getTransactionHistory" },
         { obj: this.manager, name: "getHistory" },
+        { obj: this.manager, name: "getTransactions" },
       ]
 
       for (const method of methods) {
@@ -520,11 +451,20 @@ class HoldstationService {
     return this.manager
   }
 
+  getSwapHelper() {
+    return this.swapHelper
+  }
+
+  getTokenProvider() {
+    return this.tokenProvider
+  }
+
   getSDKStatus() {
     return {
       initialized: this.initialized,
-      hasSDK: !!this.holdstation,
       hasManager: !!this.manager,
+      hasSwapHelper: !!this.swapHelper,
+      hasTokenProvider: !!this.tokenProvider,
       sdkType: "NPM @holdstation/worldchain-sdk",
       chainId: WORLDCHAIN_CONFIG.chainId,
       rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
@@ -538,17 +478,23 @@ class HoldstationService {
 
       console.log("=== HOLDSTATION SDK DEBUG ===")
       console.log("Initialized:", this.initialized)
-      console.log("Has SDK:", !!this.holdstation)
       console.log("Has Manager:", !!this.manager)
-
-      if (this.holdstation) {
-        console.log("SDK Methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.holdstation)))
-        console.log("SDK Properties:", Object.keys(this.holdstation))
-      }
+      console.log("Has SwapHelper:", !!this.swapHelper)
+      console.log("Has TokenProvider:", !!this.tokenProvider)
 
       if (this.manager) {
         console.log("Manager Methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.manager)))
         console.log("Manager Properties:", Object.keys(this.manager))
+      }
+
+      if (this.swapHelper) {
+        console.log("SwapHelper Methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper)))
+        console.log("SwapHelper Properties:", Object.keys(this.swapHelper))
+      }
+
+      if (this.tokenProvider) {
+        console.log("TokenProvider Methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.tokenProvider)))
+        console.log("TokenProvider Properties:", Object.keys(this.tokenProvider))
       }
 
       console.log("=== END DEBUG ===")
