@@ -417,7 +417,7 @@ class HoldstationService {
         throw new Error("SwapHelper not available - this is critical!")
       }
 
-      console.log("📡 Using swapHelper.quote() method from docs...")
+      console.log("📡 Using swapHelper._quote() method (available in SwapHelper)...")
 
       // Preparar parâmetros exatamente como na documentação
       const quoteParams = {
@@ -428,37 +428,67 @@ class HoldstationService {
         fee: "0.2", // Como mostrado na documentação
       }
 
-      console.log("📋 Quote params (following docs):", quoteParams)
+      console.log("📋 Quote params for HOLDSTATION FOUNDER:", JSON.stringify(quoteParams, null, 2))
 
       let quote = null
 
-      // Tentar o método exato da documentação: swapHelper.quote(params)
+      // MÉTODO ESPECÍFICO: swapHelper._quote (que sabemos que existe)
       try {
-        console.log("🔄 Trying swapHelper.quote(params)...")
-        quote = await this.swapHelper.quote(quoteParams)
-        console.log("✅ swapHelper.quote() succeeded!")
-        console.log("📊 Quote result:", quote)
-      } catch (quoteError) {
-        console.log("❌ swapHelper.quote() failed:", quoteError.message)
+        console.log("🔄 Calling swapHelper._quote(params) - EXACT METHOD AVAILABLE...")
+        console.log("📋 FOUNDER DEBUG - Params being sent to _quote:")
+        console.log("├─ Type of params:", typeof quoteParams)
+        console.log("├─ Params keys:", Object.keys(quoteParams))
+        console.log("├─ Full params:", JSON.stringify(quoteParams, null, 2))
 
-        // Tentar outros métodos como fallback
-        const fallbackMethods = [
-          { name: "getQuote", params: [quoteParams] },
-          { name: "_quote", params: [quoteParams] },
-          { name: "estimateSwap", params: [quoteParams] },
+        quote = await this.swapHelper._quote(quoteParams)
+        console.log("✅ swapHelper._quote() succeeded!")
+        console.log("📊 Quote result for FOUNDER:", JSON.stringify(quote, null, 2))
+      } catch (quoteError) {
+        console.log("❌ swapHelper._quote() failed for FOUNDER:")
+        console.log("├─ Error message:", quoteError.message)
+        console.log("├─ Error stack:", quoteError.stack)
+        console.log("├─ Error name:", quoteError.name)
+        console.log("├─ Error cause:", quoteError.cause || "N/A")
+
+        // Tentar diferentes formatos de parâmetros
+        const alternativeFormats = [
+          {
+            name: "Individual parameters",
+            params: [params.tokenIn, params.tokenOut, params.amountIn, params.slippage || "3"],
+          },
+          {
+            name: "Minimal object",
+            params: [
+              {
+                tokenIn: params.tokenIn,
+                tokenOut: params.tokenOut,
+                amountIn: params.amountIn,
+              },
+            ],
+          },
+          {
+            name: "With numeric slippage",
+            params: [
+              {
+                tokenIn: params.tokenIn,
+                tokenOut: params.tokenOut,
+                amountIn: params.amountIn,
+                slippage: Number.parseFloat(params.slippage || "3"),
+              },
+            ],
+          },
         ]
 
-        for (const method of fallbackMethods) {
-          if (typeof this.swapHelper[method.name] === "function") {
-            try {
-              console.log(`🔄 Trying fallback: swapHelper.${method.name}...`)
-              quote = await this.swapHelper[method.name](...method.params)
-              console.log(`✅ swapHelper.${method.name} succeeded!`)
-              console.log("📊 Quote result:", quote)
-              break
-            } catch (fallbackError) {
-              console.log(`❌ swapHelper.${method.name} failed:`, fallbackError.message)
-            }
+        for (const format of alternativeFormats) {
+          try {
+            console.log(`🔄 FOUNDER DEBUG - Trying ${format.name}:`)
+            console.log("├─ Params:", JSON.stringify(format.params, null, 2))
+            quote = await this.swapHelper._quote(...format.params)
+            console.log(`✅ ${format.name} worked!`)
+            console.log("📊 Quote result:", JSON.stringify(quote, null, 2))
+            break
+          } catch (altError) {
+            console.log(`❌ ${format.name} failed:`, altError.message)
           }
         }
       }
