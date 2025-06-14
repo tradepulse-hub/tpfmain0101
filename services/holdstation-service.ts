@@ -245,11 +245,58 @@ class HoldstationService {
           const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
           console.log(`📋 SwapHelper methods: ${swapMethods.join(", ")}`)
 
-          // CARREGAR O SWAPHELPER IMEDIATAMENTE
-          console.log("🔄 Loading SwapHelper immediately...")
+          // CARREGAR MÓDULOS AUTOMATICAMENTE
+          console.log("🔄 Loading SwapHelper modules automatically...")
+
+          try {
+            // Tentar carregar módulos disponíveis
+            const availableModules = []
+
+            // Verificar se há módulos Uniswap disponíveis
+            if (EthersModule.UniswapV3Module) {
+              console.log("🔄 Loading UniswapV3Module...")
+              const uniswapModule = new EthersModule.UniswapV3Module(this.client)
+              await this.swapHelper.load(uniswapModule)
+              availableModules.push("UniswapV3")
+              console.log("✅ UniswapV3Module loaded!")
+            }
+
+            if (EthersModule.UniswapV2Module) {
+              console.log("🔄 Loading UniswapV2Module...")
+              const uniswapV2Module = new EthersModule.UniswapV2Module(this.client)
+              await this.swapHelper.load(uniswapV2Module)
+              availableModules.push("UniswapV2")
+              console.log("✅ UniswapV2Module loaded!")
+            }
+
+            if (HoldstationModule.UniswapV3Module) {
+              console.log("🔄 Loading UniswapV3Module from HoldstationModule...")
+              const uniswapModule = new HoldstationModule.UniswapV3Module(this.client)
+              await this.swapHelper.load(uniswapModule)
+              availableModules.push("UniswapV3-Holdstation")
+              console.log("✅ UniswapV3Module from HoldstationModule loaded!")
+            }
+
+            console.log(`✅ Loaded modules: ${availableModules.join(", ")}`)
+
+            if (availableModules.length === 0) {
+              console.log("⚠️ No modules loaded - will try alternative approach")
+            }
+          } catch (moduleError) {
+            console.log(`⚠️ Module loading failed: ${moduleError.message}`)
+            console.log("🔄 Will try alternative quote methods...")
+          }
+
+          // CARREGAR O SWAPHELPER BÁSICO
+          console.log("🔄 Loading SwapHelper basic functionality...")
           if (typeof this.swapHelper.load === "function") {
-            await this.swapHelper.load()
-            console.log("✅ SwapHelper loaded successfully!")
+            try {
+              // Tentar carregar sem parâmetros
+              await this.swapHelper.load()
+              console.log("✅ SwapHelper basic load completed!")
+            } catch (basicLoadError) {
+              console.log(`⚠️ Basic load failed: ${basicLoadError.message}`)
+            }
           }
         }
       } catch (swapError) {
@@ -461,8 +508,72 @@ class HoldstationService {
       let quote = null
       const strategies = [
         {
-          name: "SwapHelper._quote with string amountIn",
-          call: () => this.swapHelper._quote(baseParams),
+          name: "SwapHelper._quote with loaded modules",
+          call: async () => {
+            // Garantir que módulos estão carregados
+            if (typeof this.swapHelper.load === "function") {
+              try {
+                await this.swapHelper.load()
+              } catch (loadError) {
+                console.log(`Load warning: ${loadError.message}`)
+              }
+            }
+            return this.swapHelper._quote(baseParams)
+          },
+        },
+        {
+          name: "Direct Uniswap V3 Quote",
+          call: async () => {
+            // Usar contrato Uniswap diretamente
+            const quoterAddress = "0x61fFE014bA17989E743c5F6cB21bF9697530B21e" // Uniswap V3 Quoter
+            const quoterContract = new ethers.Contract(
+              quoterAddress,
+              [
+                {
+                  inputs: [
+                    { name: "tokenIn", type: "address" },
+                    { name: "tokenOut", type: "address" },
+                    { name: "fee", type: "uint24" },
+                    { name: "amountIn", type: "uint256" },
+                    { name: "sqrtPriceLimitX96", type: "uint160" },
+                  ],
+                  name: "quoteExactInputSingle",
+                  outputs: [{ name: "amountOut", type: "uint256" }],
+                  type: "function",
+                },
+              ],
+              this.provider,
+            )
+
+            const amountInWei = ethers.parseEther(baseParams.amountIn)
+            const fee = 3000 // 0.3%
+
+            const amountOut = await quoterContract.quoteExactInputSingle(
+              baseParams.tokenIn,
+              baseParams.tokenOut,
+              fee,
+              amountInWei,
+              0,
+            )
+
+            return {
+              amountOut: ethers.formatEther(amountOut),
+              data: "0x",
+              to: quoterAddress,
+              value: "0",
+            }
+          },
+        },
+        {
+          name: "SwapHelper.submitSwapTokensForTokens (simulation)",
+          call: () =>
+            this.swapHelper.submitSwapTokensForTokens({
+              tokenIn: baseParams.tokenIn,
+              tokenOut: baseParams.tokenOut,
+              amountIn: ethers.parseEther(baseParams.amountIn).toString(),
+              slippage: baseParams.slippage,
+              tx: { data: "0x", to: "0x0000000000000000000000000000000000000000" },
+            }),
         },
         {
           name: "SwapHelper._quote with BigNumber amountIn",
@@ -473,15 +584,6 @@ class HoldstationService {
             }),
         },
         {
-          name: "SwapHelper._quote with minimal params",
-          call: () =>
-            this.swapHelper._quote({
-              tokenIn: baseParams.tokenIn,
-              tokenOut: baseParams.tokenOut,
-              amountIn: baseParams.amountIn,
-            }),
-        },
-        {
           name: "SwapHelper._quote with fee",
           call: () =>
             this.swapHelper._quote({
@@ -489,39 +591,7 @@ class HoldstationService {
               fee: "0.2",
             }),
         },
-        {
-          name: "SwapHelper.submitSwapTokensForTokens",
-          call: () =>
-            this.swapHelper.submitSwapTokensForTokens({
-              tokenIn: baseParams.tokenIn,
-              tokenOut: baseParams.tokenOut,
-              amountIn: ethers.parseEther(baseParams.amountIn).toString(),
-              slippage: baseParams.slippage,
-            }),
-        },
       ]
-
-      // Se temos Quoter, adicionar estratégias do Quoter
-      if (this.quoter) {
-        console.log("✅ Quoter available - adding Quoter strategies...")
-        const quoterMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.quoter))
-        console.log(`📋 Available Quoter methods: ${quoterMethods.join(", ")}`)
-
-        strategies.unshift(
-          {
-            name: "Quoter.quote",
-            call: () => this.quoter.quote(baseParams),
-          },
-          {
-            name: "Quoter.getQuote",
-            call: () => this.quoter.getQuote(baseParams),
-          },
-          {
-            name: "Quoter._quote",
-            call: () => this.quoter._quote(baseParams),
-          },
-        )
-      }
 
       // Tentar cada estratégia
       for (const strategy of strategies) {
