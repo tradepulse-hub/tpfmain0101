@@ -1,40 +1,55 @@
-import type { Transaction } from "./types"
+import * as sdk from "@holdstation/worldchain-sdk"
 import { ethers } from "ethers"
+import type { Transaction } from "./types"
 
 class HoldstationHistoryService {
-  private watchers: Map<string, { start: () => Promise<void>; stop: () => Promise<void> }> = new Map()
   private debugLogs: string[] = []
   private provider: ethers.JsonRpcProvider | null = null
-
-  // Mapeamento completo de todos os tokens suportados
-  private readonly TOKEN_ADDRESS_MAP: Record<string, string> = {
-    "0x834a73c0a83f3bce349a116ffb2a4c2d1c651e45": "TPF", // TPulseFi
-    "0x2cfc85d8e48f8eab294be644d9e25c3030863003": "WLD", // Worldcoin
-    "0xed49fe44fd4249a09843c2ba4bba7e50beca7113": "DNA", // DNA Token
-    "0xede54d9c024ee80c85ec0a75ed2d8774c7fbac9b": "WDD", // Drachma Token
-  }
-
-  // Lista de endereços de tokens para buscar especificamente
-  private readonly TOKEN_ADDRESSES = [
-    "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45", // TPF
-    "0x2cFc85d8E48F8EAB294be644d9E25C3030863003", // WLD
-    "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113", // DNA
-    "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B", // WDD
-  ]
+  private managerHistory: any = null
+  private walletHistory: any = null
+  private watchers: Map<string, { start: () => Promise<void>; stop: () => Promise<void> }> = new Map()
 
   constructor() {
-    this.initializeProvider()
+    this.initializeSDK()
   }
 
-  private initializeProvider() {
+  private async initializeSDK() {
     try {
-      this.addDebugLog("🔧 Inicializando provider Worldchain...")
-      // Worldchain RPC
+      this.addDebugLog("🔧 Inicializando Holdstation SDK conforme documentação...")
+
+      // Setup exato da documentação
       this.provider = new ethers.JsonRpcProvider("https://worldchain-mainnet.g.alchemy.com/public")
-      this.addDebugLog("✅ Provider Worldchain inicializado com sucesso")
+      this.addDebugLog("✅ Provider criado")
+
+      // Criar Manager com chainId 480 (WorldChain)
+      this.managerHistory = new sdk.Manager(this.provider, 480)
+      this.addDebugLog("✅ managerHistory criado (chainId: 480)")
+
+      // Criar walletHistory separadamente (conforme documentação)
+      this.walletHistory = new sdk.History(this.provider, 480)
+      this.addDebugLog("✅ walletHistory criado separadamente")
+
+      // Verificar se ambos foram criados
+      if (this.managerHistory && this.walletHistory) {
+        this.addDebugLog("✅ SDK Holdstation inicializado conforme documentação!")
+
+        // Log métodos disponíveis
+        this.addDebugLog("📋 Verificando métodos do managerHistory...")
+        if (typeof this.managerHistory.watch === "function") {
+          this.addDebugLog("✅ managerHistory.watch() disponível")
+        }
+
+        this.addDebugLog("📋 Verificando métodos do walletHistory...")
+        if (typeof this.walletHistory.find === "function") {
+          this.addDebugLog("✅ walletHistory.find() disponível")
+        }
+      } else {
+        this.addDebugLog("❌ Falha ao criar instâncias do SDK")
+      }
     } catch (error) {
-      this.addDebugLog(`❌ Erro ao inicializar provider: ${error.message}`)
-      console.error("❌ Failed to initialize provider:", error)
+      this.addDebugLog(`❌ Erro ao inicializar SDK: ${error.message}`)
+      this.addDebugLog(`Stack: ${error.stack}`)
+      console.error("❌ Failed to initialize Holdstation SDK:", error)
     }
   }
 
@@ -43,7 +58,6 @@ class HoldstationHistoryService {
     const logMessage = `${timestamp}: ${message}`
     console.log(logMessage)
     this.debugLogs.push(logMessage)
-    // Manter apenas os últimos 50 logs para evitar memory leak
     if (this.debugLogs.length > 50) {
       this.debugLogs = this.debugLogs.slice(-50)
     }
@@ -53,71 +67,83 @@ class HoldstationHistoryService {
     return [...this.debugLogs]
   }
 
-  async getTransactionHistory(walletAddress: string, offset = 0, limit = 50): Promise<Transaction[]> {
-    this.addDebugLog("=== INICIANDO BUSCA DE HISTÓRICO REAL ===")
-    this.addDebugLog(`Endereço da carteira: ${walletAddress}`)
-    this.addDebugLog(`Limite: ${limit} transações`)
+  async watchTransactions(
+    walletAddress: string,
+    callback?: (transactions: Transaction[]) => void,
+  ): Promise<{ start: () => Promise<void>; stop: () => Promise<void> }> {
+    try {
+      this.addDebugLog(`🔍 Configurando watcher conforme documentação para: ${walletAddress}`)
 
-    if (!this.provider) {
-      this.addDebugLog("❌ Provider não disponível - inicializando novamente...")
-      this.initializeProvider()
-      if (!this.provider) {
-        this.addDebugLog("❌ Falha crítica: Provider não pode ser inicializado")
+      if (!this.managerHistory) {
+        this.addDebugLog("❌ managerHistory não disponível - reinicializando...")
+        await this.initializeSDK()
+        if (!this.managerHistory) {
+          throw new Error("managerHistory não pode ser inicializado")
+        }
+      }
+
+      // Stop existing watcher if any
+      if (this.watchers.has(walletAddress)) {
+        this.addDebugLog("🛑 Parando watcher existente...")
+        await this.watchers.get(walletAddress)?.stop()
+        this.watchers.delete(walletAddress)
+      }
+
+      this.addDebugLog("⚙️ Chamando managerHistory.watch(address, callback)...")
+
+      // Implementação exata da documentação
+      const { start, stop } = await this.managerHistory.watch(walletAddress, () => {
+        this.addDebugLog("📡 Nova atividade detectada! Triggering refetch...")
+        if (callback) {
+          this.getTransactionHistory(walletAddress, 0, 10).then(callback)
+        }
+      })
+
+      this.addDebugLog("✅ managerHistory.watch() retornou { start, stop }")
+
+      const watcherConfig = { start, stop }
+
+      // Store watcher
+      this.watchers.set(walletAddress, watcherConfig)
+
+      return watcherConfig
+    } catch (error) {
+      this.addDebugLog(`❌ Erro ao configurar watcher: ${error.message}`)
+      console.error("Error setting up transaction watcher:", error)
+      throw error
+    }
+  }
+
+  async getTransactionHistory(walletAddress: string, offset = 0, limit = 50): Promise<Transaction[]> {
+    this.addDebugLog("=== FETCH STORED TRANSACTION HISTORY ===")
+    this.addDebugLog(`Endereço: ${walletAddress}`)
+    this.addDebugLog(`Offset: ${offset}, Limit: ${limit}`)
+
+    if (!this.walletHistory) {
+      this.addDebugLog("❌ walletHistory não disponível - reinicializando...")
+      await this.initializeSDK()
+      if (!this.walletHistory) {
+        this.addDebugLog("❌ Falha crítica: walletHistory não pode ser inicializado")
         return []
       }
     }
 
     try {
-      this.addDebugLog("🔍 Verificando conectividade com Worldchain...")
+      this.addDebugLog("📡 Chamando walletHistory.find(offset, limit)...")
 
-      // Testar conectividade primeiro
-      const latestBlock = (await Promise.race([
-        this.provider.getBlockNumber(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000)),
-      ])) as number
+      // Implementação exata da documentação
+      const fetchedTransactions = await this.walletHistory.find(offset, limit)
 
-      this.addDebugLog(`✅ Conectado! Bloco atual: ${latestBlock}`)
+      this.addDebugLog(`✅ walletHistory.find() retornou ${fetchedTransactions.length} transações`)
+      this.addDebugLog(`📊 Dados brutos: ${JSON.stringify(fetchedTransactions.slice(0, 2), null, 2)}`)
 
-      const transactions: Transaction[] = []
+      // Processar e formatar transações
+      const formattedTransactions = this.formatHoldstationTransactions(fetchedTransactions, walletAddress)
 
-      // Buscar transações dos últimos 2000 blocos (mais conservador)
-      const fromBlock = Math.max(0, latestBlock - 2000)
-      this.addDebugLog(`📊 Buscando do bloco ${fromBlock} ao ${latestBlock}`)
+      this.addDebugLog(`✅ ${formattedTransactions.length} transações formatadas`)
 
-      // Buscar para cada token individualmente
-      for (const tokenAddress of this.TOKEN_ADDRESSES) {
-        const tokenSymbol = this.getTokenSymbolFromAddress(tokenAddress)
-        this.addDebugLog(`🔍 Buscando transações de ${tokenSymbol}...`)
-
-        try {
-          // Buscar transações RECEBIDAS
-          const receivedTxs = await this.getTokenTransfers(
-            walletAddress,
-            tokenAddress,
-            "received",
-            fromBlock,
-            latestBlock,
-          )
-          this.addDebugLog(`📥 ${tokenSymbol} RECEBIDAS: ${receivedTxs.length}`)
-          transactions.push(...receivedTxs)
-
-          // Buscar transações ENVIADAS
-          const sentTxs = await this.getTokenTransfers(walletAddress, tokenAddress, "sent", fromBlock, latestBlock)
-          this.addDebugLog(`📤 ${tokenSymbol} ENVIADAS: ${sentTxs.length}`)
-          transactions.push(...sentTxs)
-        } catch (tokenError) {
-          this.addDebugLog(`⚠️ Erro ao buscar ${tokenSymbol}: ${tokenError.message}`)
-        }
-      }
-
-      // Deduplificar e ordenar
-      const uniqueTransactions = this.deduplicateTransactions(transactions)
-      uniqueTransactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-
-      this.addDebugLog(`✅ Total de transações encontradas: ${uniqueTransactions.length}`)
-
-      // Log resumo por token
-      const summary = uniqueTransactions.reduce(
+      // Log resumo
+      const summary = formattedTransactions.reduce(
         (acc, tx) => {
           acc[tx.tokenSymbol] = (acc[tx.tokenSymbol] || 0) + 1
           return acc
@@ -125,151 +151,119 @@ class HoldstationHistoryService {
         {} as Record<string, number>,
       )
 
-      this.addDebugLog(`📊 Resumo: ${JSON.stringify(summary)}`)
+      this.addDebugLog(`📊 Resumo por token: ${JSON.stringify(summary)}`)
 
-      return uniqueTransactions.slice(0, limit)
+      return formattedTransactions
     } catch (error) {
-      this.addDebugLog(`❌ ERRO CRÍTICO: ${error.message}`)
-      this.addDebugLog(`Stack trace: ${error.stack}`)
-      console.error("❌ Critical error in getTransactionHistory:", error)
-
-      // Retornar array vazio em caso de erro para evitar crash
+      this.addDebugLog(`❌ ERRO em walletHistory.find(): ${error.message}`)
+      this.addDebugLog(`Stack: ${error.stack}`)
+      console.error("❌ Error fetching transaction history:", error)
       return []
     }
   }
 
-  private async getTokenTransfers(
-    walletAddress: string,
-    tokenAddress: string,
-    direction: "received" | "sent",
-    fromBlock: number,
-    toBlock: number,
-  ): Promise<Transaction[]> {
-    if (!this.provider) return []
+  private formatHoldstationTransactions(transactions: any[], walletAddress: string): Transaction[] {
+    this.addDebugLog(`🔄 Formatando ${transactions.length} transações...`)
 
-    const transactions: Transaction[] = []
-
-    try {
-      // Configurar filtro ERC20 Transfer
-      const transferTopic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
-
-      const filter = {
-        address: tokenAddress,
-        topics: [
-          transferTopic,
-          direction === "sent" ? ethers.zeroPadValue(walletAddress, 32) : null,
-          direction === "received" ? ethers.zeroPadValue(walletAddress, 32) : null,
-        ],
-        fromBlock,
-        toBlock,
-      }
-
-      this.addDebugLog(`🔍 Buscando logs ${direction} para ${tokenAddress}...`)
-
-      const logs = (await Promise.race([
-        this.provider.getLogs(filter),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout getLogs")), 15000)),
-      ])) as any[]
-
-      this.addDebugLog(`📊 Encontrados ${logs.length} logs`)
-
-      // Processar apenas os primeiros 10 logs para evitar timeout
-      const logsToProcess = logs.slice(0, 10)
-
-      for (const log of logsToProcess) {
+    return transactions
+      .map((tx, index) => {
         try {
-          const tx = await this.parseTransferLog(log, walletAddress)
-          if (tx) {
-            transactions.push(tx)
+          this.addDebugLog(`Processando transação ${index + 1}: ${JSON.stringify(tx).substring(0, 100)}...`)
+
+          // Estrutura baseada na documentação Holdstation
+          let type: "send" | "receive" | "swap" = "send"
+          let amount = "0"
+          let tokenSymbol = "UNKNOWN"
+          let tokenAddress = ""
+          let from = ""
+          let to = ""
+
+          // Processar transfers
+          if (tx.transfers && Array.isArray(tx.transfers) && tx.transfers.length > 0) {
+            const transfer = tx.transfers[0]
+
+            // Determinar tipo baseado no endereço
+            if (transfer.to && transfer.to.toLowerCase() === walletAddress.toLowerCase()) {
+              type = "receive"
+            } else if (transfer.from && transfer.from.toLowerCase() === walletAddress.toLowerCase()) {
+              type = "send"
+            }
+
+            // Múltiplas transferências = swap
+            if (tx.transfers.length > 1) {
+              type = "swap"
+            }
+
+            // Extrair dados
+            amount = transfer.amount
+              ? (Number.parseFloat(transfer.amount) / Math.pow(10, transfer.decimals || 18)).toFixed(6)
+              : "0"
+            tokenSymbol = transfer.tokenSymbol || transfer.symbol || "UNKNOWN"
+            tokenAddress = transfer.tokenAddress || transfer.address || ""
+            from = transfer.from || ""
+            to = transfer.to || ""
+          } else {
+            // Transação nativa (ETH/WLD)
+            if (tx.to && tx.to.toLowerCase() === walletAddress.toLowerCase()) {
+              type = "receive"
+            }
+            amount = tx.value ? ethers.formatEther(tx.value) : "0"
+            tokenSymbol = "WLD"
+            from = tx.from || ""
+            to = tx.to || ""
           }
-        } catch (parseError) {
-          this.addDebugLog(`⚠️ Erro ao parsear log: ${parseError.message}`)
+
+          const formatted: Transaction = {
+            id: tx.hash || `tx_${index}`,
+            hash: tx.hash || "",
+            type,
+            amount,
+            tokenSymbol,
+            tokenAddress,
+            from,
+            to,
+            timestamp: tx.timestamp ? new Date(tx.timestamp * 1000) : tx.date ? new Date(tx.date) : new Date(),
+            status: tx.status === 1 || tx.success === 2 ? "completed" : "pending",
+            blockNumber: tx.blockNumber || tx.block || 0,
+          }
+
+          this.addDebugLog(`✅ Formatado: ${type} ${amount} ${tokenSymbol}`)
+          return formatted
+        } catch (error) {
+          this.addDebugLog(`❌ Erro ao formatar transação ${index}: ${error.message}`)
+          return null
         }
-      }
-
-      return transactions
-    } catch (error) {
-      this.addDebugLog(`❌ Erro em getTokenTransfers: ${error.message}`)
-      return []
-    }
-  }
-
-  private async parseTransferLog(log: any, walletAddress: string): Promise<Transaction | null> {
-    try {
-      if (!this.provider) return null
-
-      // Decodificar Transfer event
-      const iface = new ethers.Interface(["event Transfer(address indexed from, address indexed to, uint256 value)"])
-
-      const decoded = iface.parseLog(log)
-      if (!decoded) return null
-
-      const [from, to, value] = decoded.args
-
-      // Buscar detalhes da transação com timeout
-      const txDetails = (await Promise.race([
-        this.provider.getTransaction(log.transactionHash),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout getTransaction")), 5000)),
-      ])) as any
-
-      if (!txDetails) return null
-
-      // Determinar tipo
-      const isReceiving = to.toLowerCase() === walletAddress.toLowerCase()
-      const type = isReceiving ? "receive" : "send"
-
-      // Mapear token
-      const tokenSymbol = this.getTokenSymbolFromAddress(log.address)
-
-      return {
-        id: log.transactionHash,
-        hash: log.transactionHash,
-        type,
-        amount: ethers.formatUnits(value, 18),
-        tokenSymbol,
-        tokenAddress: log.address,
-        from,
-        to,
-        timestamp: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000), // Mock timestamp
-        status: "completed",
-        blockNumber: log.blockNumber,
-      }
-    } catch (error) {
-      this.addDebugLog(`❌ Erro ao parsear log: ${error.message}`)
-      return null
-    }
-  }
-
-  private getTokenSymbolFromAddress(address: string): string {
-    const normalizedAddress = address.toLowerCase()
-    return this.TOKEN_ADDRESS_MAP[normalizedAddress] || "UNKNOWN"
-  }
-
-  private deduplicateTransactions(transactions: Transaction[]): Transaction[] {
-    const seen = new Set<string>()
-    return transactions.filter((tx) => {
-      if (seen.has(tx.hash)) {
-        return false
-      }
-      seen.add(tx.hash)
-      return true
-    })
-  }
-
-  async watchTransactions(walletAddress: string, callback?: any) {
-    this.addDebugLog(`🔍 Configurando watcher para: ${walletAddress}`)
-    return {
-      start: async () => this.addDebugLog("🔄 Watcher iniciado"),
-      stop: async () => this.addDebugLog("🛑 Watcher parado"),
-    }
+      })
+      .filter(Boolean) as Transaction[]
   }
 
   async stopWatching(walletAddress: string): Promise<void> {
-    this.addDebugLog(`🛑 Parando watcher para: ${walletAddress}`)
+    try {
+      const watcher = this.watchers.get(walletAddress)
+      if (watcher) {
+        this.addDebugLog(`🛑 Chamando stop() para: ${walletAddress}`)
+        await watcher.stop()
+        this.watchers.delete(walletAddress)
+        this.addDebugLog(`✅ Watcher parado com sucesso`)
+      }
+    } catch (error) {
+      this.addDebugLog(`❌ Erro ao parar watcher: ${error.message}`)
+      console.error("Error stopping transaction watcher:", error)
+    }
   }
 
   async cleanup(): Promise<void> {
-    this.addDebugLog("🧹 Limpeza concluída")
+    try {
+      this.addDebugLog(`🧹 Limpando ${this.watchers.size} watchers...`)
+      for (const [address, watcher] of this.watchers) {
+        await watcher.stop()
+      }
+      this.watchers.clear()
+      this.addDebugLog("✅ Limpeza concluída")
+    } catch (error) {
+      this.addDebugLog(`❌ Erro durante limpeza: ${error.message}`)
+      console.error("Error during cleanup:", error)
+    }
   }
 }
 
