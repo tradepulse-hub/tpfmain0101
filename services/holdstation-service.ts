@@ -75,9 +75,9 @@ class HoldstationService {
 
   private async _doInitialize() {
     try {
-      console.log("🚀 Initializing Holdstation SDK (Debug Mode)...")
+      console.log("🚀 Initializing Holdstation SDK (Following Official Docs)...")
 
-      // Importar os módulos
+      // Importar os módulos EXATAMENTE como na documentação
       const [HoldstationModule, EthersModule] = await Promise.all([
         import("@holdstation/worldchain-sdk"),
         import("@holdstation/worldchain-ethers-v6"),
@@ -88,44 +88,18 @@ class HoldstationService {
       console.log("├─ HoldstationModule exports:", Object.keys(HoldstationModule))
       console.log("├─ EthersModule exports:", Object.keys(EthersModule))
 
-      // Analisar cada export em detalhes
-      for (const [key, value] of Object.entries(HoldstationModule)) {
-        if (typeof value === "function") {
-          console.log(`├─ HoldstationModule.${key}: function`)
-          try {
-            const proto = value.prototype
-            if (proto) {
-              const methods = Object.getOwnPropertyNames(proto).filter((name) => name !== "constructor")
-              console.log(`│  └─ Methods: ${methods.join(", ")}`)
-            }
-          } catch (e) {
-            console.log(`│  └─ Could not analyze prototype`)
-          }
-        } else {
-          console.log(`├─ HoldstationModule.${key}: ${typeof value}`)
-        }
-      }
-
-      for (const [key, value] of Object.entries(EthersModule)) {
-        if (typeof value === "function") {
-          console.log(`├─ EthersModule.${key}: function`)
-          try {
-            const proto = value.prototype
-            if (proto) {
-              const methods = Object.getOwnPropertyNames(proto).filter((name) => name !== "constructor")
-              console.log(`│  └─ Methods: ${methods.join(", ")}`)
-            }
-          } catch (e) {
-            console.log(`│  └─ Could not analyze prototype`)
-          }
-        } else {
-          console.log(`├─ EthersModule.${key}: ${typeof value}`)
-        }
-      }
-
-      // Extrair as classes e configurações
+      // Extrair EXATAMENTE como na documentação
+      const { Client, Multicall3, Quoter, SwapHelper } = EthersModule
       const { config, inmemoryTokenStorage, TokenProvider } = HoldstationModule
-      const { Client, Multicall3 } = EthersModule
+
+      console.log("📋 Components extracted:")
+      console.log(`├─ Client: ${!!Client}`)
+      console.log(`├─ Multicall3: ${!!Multicall3}`)
+      console.log(`├─ Quoter: ${!!Quoter}`)
+      console.log(`├─ SwapHelper: ${!!SwapHelper}`)
+      console.log(`├─ config: ${!!config}`)
+      console.log(`├─ inmemoryTokenStorage: ${!!inmemoryTokenStorage}`)
+      console.log(`└─ TokenProvider: ${!!TokenProvider}`)
 
       // Guardar referência do config
       this.config = config
@@ -165,72 +139,45 @@ class HoldstationService {
       console.log("⏳ Stabilizing SDK configuration...")
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      // 7. Criar TokenProvider (SEM PARÂMETROS)
+      // 7. Criar TokenProvider
       console.log("🔧 Creating TokenProvider...")
       this.tokenProvider = new TokenProvider()
       console.log("✅ TokenProvider created!")
 
-      // 8. Tentar criar TODOS os possíveis componentes de quote
-      console.log("🔧 Creating Quote components...")
+      // 8. Criar Quoter EXATAMENTE como na documentação
+      console.log("🔧 Creating Quoter (following docs)...")
+      if (Quoter) {
+        try {
+          this.quoter = new Quoter(this.client)
+          console.log("✅ Quoter created successfully!")
 
-      // Tentar Quoter de ambos os módulos
-      const quoterCandidates = [
-        { module: "HoldstationModule", name: "Quoter", class: HoldstationModule.Quoter },
-        { module: "EthersModule", name: "Quoter", class: EthersModule.Quoter },
-        { module: "HoldstationModule", name: "QuoteProvider", class: HoldstationModule.QuoteProvider },
-        { module: "EthersModule", name: "QuoteProvider", class: EthersModule.QuoteProvider },
-        { module: "HoldstationModule", name: "SwapQuoter", class: HoldstationModule.SwapQuoter },
-        { module: "EthersModule", name: "SwapQuoter", class: EthersModule.SwapQuoter },
-      ]
-
-      for (const candidate of quoterCandidates) {
-        if (candidate.class) {
-          try {
-            console.log(`🔄 Trying to create ${candidate.module}.${candidate.name}...`)
-            const instance = new candidate.class(this.client)
-            this.quoter = instance
-            console.log(`✅ ${candidate.module}.${candidate.name} created successfully!`)
-
-            // Analisar métodos disponíveis
-            const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(instance))
-            console.log(`📋 Available methods: ${methods.join(", ")}`)
-            break
-          } catch (error) {
-            console.log(`❌ ${candidate.module}.${candidate.name} failed: ${error.message}`)
-          }
+          // Testar métodos do Quoter
+          const quoterMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.quoter))
+          console.log(`📋 Quoter methods: ${quoterMethods.join(", ")}`)
+        } catch (quoterError) {
+          console.log(`❌ Quoter creation failed: ${quoterError.message}`)
         }
+      } else {
+        console.log("❌ Quoter class not found in EthersModule")
       }
 
-      // 9. Tentar criar TODOS os possíveis componentes de swap
-      console.log("🔧 Creating Swap components...")
+      // 9. Criar SwapHelper EXATAMENTE como na documentação
+      console.log("🔧 Creating SwapHelper (following docs)...")
+      if (SwapHelper) {
+        try {
+          this.swapHelper = new SwapHelper(this.client, {
+            tokenStorage: inmemoryTokenStorage,
+          })
+          console.log("✅ SwapHelper created successfully!")
 
-      const swapCandidates = [
-        { module: "HoldstationModule", name: "SwapHelper", class: HoldstationModule.SwapHelper },
-        { module: "EthersModule", name: "SwapHelper", class: EthersModule.SwapHelper },
-        { module: "HoldstationModule", name: "SwapProvider", class: HoldstationModule.SwapProvider },
-        { module: "EthersModule", name: "SwapProvider", class: EthersModule.SwapProvider },
-        { module: "HoldstationModule", name: "Swapper", class: HoldstationModule.Swapper },
-        { module: "EthersModule", name: "Swapper", class: EthersModule.Swapper },
-      ]
-
-      for (const candidate of swapCandidates) {
-        if (candidate.class) {
-          try {
-            console.log(`🔄 Trying to create ${candidate.module}.${candidate.name}...`)
-            const instance = new candidate.class(this.client, {
-              tokenStorage: inmemoryTokenStorage,
-            })
-            this.swapHelper = instance
-            console.log(`✅ ${candidate.module}.${candidate.name} created successfully!`)
-
-            // Analisar métodos disponíveis
-            const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(instance))
-            console.log(`📋 Available methods: ${methods.join(", ")}`)
-            break
-          } catch (error) {
-            console.log(`❌ ${candidate.module}.${candidate.name} failed: ${error.message}`)
-          }
+          // Testar métodos do SwapHelper
+          const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
+          console.log(`📋 SwapHelper methods: ${swapMethods.join(", ")}`)
+        } catch (swapError) {
+          console.log(`❌ SwapHelper creation failed: ${swapError.message}`)
         }
+      } else {
+        console.log("❌ SwapHelper class not found in EthersModule")
       }
 
       // 10. Verificar se temos pelo menos o essencial
@@ -407,48 +354,71 @@ class HoldstationService {
       await this.initialize()
       await this.ensureNetworkReady()
 
-      console.log("💱 Getting swap quote...")
+      console.log("💱 Getting swap quote (following docs)...")
       console.log("📊 Quote parameters:", params)
 
       if (!this.config?.client) {
         throw new Error("Global config.client not set")
       }
 
-      if (!this.quoter && !this.swapHelper) {
-        throw new Error("No quote provider available")
-      }
-
-      console.log("📡 Calling getSwapQuote...")
+      console.log("📡 Trying quote methods...")
 
       let quote = null
-      const methods = [
-        // Quoter methods
-        { obj: this.quoter, name: "getQuote" },
-        { obj: this.quoter, name: "quote" },
-        { obj: this.quoter, name: "getSwapQuote" },
-        { obj: this.quoter, name: "fetchQuote" },
-        { obj: this.quoter, name: "requestQuote" },
-        // SwapHelper methods
-        { obj: this.swapHelper, name: "getQuote" },
-        { obj: this.swapHelper, name: "getSwapQuote" },
-        { obj: this.swapHelper, name: "quote" },
-        { obj: this.swapHelper, name: "fetchQuote" },
-        { obj: this.swapHelper, name: "requestQuote" },
-      ]
 
-      for (const method of methods) {
-        if (method.obj && typeof method.obj[method.name] === "function") {
-          try {
-            console.log(`🔄 Trying ${method.obj.constructor.name}.${method.name}...`)
-            quote = await method.obj[method.name](params)
-            console.log(`✅ ${method.obj.constructor.name}.${method.name} succeeded!`)
-            console.log(`📊 Quote result:`, quote)
-            break
-          } catch (error) {
-            console.log(`❌ ${method.obj.constructor.name}.${method.name} failed:`, error.message)
+      // MÉTODO 1: Usar Quoter (como na documentação)
+      if (this.quoter) {
+        console.log("🔄 Method 1: Using Quoter (from docs)...")
+
+        const quoterMethods = [
+          { name: "simple", params: [params.tokenIn, params.tokenOut, params.amountIn] },
+          { name: "smart", params: [params.tokenIn, params.tokenOut, params.amountIn] },
+          { name: "getQuote", params: [params] },
+          { name: "quote", params: [params] },
+        ]
+
+        for (const method of quoterMethods) {
+          if (typeof this.quoter[method.name] === "function") {
+            try {
+              console.log(`🔄 Trying quoter.${method.name}...`)
+              quote = await this.quoter[method.name](...method.params)
+              console.log(`✅ quoter.${method.name} succeeded!`)
+              console.log(`📊 Quote result:`, quote)
+              break
+            } catch (error) {
+              console.log(`❌ quoter.${method.name} failed:`, error.message)
+            }
+          } else {
+            console.log(`⚠️ quoter.${method.name} is not a function`)
           }
-        } else if (method.obj) {
-          console.log(`⚠️ ${method.obj.constructor.name}.${method.name} is not a function`)
+        }
+      } else {
+        console.log("⚠️ Quoter not available")
+      }
+
+      // MÉTODO 2: Usar SwapHelper._quote (visto nos logs)
+      if (!quote && this.swapHelper) {
+        console.log("🔄 Method 2: Using SwapHelper._quote...")
+
+        const swapMethods = [
+          { name: "_quote", params: [params] },
+          { name: "quote", params: [params] },
+          { name: "getQuote", params: [params] },
+        ]
+
+        for (const method of swapMethods) {
+          if (typeof this.swapHelper[method.name] === "function") {
+            try {
+              console.log(`🔄 Trying swapHelper.${method.name}...`)
+              quote = await this.swapHelper[method.name](...method.params)
+              console.log(`✅ swapHelper.${method.name} succeeded!`)
+              console.log(`📊 Quote result:`, quote)
+              break
+            } catch (error) {
+              console.log(`❌ swapHelper.${method.name} failed:`, error.message)
+            }
+          } else {
+            console.log(`⚠️ swapHelper.${method.name} is not a function`)
+          }
         }
       }
 
@@ -511,7 +481,7 @@ class HoldstationService {
       await this.initialize()
       await this.ensureNetworkReady()
 
-      console.log("🚀 Executing swap...")
+      console.log("🚀 Executing swap (following docs)...")
       console.log("📊 Swap parameters:", params)
       console.log("⚠️ This will execute a REAL transaction!")
 
@@ -531,8 +501,8 @@ class HoldstationService {
 
       let txHash = null
       const methods = [
-        { obj: this.swapHelper, name: "executeSwap" },
         { obj: this.swapHelper, name: "swap" },
+        { obj: this.swapHelper, name: "executeSwap" },
         { obj: this.swapHelper, name: "performSwap" },
         { obj: this.swapHelper, name: "doSwap" },
       ]
