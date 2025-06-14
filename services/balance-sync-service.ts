@@ -1,4 +1,4 @@
-// Serviço otimizado para sincronização de saldos
+// Serviço APENAS para TPF definido manualmente pelo usuário
 class BalanceSyncService {
   private static instance: BalanceSyncService
 
@@ -11,19 +11,20 @@ class BalanceSyncService {
 
   updateTPFBalance(walletAddress: string, balance: number): void {
     try {
+      console.log(`🔄 User manually setting TPF balance: ${balance.toLocaleString()} TPF`)
+
       const balanceStr = balance.toString()
       localStorage.setItem(`tpf_balance_${walletAddress}`, balanceStr)
       localStorage.setItem("current_tpf_balance", balanceStr)
-      localStorage.setItem("last_tpf_balance", balanceStr)
-      localStorage.setItem("wallet_tpf_balance", balanceStr)
+      localStorage.setItem("tpf_balance_timestamp", Date.now().toString())
 
       // Dispatch events
       const event = new CustomEvent("tpf_balance_updated", {
-        detail: { walletAddress, tpfBalance: balance, timestamp: Date.now() },
+        detail: { walletAddress, tpfBalance: balance, timestamp: Date.now(), userSet: true },
       })
       window.dispatchEvent(event)
 
-      console.log(`TPF Balance updated: ${balance.toLocaleString()} TPF`)
+      console.log(`✅ TPF Balance manually set: ${balance.toLocaleString()} TPF`)
     } catch (error) {
       console.error("Error updating TPF balance:", error)
     }
@@ -31,22 +32,25 @@ class BalanceSyncService {
 
   getCurrentTPFBalance(walletAddress: string): number {
     try {
-      const sources = [
-        localStorage.getItem(`tpf_balance_${walletAddress}`),
-        localStorage.getItem("current_tpf_balance"),
-        localStorage.getItem("last_tpf_balance"),
-        localStorage.getItem("wallet_tpf_balance"),
-      ]
+      // Só retornar se foi definido pelo usuário (tem timestamp)
+      const timestamp = localStorage.getItem("tpf_balance_timestamp")
+      if (!timestamp) {
+        console.log("📊 No user-set TPF balance found")
+        return 0
+      }
 
-      for (const source of sources) {
-        if (source && source !== "0" && source !== "null") {
-          const balance = Number.parseFloat(source)
-          if (!isNaN(balance) && balance > 0) {
-            return balance
-          }
+      const balance =
+        localStorage.getItem(`tpf_balance_${walletAddress}`) || localStorage.getItem("current_tpf_balance")
+
+      if (balance && balance !== "0" && balance !== "null") {
+        const numBalance = Number.parseFloat(balance)
+        if (!isNaN(numBalance) && numBalance > 0) {
+          console.log(`✅ Found user-set TPF balance: ${numBalance}`)
+          return numBalance
         }
       }
 
+      console.log("📊 No valid user-set TPF balance")
       return 0
     } catch (error) {
       console.error("Error getting TPF balance:", error)
@@ -56,66 +60,57 @@ class BalanceSyncService {
 
   async forceBalanceUpdate(walletAddress: string): Promise<number> {
     try {
-      // Try to get real balance first
-      const realBalance = await this.getRealTPFBalance(walletAddress)
+      console.log("🔄 Force balance update - checking for REAL balance...")
 
+      // Tentar obter saldo real da blockchain primeiro
+      const realBalance = await this.getRealTPFBalance(walletAddress)
       if (realBalance > 0) {
+        console.log(`✅ Found real TPF balance: ${realBalance}`)
         this.updateTPFBalance(walletAddress, realBalance)
         return realBalance
       }
 
-      // Fallback to stored balance
-      const storedBalance = this.getCurrentTPFBalance(walletAddress)
-      if (storedBalance > 0) {
-        return storedBalance
+      // Se não tem saldo real, verificar se usuário definiu manualmente
+      const userSetBalance = this.getCurrentTPFBalance(walletAddress)
+      if (userSetBalance > 0) {
+        console.log(`✅ Using user-set TPF balance: ${userSetBalance}`)
+        return userSetBalance
       }
 
-      // Default demo balance
-      const defaultBalance = 108567827.002
-      this.updateTPFBalance(walletAddress, defaultBalance)
-      return defaultBalance
+      console.log("📊 No TPF balance found (real or user-set)")
+      return 0
     } catch (error) {
       console.error("Error forcing balance update:", error)
-      const defaultBalance = 108567827.002
-      this.updateTPFBalance(walletAddress, defaultBalance)
-      return defaultBalance
+      return 0
     }
   }
 
   private async getRealTPFBalance(walletAddress: string): Promise<number> {
     try {
-      // Try MiniKit first if available
-      if (typeof window !== "undefined" && window.MiniKit?.isConnected?.()) {
-        const balance = await this.getBalanceFromMiniKit(walletAddress)
-        if (balance > 0) return balance
+      console.log("🔍 Checking for REAL TPF balance...")
+
+      // Tentar MiniKit primeiro
+      if (typeof window !== "undefined" && window.MiniKit?.getTokenBalance) {
+        try {
+          const result = await window.MiniKit.getTokenBalance({
+            tokenAddress: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45", // TPF
+            walletAddress: walletAddress,
+          })
+
+          if (result?.balance) {
+            const balance = Number(result.balance) / 1e18
+            console.log(`✅ Real TPF balance from MiniKit: ${balance}`)
+            return balance
+          }
+        } catch (miniKitError) {
+          console.log("⚠️ MiniKit TPF balance failed:", miniKitError.message)
+        }
       }
 
-      // Fallback to default for now
+      console.log("📊 No real TPF balance found")
       return 0
     } catch (error) {
       console.error("Error getting real TPF balance:", error)
-      return 0
-    }
-  }
-
-  private async getBalanceFromMiniKit(walletAddress: string): Promise<number> {
-    try {
-      if (!window.MiniKit) return 0
-
-      const tpfAddress = "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45"
-      const result = await window.MiniKit.getTokenBalance({
-        tokenAddress: tpfAddress,
-        walletAddress: walletAddress,
-      })
-
-      if (result?.balance) {
-        const balance = Number(BigInt(result.balance)) / 1e18
-        return balance
-      }
-
-      return 0
-    } catch (error) {
-      console.error("Error getting balance from MiniKit:", error)
       return 0
     }
   }
