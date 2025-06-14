@@ -37,14 +37,14 @@ class HoldstationService {
 
   private async _doInitialize() {
     try {
-      console.log("🚀 Initializing Holdstation SDK (NPM Package)...")
+      console.log("🚀 Initializing Holdstation SDK (Worldchain)...")
 
-      // Método 1: Importação dinâmica do pacote NPM instalado
+      // Importação dinâmica do SDK correto da Holdstation
       try {
-        console.log("📦 Trying dynamic import from @holdstation/sdk...")
-        const HoldstationModule = await import("@holdstation/sdk")
+        console.log("📦 Trying dynamic import from @holdstation/worldchain-sdk...")
+        const HoldstationModule = await import("@holdstation/worldchain-sdk")
 
-        console.log("✅ @holdstation/sdk imported successfully!")
+        console.log("✅ @holdstation/worldchain-sdk imported successfully!")
         console.log("Available exports:", Object.keys(HoldstationModule))
 
         // Tentar diferentes formas de acessar a classe principal
@@ -59,6 +59,12 @@ class HoldstationService {
         } else if (HoldstationModule.HoldstationSDK) {
           HoldstationClass = HoldstationModule.HoldstationSDK
           console.log("📋 Using named export 'HoldstationSDK'")
+        } else if (HoldstationModule.WorldchainSDK) {
+          HoldstationClass = HoldstationModule.WorldchainSDK
+          console.log("📋 Using named export 'WorldchainSDK'")
+        } else if (HoldstationModule.SDK) {
+          HoldstationClass = HoldstationModule.SDK
+          console.log("📋 Using named export 'SDK'")
         } else {
           // Tentar o primeiro export disponível
           const firstExport = Object.values(HoldstationModule)[0]
@@ -72,11 +78,12 @@ class HoldstationService {
           throw new Error("No valid Holdstation class found in module")
         }
 
-        // Inicializar o SDK
-        console.log("🔧 Initializing Holdstation SDK...")
+        // Inicializar o SDK com configuração da Worldchain
+        console.log("🔧 Initializing Holdstation SDK with Worldchain config...")
         this.holdstation = new HoldstationClass({
           chainId: WORLDCHAIN_CONFIG.chainId,
           rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
+          network: "worldchain",
         })
 
         console.log("✅ Holdstation SDK initialized!")
@@ -88,9 +95,12 @@ class HoldstationService {
         } else if (this.holdstation.manager) {
           this.manager = this.holdstation.manager
           console.log("✅ Holdstation Manager found as property!")
+        } else if (this.holdstation.createManager) {
+          this.manager = await this.holdstation.createManager()
+          console.log("✅ Holdstation Manager created!")
         }
       } catch (importError) {
-        console.error("❌ Failed to import @holdstation/sdk:", importError)
+        console.error("❌ Failed to import @holdstation/worldchain-sdk:", importError)
         throw new Error(`NPM import failed: ${importError.message}`)
       }
 
@@ -127,6 +137,10 @@ class HoldstationService {
       "getManager",
       "isConnected",
       "getNetworkInfo",
+      "quote",
+      "swap",
+      "getBalances",
+      "getQuote",
     ]
 
     for (const method of testMethods) {
@@ -162,6 +176,8 @@ class HoldstationService {
         balances = await this.holdstation.getBalances(walletAddress)
       } else if (this.manager && typeof this.manager.getTokenBalances === "function") {
         balances = await this.manager.getTokenBalances(walletAddress)
+      } else if (this.manager && typeof this.manager.getBalances === "function") {
+        balances = await this.manager.getBalances(walletAddress)
       } else {
         throw new Error("No balance method found in SDK")
       }
@@ -228,8 +244,14 @@ class HoldstationService {
         quote = await this.holdstation.getSwapQuote(params)
       } else if (typeof this.holdstation.getQuote === "function") {
         quote = await this.holdstation.getQuote(params)
+      } else if (typeof this.holdstation.quote === "function") {
+        quote = await this.holdstation.quote(params)
       } else if (this.manager && typeof this.manager.getSwapQuote === "function") {
         quote = await this.manager.getSwapQuote(params)
+      } else if (this.manager && typeof this.manager.getQuote === "function") {
+        quote = await this.manager.getQuote(params)
+      } else if (this.manager && typeof this.manager.quote === "function") {
+        quote = await this.manager.quote(params)
       } else {
         throw new Error("No quote method found in SDK")
       }
@@ -298,6 +320,8 @@ class HoldstationService {
         txHash = await this.holdstation.swap(params)
       } else if (this.manager && typeof this.manager.executeSwap === "function") {
         txHash = await this.manager.executeSwap(params)
+      } else if (this.manager && typeof this.manager.swap === "function") {
+        txHash = await this.manager.swap(params)
       } else {
         throw new Error("No swap execution method found in SDK")
       }
@@ -329,6 +353,41 @@ class HoldstationService {
     }
   }
 
+  // Método para obter histórico de transações
+  async getTransactionHistory(walletAddress: string, offset = 0, limit = 50): Promise<any[]> {
+    try {
+      await this.initialize()
+
+      console.log(`📜 Getting transaction history for: ${walletAddress}`)
+
+      if (!this.holdstation) {
+        throw new Error("Holdstation SDK not initialized")
+      }
+
+      let transactions = null
+
+      // Tentar diferentes métodos de histórico
+      if (typeof this.holdstation.getTransactionHistory === "function") {
+        transactions = await this.holdstation.getTransactionHistory(walletAddress, offset, limit)
+      } else if (typeof this.holdstation.getHistory === "function") {
+        transactions = await this.holdstation.getHistory(walletAddress, offset, limit)
+      } else if (this.manager && typeof this.manager.getTransactionHistory === "function") {
+        transactions = await this.manager.getTransactionHistory(walletAddress, offset, limit)
+      } else if (this.manager && typeof this.manager.getHistory === "function") {
+        transactions = await this.manager.getHistory(walletAddress, offset, limit)
+      } else {
+        console.log("⚠️ No transaction history method found in SDK")
+        return []
+      }
+
+      console.log("📊 Raw transactions from SDK:", transactions)
+      return transactions || []
+    } catch (error) {
+      console.error("❌ Error getting transaction history:", error)
+      return []
+    }
+  }
+
   private getTokenIcon(symbol: string): string {
     const icons: Record<string, string> = {
       TPF: "/logo-tpf.png",
@@ -357,7 +416,7 @@ class HoldstationService {
       initialized: this.initialized,
       hasSDK: !!this.holdstation,
       hasManager: !!this.manager,
-      sdkType: "NPM @holdstation/sdk",
+      sdkType: "NPM @holdstation/worldchain-sdk",
       chainId: WORLDCHAIN_CONFIG.chainId,
       rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
     }
