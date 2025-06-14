@@ -18,7 +18,6 @@ const SUPPORTED_TOKENS = {
 class HoldstationService {
   private holdstation: any = null
   private initialized = false
-  private isUsingMock = false
 
   constructor() {
     if (typeof window !== "undefined") {
@@ -30,189 +29,189 @@ class HoldstationService {
     if (this.initialized) return
 
     try {
-      console.log("🚀 Initializing REAL Holdstation SDK...")
+      console.log("🚀 Initializing REAL Holdstation SDK - NO MOCK ALLOWED...")
 
-      // Tentar importar o SDK real da Holdstation
-      try {
-        // Método 1: Tentar importar do pacote npm
-        const HoldstationSDK = await import("@holdstation/sdk")
-        console.log("✅ Holdstation SDK package found:", HoldstationSDK)
+      // Método 1: Tentar carregar SDK via CDN
+      await this.loadHoldstationSDKFromCDN()
 
-        this.holdstation = new HoldstationSDK.Holdstation({
+      // Método 2: Tentar SDK global
+      if (!this.holdstation && typeof window !== "undefined" && (window as any).Holdstation) {
+        console.log("🔍 Found global Holdstation SDK")
+        this.holdstation = new (window as any).Holdstation({
           chainId: WORLDCHAIN_CONFIG.chainId,
           rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
         })
+        console.log("✅ Global Holdstation SDK initialized!")
+      }
 
-        console.log("✅ REAL Holdstation SDK initialized successfully!")
-        this.isUsingMock = false
-      } catch (importError) {
-        console.warn("⚠️ Holdstation SDK package not found:", importError.message)
-
-        // Método 2: Tentar acessar SDK global se disponível
-        if (typeof window !== "undefined" && (window as any).Holdstation) {
-          console.log("🔍 Found global Holdstation SDK")
-          const HoldstationGlobal = (window as any).Holdstation
-
-          this.holdstation = new HoldstationGlobal({
+      // Método 3: Tentar importação dinâmica
+      if (!this.holdstation) {
+        try {
+          const HoldstationModule = await import("@holdstation/sdk")
+          this.holdstation = new HoldstationModule.Holdstation({
             chainId: WORLDCHAIN_CONFIG.chainId,
             rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
           })
-
-          console.log("✅ Global Holdstation SDK initialized!")
-          this.isUsingMock = false
-        } else {
-          throw new Error("Holdstation SDK not available globally")
+          console.log("✅ NPM Holdstation SDK initialized!")
+        } catch (importError) {
+          console.warn("⚠️ NPM import failed:", importError.message)
         }
       }
 
-      // Testar se o SDK está funcionando
-      await this.testSDKConnection()
+      if (!this.holdstation) {
+        throw new Error("❌ REAL Holdstation SDK not available - refusing to use mock")
+      }
 
-      console.log(`🌐 Connected to ${WORLDCHAIN_CONFIG.name} (Chain ID: ${WORLDCHAIN_CONFIG.chainId})`)
+      // Testar conectividade real
+      await this.testRealConnection()
+
       this.initialized = true
+      console.log("✅ REAL Holdstation SDK successfully initialized!")
     } catch (error) {
       console.error("❌ Failed to initialize REAL Holdstation SDK:", error)
-      console.log("🔄 Falling back to mock implementation...")
-
-      // Fallback para mock apenas se o SDK real não funcionar
-      this.holdstation = this.createMockHoldstation()
-      this.isUsingMock = true
-      this.initialized = true
+      console.error("❌ NO MOCK WILL BE USED - Service will fail")
+      throw new Error(`Real Holdstation SDK required: ${error.message}`)
     }
   }
 
-  private async testSDKConnection() {
-    if (!this.holdstation) return
+  private async loadHoldstationSDKFromCDN(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      // Tentar carregar SDK via CDN se disponível
+      if (typeof window === "undefined") {
+        reject(new Error("Window not available"))
+        return
+      }
+
+      // Verificar se já existe um script do Holdstation
+      const existingScript = document.querySelector('script[src*="holdstation"]')
+      if (existingScript) {
+        console.log("🔍 Holdstation script already loaded")
+        setTimeout(() => {
+          if ((window as any).Holdstation) {
+            this.holdstation = new (window as any).Holdstation({
+              chainId: WORLDCHAIN_CONFIG.chainId,
+              rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
+            })
+            console.log("✅ CDN Holdstation SDK initialized!")
+            resolve()
+          } else {
+            reject(new Error("Holdstation not available after script load"))
+          }
+        }, 1000)
+        return
+      }
+
+      // URLs possíveis do SDK da Holdstation
+      const possibleCDNUrls = [
+        "https://cdn.holdstation.com/sdk/latest/holdstation.min.js",
+        "https://unpkg.com/@holdstation/sdk/dist/index.js",
+        "https://cdn.jsdelivr.net/npm/@holdstation/sdk/dist/index.js",
+      ]
+
+      let attempts = 0
+      const tryNextURL = () => {
+        if (attempts >= possibleCDNUrls.length) {
+          reject(new Error("All CDN URLs failed"))
+          return
+        }
+
+        const script = document.createElement("script")
+        script.src = possibleCDNUrls[attempts]
+        script.async = true
+
+        script.onload = () => {
+          console.log(`✅ Loaded Holdstation SDK from: ${possibleCDNUrls[attempts]}`)
+          setTimeout(() => {
+            if ((window as any).Holdstation) {
+              this.holdstation = new (window as any).Holdstation({
+                chainId: WORLDCHAIN_CONFIG.chainId,
+                rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
+              })
+              console.log("✅ CDN Holdstation SDK initialized!")
+              resolve()
+            } else {
+              attempts++
+              tryNextURL()
+            }
+          }, 500)
+        }
+
+        script.onerror = () => {
+          console.warn(`⚠️ Failed to load from: ${possibleCDNUrls[attempts]}`)
+          attempts++
+          tryNextURL()
+        }
+
+        document.head.appendChild(script)
+      }
+
+      tryNextURL()
+    })
+  }
+
+  private async testRealConnection(): Promise<void> {
+    if (!this.holdstation) {
+      throw new Error("No Holdstation SDK to test")
+    }
 
     try {
-      console.log("🧪 Testing Holdstation SDK connection...")
+      console.log("🧪 Testing REAL Holdstation SDK connection...")
 
-      // Tentar uma operação simples para verificar se o SDK está funcionando
-      if (typeof this.holdstation.getNetworkInfo === "function") {
-        const networkInfo = await this.holdstation.getNetworkInfo()
-        console.log("✅ SDK connection test passed:", networkInfo)
-      } else if (typeof this.holdstation.getSupportedTokens === "function") {
-        const tokens = await this.holdstation.getSupportedTokens()
-        console.log("✅ SDK connection test passed, supported tokens:", tokens)
-      } else {
-        console.log("⚠️ SDK loaded but methods not available for testing")
+      // Tentar métodos comuns do SDK
+      const testMethods = ["getNetworkInfo", "getSupportedTokens", "getVersion", "isConnected"]
+
+      let testPassed = false
+      for (const method of testMethods) {
+        if (typeof this.holdstation[method] === "function") {
+          try {
+            const result = await this.holdstation[method]()
+            console.log(`✅ SDK method ${method} works:`, result)
+            testPassed = true
+            break
+          } catch (methodError) {
+            console.warn(`⚠️ SDK method ${method} failed:`, methodError.message)
+          }
+        }
+      }
+
+      if (!testPassed) {
+        // Verificar se pelo menos os métodos principais existem
+        const requiredMethods = ["getTokenBalances", "getSwapQuote", "executeSwap"]
+        const missingMethods = requiredMethods.filter((method) => typeof this.holdstation[method] !== "function")
+
+        if (missingMethods.length > 0) {
+          throw new Error(`SDK missing required methods: ${missingMethods.join(", ")}`)
+        }
+
+        console.log("✅ SDK has required methods, assuming it's functional")
       }
     } catch (error) {
-      console.warn("⚠️ SDK connection test failed:", error)
-      // Não falhar aqui, pode ser que o SDK funcione mesmo assim
+      console.error("❌ SDK connection test failed:", error)
+      throw new Error(`SDK test failed: ${error.message}`)
     }
   }
 
-  private createMockHoldstation() {
-    console.log("🎭 Creating mock Holdstation implementation...")
-
-    return {
-      getTokenBalances: async (walletAddress: string) => {
-        console.log(`🎭 MOCK: Getting balances for ${walletAddress}`)
-
-        // Simular saldos realistas
-        return [
-          {
-            symbol: "TPF",
-            name: "TPulseFi",
-            address: SUPPORTED_TOKENS.TPF,
-            balance: "86452794.03338581",
-            decimals: 18,
-            formattedBalance: "86452794.03338581",
-          },
-          {
-            symbol: "WLD",
-            name: "Worldcoin",
-            address: SUPPORTED_TOKENS.WLD,
-            balance: "42.67",
-            decimals: 18,
-            formattedBalance: "42.67",
-          },
-          {
-            symbol: "DNA",
-            name: "DNA Token",
-            address: SUPPORTED_TOKENS.DNA,
-            balance: "22765.884",
-            decimals: 18,
-            formattedBalance: "22765.884",
-          },
-          {
-            symbol: "WDD",
-            name: "Drachma Token",
-            address: SUPPORTED_TOKENS.WDD,
-            balance: "78.32",
-            decimals: 18,
-            formattedBalance: "78.32",
-          },
-        ]
-      },
-
-      getSwapQuote: async (params: any) => {
-        console.log("🎭 MOCK: Getting swap quote...", params)
-
-        const amountIn = Number.parseFloat(params.amountIn)
-        const slippagePercent = Number.parseFloat(params.slippage || "0.5") / 100
-
-        // Simular taxa de conversão realista WLD → TPF
-        let rate = 23567.947685 // 1 WLD = ~23,567 TPF
-
-        // Inverter se for TPF → WLD
-        if (params.tokenIn.toLowerCase() === SUPPORTED_TOKENS.TPF.toLowerCase()) {
-          rate = 1 / rate
-        }
-
-        const amountOut = amountIn * rate
-        const minReceived = amountOut * (1 - slippagePercent)
-        const feeAmount = amountIn * 0.003 // 0.3% fee
-
-        return {
-          amountOut: amountOut.toFixed(6),
-          data: "0x" + Math.random().toString(16).substring(2, 16),
-          to: "0xHoldstationRouter",
-          value: "0",
-          addons: {
-            outAmount: amountOut.toFixed(6),
-            rateSwap: rate.toString(),
-            amountOutUsd: (amountOut * 1.2).toFixed(2),
-            minReceived: minReceived.toFixed(6),
-            feeAmountOut: feeAmount.toFixed(6),
-          },
-        }
-      },
-
-      executeSwap: async (params: any) => {
-        console.log("🎭 MOCK: Executing swap...", params)
-        console.log("⚠️ THIS IS A MOCK SWAP - NO REAL TRANSACTION WILL OCCUR")
-
-        // Simular delay de transação
-        await new Promise((resolve) => setTimeout(resolve, 2000))
-
-        // Simular sucesso com hash mock
-        const txHash = "0x" + Math.random().toString(16).substring(2, 16)
-        console.log("🎭 MOCK: Swap completed with MOCK hash:", txHash)
-
-        return txHash
-      },
-    }
-  }
-
-  // Obter saldos de tokens
+  // Obter saldos de tokens - APENAS REAL
   async getTokenBalances(walletAddress: string): Promise<TokenBalance[]> {
     try {
       if (!this.initialized) {
         await this.initialize()
       }
 
-      console.log(`💰 Getting token balances for: ${walletAddress}`)
-      console.log(`🔧 Using ${this.isUsingMock ? "MOCK" : "REAL"} Holdstation SDK`)
+      console.log(`💰 Getting REAL token balances for: ${walletAddress}`)
 
       if (!this.holdstation) {
-        throw new Error("Holdstation SDK not available")
+        throw new Error("REAL Holdstation SDK not available")
       }
 
+      console.log("📡 Calling REAL Holdstation getTokenBalances...")
       const balances = await this.holdstation.getTokenBalances(walletAddress)
 
-      console.log("📊 Raw balances from Holdstation:", balances)
+      console.log("📊 REAL balances from Holdstation:", balances)
+
+      if (!Array.isArray(balances)) {
+        throw new Error("Invalid response from Holdstation SDK")
+      }
 
       // Processar e formatar saldos
       const formattedBalances: TokenBalance[] = balances.map((balance: any) => ({
@@ -225,15 +224,15 @@ class HoldstationService {
         formattedBalance: balance.formattedBalance || balance.balance,
       }))
 
-      console.log("✅ Formatted balances:", formattedBalances)
+      console.log("✅ REAL formatted balances:", formattedBalances)
       return formattedBalances
     } catch (error) {
-      console.error("❌ Error getting token balances:", error)
-      throw error
+      console.error("❌ Error getting REAL token balances:", error)
+      throw new Error(`Real balance fetch failed: ${error.message}`)
     }
   }
 
-  // Obter cotação de swap
+  // Obter cotação de swap - APENAS REAL
   async getSwapQuote(params: {
     tokenIn: string
     tokenOut: string
@@ -245,14 +244,14 @@ class HoldstationService {
         await this.initialize()
       }
 
-      console.log("💱 Getting swap quote from Holdstation...")
-      console.log(`🔧 Using ${this.isUsingMock ? "MOCK" : "REAL"} Holdstation SDK`)
-      console.log("📊 Quote parameters:", params)
+      console.log("💱 Getting REAL swap quote from Holdstation...")
+      console.log("📊 REAL quote parameters:", params)
 
       if (!this.holdstation) {
-        throw new Error("Holdstation SDK not available")
+        throw new Error("REAL Holdstation SDK not available")
       }
 
+      console.log("📡 Calling REAL Holdstation getSwapQuote...")
       const quote = await this.holdstation.getSwapQuote({
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
@@ -260,22 +259,26 @@ class HoldstationService {
         slippage: params.slippage || "0.5",
       })
 
-      console.log("📊 Raw quote from Holdstation:", quote)
+      console.log("📊 REAL quote from Holdstation:", quote)
 
-      // Validar cotação
-      if (!quote || !quote.amountOut || Number.parseFloat(quote.amountOut) <= 0) {
-        throw new Error("Invalid quote received from Holdstation")
+      // Validar cotação real
+      if (!quote || typeof quote !== "object") {
+        throw new Error("Invalid quote response from Holdstation SDK")
       }
 
-      console.log("✅ Valid quote received:", quote)
+      if (!quote.amountOut || Number.parseFloat(quote.amountOut) <= 0) {
+        throw new Error("Invalid quote amount from Holdstation SDK")
+      }
+
+      console.log("✅ REAL valid quote received:", quote)
       return quote
     } catch (error) {
-      console.error("❌ Error getting swap quote:", error)
-      throw error
+      console.error("❌ Error getting REAL swap quote:", error)
+      throw new Error(`Real quote fetch failed: ${error.message}`)
     }
   }
 
-  // Executar swap
+  // Executar swap - APENAS REAL
   async executeSwap(params: {
     tokenIn: string
     tokenOut: string
@@ -287,18 +290,15 @@ class HoldstationService {
         await this.initialize()
       }
 
-      console.log("🚀 Executing swap via Holdstation...")
-      console.log(`🔧 Using ${this.isUsingMock ? "MOCK" : "REAL"} Holdstation SDK`)
-      console.log("📊 Swap parameters:", params)
-
-      if (this.isUsingMock) {
-        console.log("⚠️ WARNING: This is a MOCK swap - no real transaction will occur!")
-        console.log("⚠️ To use real swaps, install the Holdstation SDK package")
-      }
+      console.log("🚀 Executing REAL swap via Holdstation...")
+      console.log("📊 REAL swap parameters:", params)
 
       if (!this.holdstation) {
-        throw new Error("Holdstation SDK not available")
+        throw new Error("REAL Holdstation SDK not available")
       }
+
+      console.log("📡 Calling REAL Holdstation executeSwap...")
+      console.log("⚠️ This will execute a REAL transaction on the blockchain!")
 
       const txHash = await this.holdstation.executeSwap({
         tokenIn: params.tokenIn,
@@ -307,17 +307,23 @@ class HoldstationService {
         slippage: params.slippage || "0.5",
       })
 
-      if (this.isUsingMock) {
-        console.log("🎭 MOCK swap completed with hash:", txHash)
-        console.log("⚠️ This transaction hash is FAKE - no real swap occurred")
-      } else {
-        console.log("✅ REAL swap executed successfully:", txHash)
+      console.log("✅ REAL swap executed successfully!")
+      console.log("📋 REAL transaction hash:", txHash)
+
+      // Validar hash de transação real
+      if (!txHash || typeof txHash !== "string" || !txHash.startsWith("0x")) {
+        throw new Error("Invalid transaction hash from Holdstation SDK")
       }
 
+      if (txHash.length < 20) {
+        throw new Error("Transaction hash too short - possibly mock")
+      }
+
+      console.log("✅ REAL transaction confirmed:", txHash)
       return txHash
     } catch (error) {
-      console.error("❌ Error executing swap:", error)
-      throw error
+      console.error("❌ Error executing REAL swap:", error)
+      throw new Error(`Real swap execution failed: ${error.message}`)
     }
   }
 
@@ -344,25 +350,33 @@ class HoldstationService {
     return {
       initialized: this.initialized,
       hasSDK: !!this.holdstation,
-      sdkType: this.isUsingMock ? "Mock Implementation" : "Real Holdstation SDK",
-      isUsingMock: this.isUsingMock,
+      sdkType: "REAL Holdstation SDK ONLY",
+      noMockAllowed: true,
       chainId: WORLDCHAIN_CONFIG.chainId,
       rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
     }
   }
 
-  // Método para forçar uso do SDK real (para debug)
-  async forceRealSDK() {
-    console.log("🔄 Forcing real SDK initialization...")
-    this.initialized = false
-    this.isUsingMock = false
-    this.holdstation = null
-    await this.initialize()
-  }
+  // Método para verificar se o SDK é real
+  async verifyRealSDK(): Promise<boolean> {
+    try {
+      if (!this.holdstation) return false
 
-  // Método para verificar se está usando mock
-  isUsingMockImplementation(): boolean {
-    return this.isUsingMock
+      // Verificar se tem métodos reais
+      const requiredMethods = ["getTokenBalances", "getSwapQuote", "executeSwap"]
+      const hasAllMethods = requiredMethods.every((method) => typeof this.holdstation[method] === "function")
+
+      if (!hasAllMethods) {
+        console.error("❌ SDK missing required methods")
+        return false
+      }
+
+      console.log("✅ SDK verification passed - appears to be real")
+      return true
+    } catch (error) {
+      console.error("❌ SDK verification failed:", error)
+      return false
+    }
   }
 }
 
