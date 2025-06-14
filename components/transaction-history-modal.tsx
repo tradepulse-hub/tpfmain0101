@@ -1,12 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, ArrowUpRight, ArrowDownLeft, ArrowUpDown, ExternalLink, RefreshCw, Plus, Bug } from "lucide-react"
+import { X, ArrowUpRight, ArrowDownLeft, ArrowUpDown, ExternalLink, RefreshCw, Plus } from "lucide-react"
 import { holdstationHistoryService } from "@/services/holdstation-history-service"
 import type { Transaction } from "@/services/types"
 import { useTranslation } from "@/lib/i18n"
-import { toast } from "sonner"
 
 interface TransactionHistoryModalProps {
   isOpen: boolean
@@ -19,33 +18,49 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [currentLimit, setCurrentLimit] = useState(10)
+  const [refetch, setRefetch] = useState(false)
+  const [currentLimit, setCurrentLimit] = useState(10) // Começar com 10
   const [hasMore, setHasMore] = useState(true)
-  const [showDebugLogs, setShowDebugLogs] = useState(false)
-  const [debugLogs, setDebugLogs] = useState<string[]>([])
   const { t } = useTranslation()
+  const watcherSetupRef = useRef(false)
 
-  // Load transactions when modal opens
+  // Setup real-time transaction watching
+  useEffect(() => {
+    if (!isOpen || !walletAddress || watcherSetupRef.current) return
+
+    const setupWatcher = async () => {
+      try {
+        await holdstationHistoryService.watchTransactions(walletAddress, () => {
+          setRefetch((prev) => !prev)
+        })
+
+        watcherSetupRef.current = true
+      } catch (error) {
+        setError("Error setting up transaction watcher")
+      }
+    }
+
+    setupWatcher()
+
+    // Cleanup watcher when modal closes or component unmounts
+    return () => {
+      if (watcherSetupRef.current) {
+        holdstationHistoryService.stopWatching(walletAddress)
+        watcherSetupRef.current = false
+      }
+    }
+  }, [isOpen, walletAddress])
+
+  // Load transactions when modal opens or refetch is triggered
   useEffect(() => {
     if (isOpen && walletAddress) {
+      // Reset quando abrir o modal
       setCurrentLimit(10)
       setHasMore(true)
       setTransactions([])
       loadTransactions(10, true) // true = reset
     }
-  }, [isOpen, walletAddress])
-
-  // Update debug logs periodically
-  useEffect(() => {
-    if (isOpen) {
-      const interval = setInterval(() => {
-        const logs = holdstationHistoryService.getDebugLogs()
-        setDebugLogs(logs)
-      }, 1000)
-
-      return () => clearInterval(interval)
-    }
-  }, [isOpen])
+  }, [isOpen, walletAddress, refetch])
 
   const loadTransactions = async (limit: number = currentLimit, reset = false) => {
     if (reset) {
@@ -58,29 +73,193 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
     setError(null)
 
     try {
-      console.log("🔍 Carregando transações reais da blockchain...")
-      const realTransactions = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, limit)
+      const fetchedTransactions = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, limit)
+
+      const validTransactions = fetchedTransactions.filter((tx) => {
+        const isValid = tx.id && tx.hash && tx.type && tx.amount && tx.tokenSymbol
+        return isValid
+      })
+
+      validTransactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
       if (reset) {
-        setTransactions(realTransactions)
+        setTransactions(validTransactions)
       } else {
-        setTransactions((prev) => [...prev, ...realTransactions])
+        // Adicionar novas transações evitando duplicatas
+        setTransactions((prev) => {
+          const existingHashes = new Set(prev.map((tx) => tx.hash))
+          const newTransactions = validTransactions.filter((tx) => !existingHashes.has(tx.hash))
+          return [...prev, ...newTransactions]
+        })
       }
 
-      setHasMore(realTransactions.length >= limit)
-      console.log(`✅ Carregadas ${realTransactions.length} transações reais`)
+      // Verificar se há mais transações
+      setHasMore(validTransactions.length >= limit)
     } catch (error) {
-      console.error("❌ Erro ao carregar transações:", error)
       setError("Erro ao carregar histórico de transações")
-      setTransactions([])
+
+      // Tentar carregar transações mock como fallback
+      try {
+        const mockTransactions = await loadMockTransactions()
+        if (reset) {
+          setTransactions(mockTransactions)
+        } else {
+          setTransactions((prev) => [...prev, ...mockTransactions])
+        }
+      } catch (mockError) {
+        setError(`Erro ao carregar mock: ${mockError.message}`)
+      }
     } finally {
       setIsLoading(false)
       setIsLoadingMore(false)
     }
   }
 
+  const loadMockTransactions = async (): Promise<Transaction[]> => {
+    const mockTransactions: Transaction[] = [
+      // TPF Transactions
+      {
+        id: "mock_tpf_1",
+        hash: "0x123...abc",
+        type: "receive",
+        amount: "1000.0",
+        tokenSymbol: "TPF",
+        tokenAddress: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
+        from: "0x456...def",
+        to: walletAddress,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
+        status: "completed",
+        blockNumber: 12345,
+      },
+      {
+        id: "mock_tpf_2",
+        hash: "0x456...def",
+        type: "send",
+        amount: "500.0",
+        tokenSymbol: "TPF",
+        tokenAddress: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
+        from: walletAddress,
+        to: "0x789...ghi",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
+        status: "completed",
+        blockNumber: 12344,
+      },
+      // WLD Transactions
+      {
+        id: "mock_wld_1",
+        hash: "0x789...ghi",
+        type: "receive",
+        amount: "25.5",
+        tokenSymbol: "WLD",
+        tokenAddress: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+        from: "0xabc...123",
+        to: walletAddress,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 12),
+        status: "completed",
+        blockNumber: 12343,
+      },
+      {
+        id: "mock_wld_2",
+        hash: "0xabc...123",
+        type: "send",
+        amount: "10.0",
+        tokenSymbol: "WLD",
+        tokenAddress: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+        from: walletAddress,
+        to: "0xdef...456",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 36),
+        status: "completed",
+        blockNumber: 12342,
+      },
+      // DNA Transactions
+      {
+        id: "mock_dna_1",
+        hash: "0xdef...456",
+        type: "receive",
+        amount: "2500.0",
+        tokenSymbol: "DNA",
+        tokenAddress: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113",
+        from: "0x111...222",
+        to: walletAddress,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 18),
+        status: "completed",
+        blockNumber: 12341,
+      },
+      {
+        id: "mock_dna_2",
+        hash: "0x111...222",
+        type: "send",
+        amount: "1000.0",
+        tokenSymbol: "DNA",
+        tokenAddress: "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113",
+        from: walletAddress,
+        to: "0x333...444",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48),
+        status: "completed",
+        blockNumber: 12340,
+      },
+      // WDD Transactions
+      {
+        id: "mock_wdd_1",
+        hash: "0x333...444",
+        type: "receive",
+        amount: "150.0",
+        tokenSymbol: "WDD",
+        tokenAddress: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B",
+        from: "0x555...666",
+        to: walletAddress,
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6),
+        status: "completed",
+        blockNumber: 12339,
+      },
+      {
+        id: "mock_wdd_2",
+        hash: "0x555...666",
+        type: "send",
+        amount: "75.0",
+        tokenSymbol: "WDD",
+        tokenAddress: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B",
+        from: walletAddress,
+        to: "0x777...888",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 72),
+        status: "completed",
+        blockNumber: 12338,
+      },
+      // Swap Transactions
+      {
+        id: "mock_swap_1",
+        hash: "0x777...888",
+        type: "swap",
+        amount: "100.0",
+        tokenSymbol: "WLD",
+        tokenAddress: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+        from: walletAddress,
+        to: "0x999...aaa",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 30),
+        status: "completed",
+        blockNumber: 12337,
+      },
+      {
+        id: "mock_swap_2",
+        hash: "0x999...aaa",
+        type: "swap",
+        amount: "500.0",
+        tokenSymbol: "TPF",
+        tokenAddress: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45",
+        from: walletAddress,
+        to: "0xbbb...ccc",
+        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 54),
+        status: "completed",
+        blockNumber: 12336,
+      },
+    ]
+
+    return mockTransactions
+  }
+
   const handleRefresh = async () => {
     if (isLoading || !walletAddress) return
+
     setCurrentLimit(10)
     setHasMore(true)
     await loadTransactions(10, true) // Reset
@@ -88,6 +267,7 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
 
   const handleLoadMore = async () => {
     if (isLoadingMore || !walletAddress || !hasMore) return
+
     const newLimit = currentLimit + 10
     setCurrentLimit(newLimit)
     await loadTransactions(newLimit, false) // Não reset
@@ -135,6 +315,18 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`
   }
 
+  // Contar transações por token
+  const getTokenCounts = () => {
+    const counts = transactions.reduce(
+      (acc, tx) => {
+        acc[tx.tokenSymbol] = (acc[tx.tokenSymbol] || 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+    return counts
+  }
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -156,16 +348,18 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
             <div className="flex justify-between items-center p-4 border-b border-gray-800">
               <div>
                 <h3 className="text-lg font-bold text-white">{t.history?.title || "Transaction History"}</h3>
-                <p className="text-xs text-gray-400">{formatAddress(walletAddress)} • Real Blockchain Data</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xs text-gray-400">{formatAddress(walletAddress)} • Powered by Holdstation</p>
+                  {transactions.length > 0 && (
+                    <div className="text-xs text-blue-400">
+                      {Object.entries(getTokenCounts())
+                        .map(([token, count]) => `${token}:${count}`)
+                        .join(" • ")}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowDebugLogs(!showDebugLogs)}
-                  className="text-gray-400 hover:text-white transition-colors p-1"
-                  title="Toggle Debug Logs"
-                >
-                  <Bug size={16} />
-                </button>
                 <button
                   onClick={handleRefresh}
                   disabled={isLoading}
@@ -180,50 +374,11 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
               </div>
             </div>
 
-            {/* Debug Logs */}
-            {showDebugLogs && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="border-b border-gray-800 bg-gray-800/30"
-              >
-                <div className="p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-gray-400">Debug Logs ({debugLogs.length})</span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(debugLogs.join("\n"))
-                        toast.success("Logs copiados!")
-                      }}
-                      className="text-xs text-blue-400 hover:text-blue-300"
-                    >
-                      📋 Copiar
-                    </button>
-                  </div>
-                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-2 max-h-40 overflow-y-auto">
-                    <div className="space-y-1">
-                      {debugLogs.map((log, index) => (
-                        <div key={index} className="text-xs font-mono text-gray-300">
-                          {log}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
             {/* Content */}
             <div className="p-4 overflow-y-auto max-h-[calc(80vh-100px)]">
               {error && (
                 <div className="mb-4 p-3 bg-red-900/20 border border-red-800/30 rounded-lg">
                   <p className="text-red-300 text-sm">{error}</p>
-                  <button
-                    onClick={() => setShowDebugLogs(true)}
-                    className="text-xs text-red-400 hover:text-red-300 mt-1"
-                  >
-                    Ver logs de debug →
-                  </button>
                 </div>
               )}
 
@@ -321,13 +476,9 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
                 ) : (
                   <div className="text-center py-8 text-gray-400">
                     <div className="text-sm">{t.history?.noTransactions || "No recent transactions"}</div>
-                    <div className="text-xs mt-2 text-gray-500">Searching real blockchain data...</div>
-                    <button
-                      onClick={() => setShowDebugLogs(true)}
-                      className="text-xs text-blue-400 hover:text-blue-300 mt-2"
-                    >
-                      Ver logs de debug →
-                    </button>
+                    <div className="text-xs mt-2 text-gray-500">
+                      Transactions will appear here when detected by Holdstation SDK
+                    </div>
                   </div>
                 )}
               </div>
