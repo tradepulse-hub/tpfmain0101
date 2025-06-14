@@ -1,4 +1,3 @@
-import { holdstationService } from "./holdstation-service"
 import type { Transaction as HoldstationTransaction } from "./types"
 import { ethers } from "ethers"
 
@@ -74,13 +73,13 @@ class HoldstationHistoryService {
     try {
       this.addDebugLog(`🔍 Configurando watcher para: ${walletAddress}`)
 
-      const manager = holdstationService.getManager()
-      if (!manager) {
-        this.addDebugLog("❌ Manager do Holdstation não disponível")
-        throw new Error("Manager not available")
-      }
+      // const manager = holdstationService.getManager()
+      // if (!manager) {
+      //   this.addDebugLog("❌ Manager do Holdstation não disponível")
+      //   throw new Error("Manager not available")
+      // }
 
-      this.addDebugLog("✅ Manager do Holdstation disponível")
+      // this.addDebugLog("✅ Manager do Holdstation disponível")
 
       // Stop existing watcher if any
       if (this.watchers.has(walletAddress)) {
@@ -94,9 +93,10 @@ class HoldstationHistoryService {
 
       let currentBlock = 0
       try {
-        if (manager.client && typeof manager.client.getBlockNumber === "function") {
-          currentBlock = await manager.client.getBlockNumber()
-        } else if (this.provider) {
+        // if (manager.client && typeof manager.client.getBlockNumber === "function") {
+        //   currentBlock = await manager.client.getBlockNumber()
+        // } else
+        if (this.provider) {
           currentBlock = await this.provider.getBlockNumber()
         } else {
           throw new Error("No provider available")
@@ -124,12 +124,20 @@ class HoldstationHistoryService {
 
       let watcher = null
       try {
-        if (typeof manager.watch === "function") {
-          watcher = await manager.watch(walletAddress, fromBlock, toBlock)
-        } else if (typeof manager.createWatcher === "function") {
-          watcher = await manager.createWatcher(walletAddress, fromBlock, toBlock)
-        } else {
-          throw new Error("No watch method available")
+        // if (typeof manager.watch === "function") {
+        //   watcher = await manager.watch(walletAddress, fromBlock, toBlock)
+        // } else if (typeof manager.createWatcher === "function") {
+        //   watcher = await manager.createWatcher(walletAddress, fromBlock, toBlock)
+        // } else {
+        //   throw new Error("No watch method available")
+        // }
+        watcher = {
+          start: async () => {
+            this.addDebugLog("🔄 Mock watcher started")
+          },
+          stop: async () => {
+            this.addDebugLog("🛑 Mock watcher stopped")
+          },
         }
       } catch (watchError) {
         this.addDebugLog(`⚠️ Erro ao criar watcher: ${watchError.message}`)
