@@ -10,7 +10,6 @@ import {
   ArrowDownLeft,
   AlertCircle,
   RefreshCw,
-  ArrowUpDown,
   ChevronRight,
   Copy,
   TrendingUp,
@@ -25,7 +24,6 @@ import { balanceSyncService } from "@/services/balance-sync-service"
 import { SetBalanceModal } from "@/components/set-balance-modal"
 import { SendTokenModal } from "@/components/send-token-modal"
 import { ReceiveTokenModal } from "@/components/receive-token-modal"
-import { SwapModal } from "@/components/swap-modal"
 import { TransactionHistoryModal } from "@/components/transaction-history-modal"
 import { toast } from "sonner"
 import { useTranslation } from "@/lib/i18n"
@@ -43,7 +41,6 @@ export default function WalletPage() {
   const [isSetBalanceModalOpen, setIsSetBalanceModalOpen] = useState(false)
   const [isSendModalOpen, setIsSendModalOpen] = useState(false)
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false)
-  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false)
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
 
   const router = useRouter()
@@ -193,8 +190,6 @@ export default function WalletPage() {
         walletAddress={walletAddress}
       />
 
-      <SwapModal isOpen={isSwapModalOpen} onClose={() => setIsSwapModalOpen(false)} walletAddress={walletAddress} />
-
       <TransactionHistoryModal
         isOpen={isHistoryModalOpen}
         onClose={() => setIsHistoryModalOpen(false)}
@@ -311,7 +306,7 @@ export default function WalletPage() {
 
               <CardContent className="relative z-10 pt-6 pb-4">
                 {/* Action Buttons */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <Button
                     variant="secondary"
                     className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
@@ -332,17 +327,6 @@ export default function WalletPage() {
                       <ArrowDownLeft className="w-4 h-4 text-gray-400" />
                     </div>
                     <span className="text-xs font-medium">{t.wallet?.receive || "Receive"}</span>
-                  </Button>
-
-                  <Button
-                    variant="secondary"
-                    className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
-                    onClick={() => setIsSwapModalOpen(true)}
-                  >
-                    <div className="rounded-full bg-gray-700 p-2 mb-1">
-                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                    </div>
-                    <span className="text-xs font-medium">{t.wallet?.swap || "Swap"}</span>
                   </Button>
                 </div>
               </CardContent>
