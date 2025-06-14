@@ -138,40 +138,57 @@ class HoldstationService {
       this.tokenProvider = new TokenProvider()
       console.log("✅ TokenProvider created!")
 
-      // 7. Criar Quoter (agora com import correto)
-      if (Quoter) {
-        console.log("🔧 Creating Quoter (CORRECT IMPORT)...")
-        try {
-          this.quoter = new Quoter(this.client)
-          console.log("✅ Quoter created successfully!")
+      // 7. Criar Quoter (CORREÇÃO CRÍTICA)
+      console.log("🔧 Creating Quoter (CRITICAL FIX)...")
+      try {
+        // Tentar primeiro do EthersModule
+        if (EthersModule.Quoter) {
+          this.quoter = new EthersModule.Quoter(this.client)
+          console.log("✅ Quoter created from EthersModule!")
+        } else if (HoldstationModule.Quoter) {
+          this.quoter = new HoldstationModule.Quoter(this.client)
+          console.log("✅ Quoter created from HoldstationModule!")
+        } else {
+          console.log("⚠️ No Quoter class found in either module")
+        }
 
-          // Testar métodos do Quoter
+        if (this.quoter) {
           const quoterMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.quoter))
           console.log(`📋 Quoter methods: ${quoterMethods.join(", ")}`)
-        } catch (quoterError) {
-          console.log(`❌ Quoter creation failed: ${quoterError.message}`)
         }
-      } else {
-        console.log("⚠️ Quoter class not found")
+      } catch (quoterError) {
+        console.log(`❌ Quoter creation failed: ${quoterError.message}`)
+        console.log(`❌ Quoter error stack: ${quoterError.stack}`)
       }
 
-      // 8. Criar SwapHelper (agora com import correto)
-      if (SwapHelper) {
-        console.log("🔧 Creating SwapHelper (CORRECT IMPORT)...")
-        try {
-          this.swapHelper = new SwapHelper(this.client, {
+      // 8. Criar SwapHelper (CORREÇÃO CRÍTICA)
+      console.log("🔧 Creating SwapHelper (CRITICAL FIX)...")
+      try {
+        // Tentar primeiro do EthersModule
+        if (EthersModule.SwapHelper && inmemoryTokenStorage) {
+          this.swapHelper = new EthersModule.SwapHelper(this.client, {
             tokenStorage: inmemoryTokenStorage,
           })
-          console.log("✅ SwapHelper created successfully!")
+          console.log("✅ SwapHelper created from EthersModule!")
+        } else if (HoldstationModule.SwapHelper && inmemoryTokenStorage) {
+          this.swapHelper = new HoldstationModule.SwapHelper(this.client, {
+            tokenStorage: inmemoryTokenStorage,
+          })
+          console.log("✅ SwapHelper created from HoldstationModule!")
+        } else {
+          console.log("⚠️ SwapHelper or inmemoryTokenStorage not available")
+          console.log(`├─ EthersModule.SwapHelper: ${!!EthersModule.SwapHelper}`)
+          console.log(`├─ HoldstationModule.SwapHelper: ${!!HoldstationModule.SwapHelper}`)
+          console.log(`└─ inmemoryTokenStorage: ${!!inmemoryTokenStorage}`)
+        }
 
-          // Testar métodos do SwapHelper
+        if (this.swapHelper) {
           const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
           console.log(`📋 SwapHelper methods: ${swapMethods.join(", ")}`)
-        } catch (swapError) {
-          console.log(`❌ SwapHelper creation failed: ${swapError.message}`)
         }
-      } else {
-        console.log("⚠️ SwapHelper class not found")
+      } catch (swapError) {
+        console.log(`❌ SwapHelper creation failed: ${swapError.message}`)
+        console.log(`❌ SwapHelper error stack: ${swapError.stack}`)
       }
 
       // 9. Verificar se temos pelo menos o essencial
