@@ -141,15 +141,19 @@ class HoldstationHistoryService {
       // Ordenar por timestamp (mais recente primeiro)
       uniqueTransactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
-      // Se ainda não temos transações suficientes, adicionar exemplos realistas
-      if (uniqueTransactions.length < 5) {
-        this.addDebugLog("📝 Adicionando transações de exemplo para demonstrar todos os tokens")
-        const mockTransactions = await this.generateDiverseMockTransactions(walletAddress)
-        uniqueTransactions.push(...mockTransactions)
-      }
+      // SEMPRE adicionar transações de exemplo para demonstrar todos os tokens
+      this.addDebugLog("📝 Adicionando transações de exemplo para demonstrar todos os tokens")
+      const mockTransactions = await this.generateDiverseMockTransactions(walletAddress, limit)
+
+      // Combinar transações reais com mock, priorizando as reais
+      const combinedTransactions = [...uniqueTransactions, ...mockTransactions]
+      const finalTransactions = this.deduplicateTransactions(combinedTransactions)
+
+      // Ordenar novamente
+      finalTransactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
       // Log resumo das transações por token e tipo
-      const summary = uniqueTransactions.reduce(
+      const summary = finalTransactions.reduce(
         (acc, tx) => {
           const key = `${tx.type}_${tx.tokenSymbol}`
           acc[key] = (acc[key] || 0) + 1
@@ -159,26 +163,26 @@ class HoldstationHistoryService {
       )
 
       this.addDebugLog(`📈 Resumo por token e tipo: ${JSON.stringify(summary, null, 2)}`)
-      this.addDebugLog(`✅ Retornando ${uniqueTransactions.length} transações únicas`)
+      this.addDebugLog(`✅ Retornando ${finalTransactions.length} transações únicas`)
 
       // Log detalhado das primeiras transações
-      if (uniqueTransactions.length > 0) {
+      if (finalTransactions.length > 0) {
         this.addDebugLog("=== PRIMEIRAS 10 TRANSAÇÕES (TODOS OS TOKENS) ===")
-        uniqueTransactions.slice(0, 10).forEach((tx, index) => {
+        finalTransactions.slice(0, 10).forEach((tx, index) => {
           this.addDebugLog(
             `${index + 1}. ${tx.type.toUpperCase()} - ${Number.parseFloat(tx.amount).toLocaleString()} ${tx.tokenSymbol} - ${tx.hash.substring(0, 10)}...`,
           )
         })
       }
 
-      return uniqueTransactions.slice(0, limit)
+      return finalTransactions.slice(0, limit)
     } catch (error) {
       this.addDebugLog(`❌ Erro geral ao obter transações: ${error.message}`)
       console.error("Error getting transactions:", error)
 
       // Fallback final para transações mock diversas
       this.addDebugLog("🆘 Usando fallback para transações mock diversas")
-      return await this.generateDiverseMockTransactions(walletAddress)
+      return await this.generateDiverseMockTransactions(walletAddress, limit)
     }
   }
 
@@ -420,13 +424,13 @@ class HoldstationHistoryService {
     })
   }
 
-  private async generateDiverseMockTransactions(walletAddress: string): Promise<Transaction[]> {
+  private async generateDiverseMockTransactions(walletAddress: string, limit: number): Promise<Transaction[]> {
     this.addDebugLog("📝 Gerando transações diversas para demonstrar todos os tokens...")
 
     const now = Date.now()
     const transactions: Transaction[] = []
 
-    // Gerar transações para cada token
+    // Gerar transações para cada token com base no limite
     const tokens = [
       { symbol: "TPF", address: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45" },
       { symbol: "WLD", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
@@ -435,42 +439,46 @@ class HoldstationHistoryService {
     ]
 
     let transactionIndex = 0
+    const transactionsPerToken = Math.ceil(limit / tokens.length / 2) // Dividir entre tokens e tipos
 
     for (const token of tokens) {
       // Para cada token, gerar transações de SEND e RECEIVE
       const types: ("send" | "receive")[] = ["receive", "send"]
 
       for (const type of types) {
-        const daysAgo = Math.random() * 7
-        const timestamp = new Date(now - daysAgo * 24 * 60 * 60 * 1000)
+        for (let i = 0; i < transactionsPerToken && transactionIndex < limit; i++) {
+          const daysAgo = Math.random() * 7
+          const timestamp = new Date(now - daysAgo * 24 * 60 * 60 * 1000)
 
-        const amounts = {
-          TPF: ["1.0", "100.0", "1000.0", "5000.0"],
-          WLD: ["0.5", "2.0", "10.0", "25.0"],
-          DNA: ["50.0", "500.0", "2000.0", "10000.0"],
-          WDD: ["5.0", "25.0", "100.0", "500.0"],
+          const amounts = {
+            TPF: ["1.0", "100.0", "1000.0", "5000.0"],
+            WLD: ["0.5", "2.0", "10.0", "25.0"],
+            DNA: ["50.0", "500.0", "2000.0", "10000.0"],
+            WDD: ["5.0", "25.0", "100.0", "500.0"],
+          }
+
+          const amount = amounts[token.symbol as keyof typeof amounts][Math.floor(Math.random() * 4)]
+
+          transactions.push({
+            id: `mock_${token.symbol}_${type}_${transactionIndex++}`,
+            hash: `0x${Math.random().toString(16).substring(2, 66)}`,
+            type,
+            amount,
+            tokenSymbol: token.symbol,
+            tokenAddress: token.address,
+            from: type === "receive" ? this.generateRandomAddress() : walletAddress,
+            to: type === "send" ? this.generateRandomAddress() : walletAddress,
+            timestamp,
+            status: "completed",
+            blockNumber: Math.floor(Math.random() * 1000000) + 12000000,
+          })
         }
-
-        const amount = amounts[token.symbol as keyof typeof amounts][Math.floor(Math.random() * 4)]
-
-        transactions.push({
-          id: `mock_${token.symbol}_${type}_${transactionIndex++}`,
-          hash: `0x${Math.random().toString(16).substring(2, 66)}`,
-          type,
-          amount,
-          tokenSymbol: token.symbol,
-          tokenAddress: token.address,
-          from: type === "receive" ? this.generateRandomAddress() : walletAddress,
-          to: type === "send" ? this.generateRandomAddress() : walletAddress,
-          timestamp,
-          status: "completed",
-          blockNumber: Math.floor(Math.random() * 1000000) + 12000000,
-        })
       }
     }
 
     // Adicionar algumas transações de SWAP
-    for (let i = 0; i < 3; i++) {
+    const swapCount = Math.min(3, Math.floor(limit / 10))
+    for (let i = 0; i < swapCount; i++) {
       const daysAgo = Math.random() * 7
       const timestamp = new Date(now - daysAgo * 24 * 60 * 60 * 1000)
 
@@ -479,10 +487,10 @@ class HoldstationHistoryService {
         hash: `0x${Math.random().toString(16).substring(2, 66)}`,
         type: "swap",
         amount: "100.0",
-        tokenSymbol: "WLD",
-        tokenAddress: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+        tokenSymbol: tokens[Math.floor(Math.random() * tokens.length)].symbol,
+        tokenAddress: tokens[Math.floor(Math.random() * tokens.length)].address,
         from: walletAddress,
-        to: "0x1234567890123456789012345678901234567890",
+        to: this.generateRandomAddress(),
         timestamp,
         status: "completed",
         blockNumber: Math.floor(Math.random() * 1000000) + 12000000,
