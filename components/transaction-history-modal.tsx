@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, ArrowUpRight, ArrowDownLeft, ArrowUpDown, ExternalLink, RefreshCw, Plus } from "lucide-react"
+import { X, ArrowUpRight, ArrowDownLeft, ArrowUpDown, ExternalLink, RefreshCw, Plus, Bug } from "lucide-react"
 import { holdstationHistoryService } from "@/services/holdstation-history-service"
 import type { Transaction } from "@/services/types"
 import { useTranslation } from "@/lib/i18n"
+import { toast } from "sonner"
 
 interface TransactionHistoryModalProps {
   isOpen: boolean
@@ -20,6 +21,8 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
   const [error, setError] = useState<string | null>(null)
   const [currentLimit, setCurrentLimit] = useState(10)
   const [hasMore, setHasMore] = useState(true)
+  const [showDebugLogs, setShowDebugLogs] = useState(false)
+  const [debugLogs, setDebugLogs] = useState<string[]>([])
   const { t } = useTranslation()
 
   // Load transactions when modal opens
@@ -32,6 +35,18 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
     }
   }, [isOpen, walletAddress])
 
+  // Update debug logs periodically
+  useEffect(() => {
+    if (isOpen) {
+      const interval = setInterval(() => {
+        const logs = holdstationHistoryService.getDebugLogs()
+        setDebugLogs(logs)
+      }, 1000)
+
+      return () => clearInterval(interval)
+    }
+  }, [isOpen])
+
   const loadTransactions = async (limit: number = currentLimit, reset = false) => {
     if (reset) {
       setIsLoading(true)
@@ -43,7 +58,7 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
     setError(null)
 
     try {
-      console.log("Loading real transactions from Holdstation...")
+      console.log("🔍 Carregando transações reais da blockchain...")
       const realTransactions = await holdstationHistoryService.getTransactionHistory(walletAddress, 0, limit)
 
       if (reset) {
@@ -53,9 +68,9 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
       }
 
       setHasMore(realTransactions.length >= limit)
-      console.log(`Loaded ${realTransactions.length} real transactions`)
+      console.log(`✅ Carregadas ${realTransactions.length} transações reais`)
     } catch (error) {
-      console.error("Error loading real transactions:", error)
+      console.error("❌ Erro ao carregar transações:", error)
       setError("Erro ao carregar histórico de transações")
       setTransactions([])
     } finally {
@@ -145,6 +160,13 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => setShowDebugLogs(!showDebugLogs)}
+                  className="text-gray-400 hover:text-white transition-colors p-1"
+                  title="Toggle Debug Logs"
+                >
+                  <Bug size={16} />
+                </button>
+                <button
                   onClick={handleRefresh}
                   disabled={isLoading}
                   className="text-gray-400 hover:text-white transition-colors p-1"
@@ -158,11 +180,50 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
               </div>
             </div>
 
+            {/* Debug Logs */}
+            {showDebugLogs && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="border-b border-gray-800 bg-gray-800/30"
+              >
+                <div className="p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-gray-400">Debug Logs ({debugLogs.length})</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(debugLogs.join("\n"))
+                        toast.success("Logs copiados!")
+                      }}
+                      className="text-xs text-blue-400 hover:text-blue-300"
+                    >
+                      📋 Copiar
+                    </button>
+                  </div>
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-2 max-h-40 overflow-y-auto">
+                    <div className="space-y-1">
+                      {debugLogs.map((log, index) => (
+                        <div key={index} className="text-xs font-mono text-gray-300">
+                          {log}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {/* Content */}
             <div className="p-4 overflow-y-auto max-h-[calc(80vh-100px)]">
               {error && (
                 <div className="mb-4 p-3 bg-red-900/20 border border-red-800/30 rounded-lg">
                   <p className="text-red-300 text-sm">{error}</p>
+                  <button
+                    onClick={() => setShowDebugLogs(true)}
+                    className="text-xs text-red-400 hover:text-red-300 mt-1"
+                  >
+                    Ver logs de debug →
+                  </button>
                 </div>
               )}
 
@@ -260,7 +321,13 @@ export function TransactionHistoryModal({ isOpen, onClose, walletAddress }: Tran
                 ) : (
                   <div className="text-center py-8 text-gray-400">
                     <div className="text-sm">{t.history?.noTransactions || "No recent transactions"}</div>
-                    <div className="text-xs mt-2 text-gray-500">Real transactions from Worldchain blockchain</div>
+                    <div className="text-xs mt-2 text-gray-500">Searching real blockchain data...</div>
+                    <button
+                      onClick={() => setShowDebugLogs(true)}
+                      className="text-xs text-blue-400 hover:text-blue-300 mt-2"
+                    >
+                      Ver logs de debug →
+                    </button>
                   </div>
                 )}
               </div>
