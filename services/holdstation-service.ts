@@ -76,31 +76,38 @@ class HoldstationService {
 
   private async _doInitialize() {
     try {
-      console.log("🚀 Initializing Holdstation SDK (OFFICIAL DOCUMENTATION WAY)...")
+      console.log("🚀 Initializing Holdstation SDK (BACK TO WORKING VERSION)...")
 
-      // IMPORTAR EXATAMENTE COMO NA DOCUMENTAÇÃO OFICIAL
-      const [{ Client, Multicall3, Quoter, SwapHelper }, { config, inmemoryTokenStorage, TokenProvider }] =
-        await Promise.all([import("@holdstation/worldchain-ethers-v6"), import("@holdstation/worldchain-sdk")])
+      // Importar os módulos (volta para a forma que funcionava)
+      const [HoldstationModule, EthersModule] = await Promise.all([
+        import("@holdstation/worldchain-sdk"),
+        import("@holdstation/worldchain-ethers-v6"),
+      ])
 
-      console.log("✅ Imports following official documentation!")
-      console.log("📋 From @holdstation/worldchain-ethers-v6:", {
-        Client: !!Client,
-        Multicall3: !!Multicall3,
-        Quoter: !!Quoter,
-        SwapHelper: !!SwapHelper,
-      })
-      console.log("📋 From @holdstation/worldchain-sdk:", {
-        config: !!config,
-        inmemoryTokenStorage: !!inmemoryTokenStorage,
-        TokenProvider: !!TokenProvider,
-      })
+      console.log("✅ Both packages imported successfully!")
+      console.log("🔍 DETAILED MODULE ANALYSIS:")
+      console.log("├─ HoldstationModule exports:", Object.keys(HoldstationModule))
+      console.log("├─ EthersModule exports:", Object.keys(EthersModule))
+
+      // Extrair componentes CORRETAMENTE (como na documentação)
+      const { config, inmemoryTokenStorage, TokenProvider } = HoldstationModule
+      const { Client, Multicall3, Quoter, SwapHelper } = EthersModule
+
+      console.log("📋 Components extracted (CORRECT WAY):")
+      console.log(`├─ Client: ${!!Client}`)
+      console.log(`├─ Multicall3: ${!!Multicall3}`)
+      console.log(`├─ Quoter: ${!!Quoter}`)
+      console.log(`├─ SwapHelper: ${!!SwapHelper}`)
+      console.log(`├─ config: ${!!config}`)
+      console.log(`├─ inmemoryTokenStorage: ${!!inmemoryTokenStorage}`)
+      console.log(`└─ TokenProvider: ${!!TokenProvider}`)
 
       // Guardar referência do config
       this.config = config
 
-      console.log("🔧 Setting up provider (OFFICIAL WAY)...")
+      console.log("🔧 Setting up provider...")
 
-      // USAR EXATAMENTE COMO NA DOCUMENTAÇÃO
+      // 1. Criar o provider do ethers v6
       this.provider = new ethers.JsonRpcProvider(WORLDCHAIN_CONFIG.rpcUrl, {
         chainId: WORLDCHAIN_CONFIG.chainId,
         name: WORLDCHAIN_CONFIG.name,
@@ -108,42 +115,83 @@ class HoldstationService {
 
       console.log("✅ Provider created!")
 
-      // Aguardar a rede estar pronta
+      // 2. Aguardar a rede estar pronta
       await this.waitForNetwork()
 
-      // SEGUIR EXATAMENTE A DOCUMENTAÇÃO OFICIAL
-      console.log("🔧 Creating Client (OFFICIAL WAY)...")
+      // 3. Criar o Client da Holdstation
+      console.log("🔧 Creating Holdstation Client...")
       this.client = new Client(this.provider)
       console.log("✅ Client created!")
 
-      console.log("🔧 Setting config (OFFICIAL WAY)...")
-      config.client = this.client
-      config.multicall3 = new Multicall3(this.provider)
-      console.log("✅ Config set exactly like documentation!")
+      // 4. IMPORTANTE: Configurar o config GLOBALMENTE
+      console.log("🔧 Setting global config...")
+      this.config.client = this.client
+      this.config.multicall3 = new Multicall3(this.provider)
+      console.log("✅ Global config set!")
 
-      console.log("🔧 Creating TokenProvider (OFFICIAL WAY)...")
-      this.tokenProvider = new TokenProvider()
-      console.log("✅ TokenProvider created!")
-
-      console.log("🔧 Creating Quoter (OFFICIAL WAY)...")
-      this.quoter = new Quoter(this.client)
-      console.log("✅ Quoter created!")
-
-      console.log("🔧 Creating SwapHelper (OFFICIAL WAY)...")
-      this.swapHelper = new SwapHelper(this.client, {
-        tokenStorage: inmemoryTokenStorage,
-      })
-      console.log("✅ SwapHelper created!")
-
-      // Aguardar estabilização
+      // 5. Aguardar estabilização
       console.log("⏳ Stabilizing SDK configuration...")
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      // Testar se o SDK está funcionando
+      // 6. Criar TokenProvider
+      console.log("🔧 Creating TokenProvider...")
+      this.tokenProvider = new TokenProvider()
+      console.log("✅ TokenProvider created!")
+
+      // 7. Criar Quoter (agora com import correto)
+      if (Quoter) {
+        console.log("🔧 Creating Quoter (CORRECT IMPORT)...")
+        try {
+          this.quoter = new Quoter(this.client)
+          console.log("✅ Quoter created successfully!")
+
+          // Testar métodos do Quoter
+          const quoterMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.quoter))
+          console.log(`📋 Quoter methods: ${quoterMethods.join(", ")}`)
+        } catch (quoterError) {
+          console.log(`❌ Quoter creation failed: ${quoterError.message}`)
+        }
+      } else {
+        console.log("⚠️ Quoter class not found")
+      }
+
+      // 8. Criar SwapHelper (agora com import correto)
+      if (SwapHelper) {
+        console.log("🔧 Creating SwapHelper (CORRECT IMPORT)...")
+        try {
+          this.swapHelper = new SwapHelper(this.client, {
+            tokenStorage: inmemoryTokenStorage,
+          })
+          console.log("✅ SwapHelper created successfully!")
+
+          // Testar métodos do SwapHelper
+          const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
+          console.log(`📋 SwapHelper methods: ${swapMethods.join(", ")}`)
+        } catch (swapError) {
+          console.log(`❌ SwapHelper creation failed: ${swapError.message}`)
+        }
+      } else {
+        console.log("⚠️ SwapHelper class not found")
+      }
+
+      // 9. Verificar se temos pelo menos o essencial
+      if (!this.client) {
+        throw new Error("Failed to create Client")
+      }
+
+      if (!this.config.client) {
+        throw new Error("Failed to set global config.client")
+      }
+
+      if (!this.tokenProvider) {
+        throw new Error("Failed to create TokenProvider")
+      }
+
+      // 10. Testar se o SDK está funcionando
       await this.testSDKFunctionality()
 
       this.initialized = true
-      console.log("✅ Holdstation SDK initialization completed (OFFICIAL WAY)!")
+      console.log("✅ Holdstation SDK initialization completed!")
       console.log("📊 Final SDK Status:", this.getSDKStatus())
     } catch (error) {
       console.error("❌ Failed to initialize Holdstation SDK:", error)
