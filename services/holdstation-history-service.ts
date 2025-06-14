@@ -22,29 +22,24 @@ class HoldstationHistoryService {
       this.addDebugLog(`Endereço: ${walletAddress}`)
       this.addDebugLog(`Offset: ${offset}, Limit: ${limit}`)
 
-      // Usar APENAS HoldStation para histórico
+      // Usar APENAS HoldStation para histórico - SEM FALLBACK
       this.addDebugLog("🔍 Usando HoldStation SDK para histórico...")
       const rawTransactions = await holdstationService.getTransactionHistory(walletAddress, offset, limit)
 
+      this.addDebugLog(`📊 HoldStation retornou: ${rawTransactions?.length || 0} transações`)
+
       if (rawTransactions && rawTransactions.length > 0) {
-        this.addDebugLog(`📊 HoldStation retornou: ${rawTransactions.length} transações`)
         const formattedTransactions = this.formatHoldstationTransactions(rawTransactions, walletAddress)
         this.addDebugLog(`✅ ${formattedTransactions.length} transações formatadas`)
         return formattedTransactions
       }
 
       this.addDebugLog("⚠️ Nenhuma transação encontrada via HoldStation")
-
-      // Se não encontrar transações reais, retornar algumas de exemplo
-      this.addDebugLog("📝 Gerando transações de exemplo...")
-      return this.generateExampleTransactions(walletAddress, limit)
+      return [] // Retornar array vazio, SEM FALLBACK
     } catch (error) {
       this.addDebugLog(`❌ Erro ao buscar histórico: ${error.message}`)
       console.error("Error getting transaction history:", error)
-
-      // Fallback para transações de exemplo
-      this.addDebugLog("🆘 Usando transações de exemplo como fallback")
-      return this.generateExampleTransactions(walletAddress, limit)
+      throw error // SEM FALLBACK - propagar o erro
     }
   }
 
@@ -85,37 +80,6 @@ class HoldstationHistoryService {
 
   private extractTokenAddress(tx: any): string {
     return tx.tokenAddress || tx.contractAddress || ""
-  }
-
-  private generateExampleTransactions(walletAddress: string, limit: number): Transaction[] {
-    this.addDebugLog("📝 Gerando transações de exemplo...")
-
-    const transactions: Transaction[] = []
-    const tokens = ["TPF", "WLD", "DNA", "WDD"]
-    const types: ("send" | "receive")[] = ["receive", "send"]
-
-    for (let i = 0; i < limit; i++) {
-      const token = tokens[i % tokens.length]
-      const type = types[i % types.length]
-      const daysAgo = Math.random() * 7
-
-      transactions.push({
-        id: `example_${i}`,
-        hash: `0x${Math.random().toString(16).substring(2, 66)}`,
-        type,
-        amount: (Math.random() * 1000).toFixed(2),
-        tokenSymbol: token,
-        tokenAddress: `0x${Math.random().toString(16).substring(2, 42)}`,
-        from: type === "receive" ? `0x${Math.random().toString(16).substring(2, 42)}` : walletAddress,
-        to: type === "send" ? `0x${Math.random().toString(16).substring(2, 42)}` : walletAddress,
-        timestamp: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
-        status: "completed",
-        blockNumber: Math.floor(Math.random() * 1000000) + 12000000,
-      })
-    }
-
-    this.addDebugLog(`✅ ${transactions.length} transações de exemplo geradas`)
-    return transactions
   }
 
   async watchTransactions(walletAddress: string, callback?: () => void) {
