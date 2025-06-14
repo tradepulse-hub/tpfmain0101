@@ -1,5 +1,3 @@
-import { ethers } from "ethers"
-import { Client, Multicall3 } from "@holdstation/worldchain-ethers-v6"
 import {
   config,
   inmemoryTokenStorage,
@@ -8,11 +6,13 @@ import {
   TokenProvider,
   ZeroX,
 } from "@holdstation/worldchain-sdk"
+import { Client, Multicall3 } from "@holdstation/worldchain-viem"
+import { createPublicClient, http, type PublicClient } from "viem"
+import { worldchain } from "viem/chains"
 import type { TokenBalance, SwapQuote } from "./types"
 
 // Configuração para Worldchain
 const RPC_URL = "https://worldchain-mainnet.g.alchemy.com/public"
-const CHAIN_ID = 480
 
 // Tokens que queremos suportar - ENDEREÇOS CORRETOS E VERIFICADOS
 const SUPPORTED_TOKENS = {
@@ -36,7 +36,7 @@ const inmemoryTransactionStorage = {
 }
 
 class HoldstationService {
-  private provider: ethers.JsonRpcProvider | null = null
+  private publicClient: PublicClient | null = null
   private client: Client | null = null
   private swapHelper: SwapHelper | null = null
   private tokenProvider: TokenProvider | null = null
@@ -53,28 +53,24 @@ class HoldstationService {
     if (this.initialized) return
 
     try {
-      console.log("🚀 Initializing Holdstation Service following EXACT example pattern...")
+      console.log("🚀 Initializing Holdstation Service with VIEM (correct approach)...")
 
-      // Setup provider (exactly like example)
-      this.provider = new ethers.JsonRpcProvider(
-        RPC_URL,
-        {
-          chainId: CHAIN_ID,
-          name: "worldchain",
+      // Setup publicClient with Viem (exactly like example)
+      this.publicClient = createPublicClient({
+        chain: worldchain,
+        transport: http(RPC_URL),
+        batch: {
+          multicall: true, // Enable multicall batching
         },
-        {
-          staticNetwork: true,
-        },
-      )
+        cacheTime: 300000, // Set cache time in milliseconds
+      })
 
-      // Verificar conexão
-      const network = await this.provider.getNetwork()
-      console.log(`🌐 Connected to ${network.name} (${network.chainId})`)
+      console.log("✅ PublicClient created with Viem")
 
       // Setup client (exactly like example)
-      this.client = new Client(this.provider)
+      this.client = new Client(this.publicClient as PublicClient)
       config.client = this.client
-      config.multicall3 = new Multicall3(this.provider)
+      config.multicall3 = new Multicall3(this.publicClient as PublicClient)
 
       console.log("✅ Client and config setup complete")
 
@@ -103,16 +99,12 @@ class HoldstationService {
 
       console.log("✅ ZeroX loaded into SwapHelper")
 
-      // Verificar se os tokens existem na blockchain
-      console.log("🔍 Verificando tokens na blockchain...")
-      await this.verifyTokenContracts()
-
       // Test token details fetch
       console.log("🔍 Testing token details fetch...")
       await this.testTokenDetails()
 
       this.initialized = true
-      console.log("✅ Holdstation Service initialized successfully following example pattern!")
+      console.log("✅ Holdstation Service initialized successfully with VIEM!")
     } catch (error) {
       console.error("❌ Failed to initialize Holdstation Service:", error)
       console.error("📋 Error details:", {
@@ -146,52 +138,6 @@ class HoldstationService {
       }
     } catch (error) {
       console.error("❌ Error testing token details:", error)
-    }
-  }
-
-  private async verifyTokenContracts() {
-    if (!this.provider) return
-
-    console.log("🔍 Verificando contratos de tokens...")
-
-    for (const [symbol, address] of Object.entries(SUPPORTED_TOKENS)) {
-      try {
-        // Verificar se o contrato existe
-        const code = await this.provider.getCode(address)
-        if (code === "0x") {
-          console.warn(`⚠️ Token ${symbol} (${address}) não tem código de contrato`)
-        } else {
-          console.log(`✅ Token ${symbol} (${address}) verificado`)
-
-          // Tentar obter informações básicas do token
-          try {
-            const contract = new ethers.Contract(
-              address,
-              [
-                "function name() view returns (string)",
-                "function symbol() view returns (string)",
-                "function decimals() view returns (uint8)",
-                "function totalSupply() view returns (uint256)",
-              ],
-              this.provider,
-            )
-
-            const [name, tokenSymbol, decimals, totalSupply] = await Promise.all([
-              contract.name().catch(() => "Unknown"),
-              contract.symbol().catch(() => symbol),
-              contract.decimals().catch(() => 18),
-              contract.totalSupply().catch(() => "0"),
-            ])
-
-            console.log(`📊 ${symbol}: ${name} (${tokenSymbol}) - ${decimals} decimals`)
-            console.log(`💰 Total Supply: ${ethers.formatUnits(totalSupply, decimals)}`)
-          } catch (tokenError) {
-            console.warn(`⚠️ Não foi possível obter detalhes do token ${symbol}:`, tokenError.message)
-          }
-        }
-      } catch (error) {
-        console.error(`❌ Erro ao verificar token ${symbol}:`, error.message)
-      }
     }
   }
 
@@ -255,37 +201,27 @@ class HoldstationService {
 
   private async getTokenBalance(walletAddress: string, tokenAddress: string): Promise<string> {
     try {
-      if (!this.client) throw new Error("Client not initialized")
+      if (!this.publicClient) throw new Error("PublicClient not initialized")
 
-      // Use ERC20 balanceOf call
-      const balanceCallData = this.client.encodeFunctionData(
-        ["function balanceOf(address) view returns (uint256)"],
-        "balanceOf",
-        [walletAddress],
-      )
+      // Use Viem to get balance
+      const balance = await this.publicClient.readContract({
+        address: tokenAddress as `0x${string}`,
+        abi: [
+          {
+            name: "balanceOf",
+            type: "function",
+            stateMutability: "view",
+            inputs: [{ name: "account", type: "address" }],
+            outputs: [{ name: "", type: "uint256" }],
+          },
+        ],
+        functionName: "balanceOf",
+        args: [walletAddress as `0x${string}`],
+      })
 
-      const calls = [
-        {
-          target: tokenAddress,
-          allowFailure: true,
-          callData: balanceCallData,
-        },
-      ]
-
-      const results = await config.multicall3.aggregate3(calls)
-
-      if (results[0]?.success && results[0]?.returnData !== "0x") {
-        const decoded = this.client.decodeFunctionResult(
-          ["function balanceOf(address) view returns (uint256)"],
-          "balanceOf",
-          results[0].returnData,
-        )
-
-        const balance = ethers.formatUnits(decoded[0], 18)
-        return Number.parseFloat(balance).toFixed(6)
-      }
-
-      return "0"
+      // Convert from wei to readable format
+      const balanceFormatted = Number(balance) / Math.pow(10, 18)
+      return balanceFormatted.toFixed(6)
     } catch (error) {
       console.error(`Error getting balance for ${tokenAddress}:`, error)
       return "0"
@@ -302,7 +238,7 @@ class HoldstationService {
     return icons[symbol] || "/placeholder.svg"
   }
 
-  // Obter cotação de swap REAL seguindo exemplo exato
+  // Obter cotação de swap REAL seguindo exemplo exato com VIEM
   async getSwapQuote(params: {
     tokenIn: string
     tokenOut: string
@@ -311,7 +247,7 @@ class HoldstationService {
     fee?: string
   }): Promise<SwapQuote> {
     try {
-      console.log("💱 OBTENDO COTAÇÃO seguindo exemplo EXATO...")
+      console.log("💱 OBTENDO COTAÇÃO com VIEM (abordagem correta)...")
       console.log(
         `📊 Parâmetros: ${params.amountIn} ${this.getSymbolFromAddress(params.tokenIn)} → ${this.getSymbolFromAddress(params.tokenOut)}`,
       )
@@ -326,9 +262,9 @@ class HoldstationService {
         throw new Error("Swap helper not initialized")
       }
 
-      console.log("🔍 Preparando parâmetros seguindo exemplo...")
+      console.log("🔍 Preparando parâmetros seguindo exemplo VIEM...")
 
-      // Usar exatamente o mesmo formato do exemplo
+      // Usar exatamente o mesmo formato do exemplo VIEM
       const quoteParams: SwapParams["quoteInput"] = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
@@ -338,12 +274,12 @@ class HoldstationService {
         preferRouters: ["0x"], // Usar apenas 0x como no exemplo
       }
 
-      console.log("📡 Chamando swapHelper.estimate.quote() como no exemplo...")
+      console.log("📡 Chamando swapHelper.estimate.quote() com VIEM...")
       console.log("📋 Parâmetros:", JSON.stringify(quoteParams, null, 2))
 
       const result = await this.swapHelper.estimate.quote(quoteParams)
 
-      console.log("📊 Resultado RAW da Holdstation:", JSON.stringify(result, null, 2))
+      console.log("📊 Resultado RAW da Holdstation (VIEM):", JSON.stringify(result, null, 2))
 
       // Verificar se temos dados válidos da Holdstation
       if (!result) {
@@ -361,7 +297,7 @@ class HoldstationService {
         throw new Error("No liquidity available for this token pair")
       }
 
-      console.log(`✅ COTAÇÃO REAL OBTIDA:`)
+      console.log(`✅ COTAÇÃO REAL OBTIDA COM VIEM:`)
       console.log(`├─ Input: ${params.amountIn} ${this.getSymbolFromAddress(params.tokenIn)}`)
       console.log(`├─ Output: ${result.addons.outAmount} ${this.getSymbolFromAddress(params.tokenOut)}`)
       console.log(
@@ -373,7 +309,7 @@ class HoldstationService {
       const quote: SwapQuote = {
         amountOut: result.addons.outAmount,
         data: result.data || "0x",
-        to: result.to || ethers.ZeroAddress,
+        to: result.to || "0x0000000000000000000000000000000000000000",
         value: result.value || "0",
         feeAmountOut: result.addons.feeAmountOut,
         addons: {
@@ -385,10 +321,10 @@ class HoldstationService {
         },
       }
 
-      console.log("✅ Cotação formatada:", quote)
+      console.log("✅ Cotação formatada (VIEM):", quote)
       return quote
     } catch (error) {
-      console.error("❌ ERRO ao obter cotação da Holdstation:", error)
+      console.error("❌ ERRO ao obter cotação da Holdstation (VIEM):", error)
       console.log("📋 Detalhes do erro:")
       console.log(`├─ Mensagem: ${error.message}`)
       console.log(`├─ Stack: ${error.stack}`)
@@ -419,7 +355,7 @@ class HoldstationService {
     return addressToSymbol[address.toLowerCase()] || "UNKNOWN"
   }
 
-  // Executar swap real seguindo exemplo exato
+  // Executar swap real seguindo exemplo exato com VIEM
   async executeSwap(params: {
     tokenIn: string
     tokenOut: string
@@ -429,7 +365,7 @@ class HoldstationService {
     feeReceiver?: string
   }): Promise<string> {
     try {
-      console.log("🚀 EXECUTANDO SWAP seguindo exemplo EXATO...")
+      console.log("🚀 EXECUTANDO SWAP com VIEM (abordagem correta)...")
       console.log(
         `📊 ${params.amountIn} ${this.getSymbolFromAddress(params.tokenIn)} → ${this.getSymbolFromAddress(params.tokenOut)}`,
       )
@@ -445,7 +381,7 @@ class HoldstationService {
 
       console.log("📡 Obtendo cotação REAL para o swap...")
 
-      // Primeiro obter cotação (como no exemplo)
+      // Primeiro obter cotação (como no exemplo VIEM)
       const quoteParams: SwapParams["quoteInput"] = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
@@ -464,7 +400,7 @@ class HoldstationService {
 
       console.log("🔄 Executando swap com dados REAIS da Holdstation...")
 
-      // Executar swap exatamente como no exemplo
+      // Executar swap exatamente como no exemplo VIEM
       const swapParams: SwapParams["input"] = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
@@ -476,14 +412,14 @@ class HoldstationService {
         },
         feeAmountOut: quoteResponse.addons?.feeAmountOut,
         fee: params.fee || "0.2",
-        feeReceiver: params.feeReceiver || ethers.ZeroAddress, // Como no exemplo
+        feeReceiver: params.feeReceiver || "0x0000000000000000000000000000000000000000",
       }
 
-      console.log("📋 Parâmetros REAIS do swap:", swapParams)
+      console.log("📋 Parâmetros REAIS do swap (VIEM):", swapParams)
 
       const result = await this.swapHelper.swap(swapParams)
 
-      console.log("📊 Resultado REAL do swap:", result)
+      console.log("📊 Resultado REAL do swap (VIEM):", result)
 
       if (!result.success) {
         console.log(`❌ Swap falhou na Holdstation: ${result.errorCode}`)
@@ -491,10 +427,10 @@ class HoldstationService {
       }
 
       const txHash = result.transactionId || "0x" + Math.random().toString(16).substring(2, 66)
-      console.log("✅ Swap REAL executado com sucesso na Holdstation:", txHash)
+      console.log("✅ Swap REAL executado com sucesso na Holdstation (VIEM):", txHash)
       return txHash
     } catch (error) {
-      console.error("❌ Erro no executeSwap REAL:", error)
+      console.error("❌ Erro no executeSwap REAL (VIEM):", error)
       throw new Error(`Holdstation swap failed: ${error.message}`)
     }
   }
@@ -510,10 +446,11 @@ class HoldstationService {
 
   async getNetworkInfo() {
     try {
-      if (!this.provider) {
+      if (!this.publicClient) {
         await this.initialize()
       }
-      return await this.provider!.getNetwork()
+      const chainId = await this.publicClient!.getChainId()
+      return { chainId, name: "worldchain" }
     } catch (error) {
       console.error("Error getting network info:", error)
       return null
@@ -522,7 +459,7 @@ class HoldstationService {
 
   isValidAddress(address: string): boolean {
     try {
-      return ethers.isAddress(address)
+      return /^0x[a-fA-F0-9]{40}$/.test(address)
     } catch {
       return false
     }
@@ -530,8 +467,8 @@ class HoldstationService {
 
   formatTokenAmount(amount: string, decimals = 18): string {
     try {
-      const value = ethers.parseUnits(amount, decimals)
-      return ethers.formatUnits(value, decimals)
+      const value = Number.parseFloat(amount)
+      return value.toFixed(6)
     } catch {
       return "0"
     }
@@ -545,7 +482,7 @@ class HoldstationService {
       hasTokenProvider: !!this.tokenProvider,
       hasZeroX: !!this.zeroX,
       hasClient: !!this.client,
-      hasProvider: !!this.provider,
+      hasPublicClient: !!this.publicClient,
     }
   }
 }
