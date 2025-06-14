@@ -9,21 +9,6 @@ export interface TokenBalance {
   formattedBalance?: string
 }
 
-export interface SwapQuote {
-  amountOut: string
-  data: string
-  to: string
-  value: string
-  feeAmountOut?: string
-  addons?: {
-    outAmount: string
-    rateSwap: string
-    amountOutUsd: string
-    minReceived: string
-    feeAmountOut: string
-  }
-}
-
 export interface Transaction {
   id: string
   hash: string
