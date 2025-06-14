@@ -268,46 +268,10 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
         addDebugLog(`📋 Parâmetros da cotação: ${JSON.stringify(quoteParams, null, 2)}`)
 
-        // Tentar Holdstation primeiro
-        let quote = null
-        try {
-          addDebugLog("🔍 Tentando Holdstation SDK...")
-          quote = await holdstationService.getSwapQuote(quoteParams)
-          addDebugLog("✅ Holdstation SDK funcionou!")
-        } catch (holdstationError) {
-          addDebugLog(`❌ Holdstation SDK falhou: ${holdstationError.message}`)
-
-          // Fallback para cotação simples baseada em taxa fixa
-          addDebugLog("🔄 Usando cotação de fallback...")
-          const amountInNum = Number.parseFloat(amountIn)
-          const slippagePercent = Number.parseFloat(slippage) / 100
-
-          // Taxa de conversão baseada nos dados que você viu funcionando
-          let rate = 23567.947685 // 1 WLD = ~23,567 TPF
-
-          // Inverter se for TPF → WLD
-          if (tokenIn === "TPF") {
-            rate = 1 / rate
-          }
-
-          const amountOutNum = amountInNum * rate
-          const minReceived = amountOutNum * (1 - slippagePercent)
-
-          quote = {
-            amountOut: amountOutNum.toFixed(6),
-            data: "0x", // Dados vazios para fallback
-            to: "0x0000000000000000000000000000000000000000",
-            value: "0",
-            addons: {
-              outAmount: amountOutNum.toFixed(6),
-              rateSwap: rate.toString(),
-              amountOutUsd: (amountOutNum * 1.2).toFixed(2),
-              minReceived: minReceived.toFixed(6),
-              feeAmountOut: (amountInNum * 0.003).toFixed(6),
-            },
-          }
-          addDebugLog("✅ Cotação de fallback criada")
-        }
+        // Tentar Holdstation - SEM FALLBACK
+        addDebugLog("🔍 Tentando Holdstation SDK...")
+        const quote = await holdstationService.getSwapQuote(quoteParams)
+        addDebugLog("✅ Holdstation SDK funcionou!")
 
         addDebugLog("📊 Cotação recebida:")
         addDebugLog(`├─ Raw response: ${JSON.stringify(quote, null, 2)}`)
@@ -326,10 +290,11 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
       } catch (error) {
         addDebugLog("❌ ERRO NA COTAÇÃO:")
         addDebugLog(`├─ Mensagem: ${error.message}`)
+        addDebugLog(`├─ Stack: ${error.stack}`)
         console.error("Error getting quote:", error)
         setAmountOut("0")
         setQuoteData(null)
-        toast.error(`Erro ao obter cotação: ${error.message}`)
+        toast.error(`Erro real do SDK: ${error.message}`)
       } finally {
         setIsQuoting(false)
         addDebugLog("=== FIM DA COTAÇÃO ===")
@@ -409,18 +374,10 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
 
       addDebugLog(`📡 Tentando executeSwap com: ${JSON.stringify(swapParams, null, 2)}`)
 
-      // Tentar Holdstation primeiro
-      let txHash = null
-      try {
-        addDebugLog("🔍 Tentando Holdstation SDK para swap...")
-        txHash = await holdstationService.executeSwap(swapParams)
-        addDebugLog("✅ Holdstation SDK swap funcionou!")
-      } catch (holdstationError) {
-        addDebugLog(`❌ Holdstation SDK swap falhou: ${holdstationError.message}`)
-
-        // Para swap real, não podemos fazer fallback - precisa do SDK real
-        throw new Error(`Swap requer Holdstation SDK: ${holdstationError.message}`)
-      }
+      // Tentar Holdstation - SEM FALLBACK
+      addDebugLog("🔍 Tentando Holdstation SDK para swap...")
+      const txHash = await holdstationService.executeSwap(swapParams)
+      addDebugLog("✅ Holdstation SDK swap funcionou!")
 
       addDebugLog("✅ SWAP EXECUTADO COM SUCESSO!")
       addDebugLog(`├─ Transaction Hash: ${txHash}`)
@@ -454,9 +411,10 @@ export function SwapModal({ isOpen, onClose, walletAddress }: SwapModalProps) {
     } catch (error: any) {
       addDebugLog("❌ ERRO NO SWAP:")
       addDebugLog(`├─ Mensagem: ${error.message}`)
+      addDebugLog(`├─ Stack: ${error.stack}`)
       console.error("❌ Swap failed:", error)
 
-      toast.error("Falha no swap", {
+      toast.error("Erro real do SDK", {
         description: error.message,
       })
 
