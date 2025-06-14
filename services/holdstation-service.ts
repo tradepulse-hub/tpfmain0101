@@ -75,7 +75,7 @@ class HoldstationService {
 
   private async _doInitialize() {
     try {
-      console.log("🚀 Initializing Holdstation SDK (Fixed Client Setup)...")
+      console.log("🚀 Initializing Holdstation SDK (Debug Mode)...")
 
       // Importar os módulos
       const [HoldstationModule, EthersModule] = await Promise.all([
@@ -84,8 +84,44 @@ class HoldstationService {
       ])
 
       console.log("✅ Both packages imported successfully!")
-      console.log("SDK exports:", Object.keys(HoldstationModule))
-      console.log("Ethers exports:", Object.keys(EthersModule))
+      console.log("🔍 DETAILED SDK ANALYSIS:")
+      console.log("├─ HoldstationModule exports:", Object.keys(HoldstationModule))
+      console.log("├─ EthersModule exports:", Object.keys(EthersModule))
+
+      // Analisar cada export em detalhes
+      for (const [key, value] of Object.entries(HoldstationModule)) {
+        if (typeof value === "function") {
+          console.log(`├─ HoldstationModule.${key}: function`)
+          try {
+            const proto = value.prototype
+            if (proto) {
+              const methods = Object.getOwnPropertyNames(proto).filter((name) => name !== "constructor")
+              console.log(`│  └─ Methods: ${methods.join(", ")}`)
+            }
+          } catch (e) {
+            console.log(`│  └─ Could not analyze prototype`)
+          }
+        } else {
+          console.log(`├─ HoldstationModule.${key}: ${typeof value}`)
+        }
+      }
+
+      for (const [key, value] of Object.entries(EthersModule)) {
+        if (typeof value === "function") {
+          console.log(`├─ EthersModule.${key}: function`)
+          try {
+            const proto = value.prototype
+            if (proto) {
+              const methods = Object.getOwnPropertyNames(proto).filter((name) => name !== "constructor")
+              console.log(`│  └─ Methods: ${methods.join(", ")}`)
+            }
+          } catch (e) {
+            console.log(`│  └─ Could not analyze prototype`)
+          }
+        } else {
+          console.log(`├─ EthersModule.${key}: ${typeof value}`)
+        }
+      }
 
       // Extrair as classes e configurações
       const { config, inmemoryTokenStorage, TokenProvider } = HoldstationModule
@@ -134,40 +170,67 @@ class HoldstationService {
       this.tokenProvider = new TokenProvider()
       console.log("✅ TokenProvider created!")
 
-      // 8. Criar Quoter (PASSANDO O CLIENT)
-      console.log("🔧 Creating Quoter...")
-      try {
-        if (HoldstationModule.Quoter) {
-          this.quoter = new HoldstationModule.Quoter(this.client)
-          console.log("✅ Quoter created from SDK!")
-        } else if (EthersModule.Quoter) {
-          this.quoter = new EthersModule.Quoter(this.client)
-          console.log("✅ Quoter created from Ethers module!")
-        } else {
-          console.log("⚠️ Quoter not found in either module")
+      // 8. Tentar criar TODOS os possíveis componentes de quote
+      console.log("🔧 Creating Quote components...")
+
+      // Tentar Quoter de ambos os módulos
+      const quoterCandidates = [
+        { module: "HoldstationModule", name: "Quoter", class: HoldstationModule.Quoter },
+        { module: "EthersModule", name: "Quoter", class: EthersModule.Quoter },
+        { module: "HoldstationModule", name: "QuoteProvider", class: HoldstationModule.QuoteProvider },
+        { module: "EthersModule", name: "QuoteProvider", class: EthersModule.QuoteProvider },
+        { module: "HoldstationModule", name: "SwapQuoter", class: HoldstationModule.SwapQuoter },
+        { module: "EthersModule", name: "SwapQuoter", class: EthersModule.SwapQuoter },
+      ]
+
+      for (const candidate of quoterCandidates) {
+        if (candidate.class) {
+          try {
+            console.log(`🔄 Trying to create ${candidate.module}.${candidate.name}...`)
+            const instance = new candidate.class(this.client)
+            this.quoter = instance
+            console.log(`✅ ${candidate.module}.${candidate.name} created successfully!`)
+
+            // Analisar métodos disponíveis
+            const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(instance))
+            console.log(`📋 Available methods: ${methods.join(", ")}`)
+            break
+          } catch (error) {
+            console.log(`❌ ${candidate.module}.${candidate.name} failed: ${error.message}`)
+          }
         }
-      } catch (error) {
-        console.log("⚠️ Quoter creation failed:", error.message)
       }
 
-      // 9. Criar SwapHelper (PASSANDO CLIENT E TOKEN STORAGE)
-      console.log("🔧 Creating SwapHelper...")
-      try {
-        if (HoldstationModule.SwapHelper) {
-          this.swapHelper = new HoldstationModule.SwapHelper(this.client, {
-            tokenStorage: inmemoryTokenStorage,
-          })
-          console.log("✅ SwapHelper created from SDK!")
-        } else if (EthersModule.SwapHelper) {
-          this.swapHelper = new EthersModule.SwapHelper(this.client, {
-            tokenStorage: inmemoryTokenStorage,
-          })
-          console.log("✅ SwapHelper created from Ethers module!")
-        } else {
-          console.log("⚠️ SwapHelper not found in either module")
+      // 9. Tentar criar TODOS os possíveis componentes de swap
+      console.log("🔧 Creating Swap components...")
+
+      const swapCandidates = [
+        { module: "HoldstationModule", name: "SwapHelper", class: HoldstationModule.SwapHelper },
+        { module: "EthersModule", name: "SwapHelper", class: EthersModule.SwapHelper },
+        { module: "HoldstationModule", name: "SwapProvider", class: HoldstationModule.SwapProvider },
+        { module: "EthersModule", name: "SwapProvider", class: EthersModule.SwapProvider },
+        { module: "HoldstationModule", name: "Swapper", class: HoldstationModule.Swapper },
+        { module: "EthersModule", name: "Swapper", class: EthersModule.Swapper },
+      ]
+
+      for (const candidate of swapCandidates) {
+        if (candidate.class) {
+          try {
+            console.log(`🔄 Trying to create ${candidate.module}.${candidate.name}...`)
+            const instance = new candidate.class(this.client, {
+              tokenStorage: inmemoryTokenStorage,
+            })
+            this.swapHelper = instance
+            console.log(`✅ ${candidate.module}.${candidate.name} created successfully!`)
+
+            // Analisar métodos disponíveis
+            const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(instance))
+            console.log(`📋 Available methods: ${methods.join(", ")}`)
+            break
+          } catch (error) {
+            console.log(`❌ ${candidate.module}.${candidate.name} failed: ${error.message}`)
+          }
         }
-      } catch (error) {
-        console.log("⚠️ SwapHelper creation failed:", error.message)
       }
 
       // 10. Verificar se temos pelo menos o essencial
@@ -242,22 +305,6 @@ class HoldstationService {
       console.log(`├─ config.client exists: ${!!this.config.client}`)
       console.log(`├─ config.multicall3 exists: ${!!this.config.multicall3}`)
       console.log("✅ Global config verified!")
-    }
-
-    // Listar métodos disponíveis
-    const components = [
-      { name: "Client", obj: this.client },
-      { name: "TokenProvider", obj: this.tokenProvider },
-      { name: "Quoter", obj: this.quoter },
-      { name: "SwapHelper", obj: this.swapHelper },
-      { name: "Multicall3", obj: this.multicall3 },
-    ]
-
-    for (const component of components) {
-      if (component.obj) {
-        const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(component.obj))
-        console.log(`📋 ${component.name} methods:`, methods.slice(0, 10)) // Limitar output
-      }
     }
 
     console.log("✅ SDK functionality test completed")
@@ -375,27 +422,46 @@ class HoldstationService {
 
       let quote = null
       const methods = [
+        // Quoter methods
         { obj: this.quoter, name: "getQuote" },
         { obj: this.quoter, name: "quote" },
+        { obj: this.quoter, name: "getSwapQuote" },
+        { obj: this.quoter, name: "fetchQuote" },
+        { obj: this.quoter, name: "requestQuote" },
+        // SwapHelper methods
         { obj: this.swapHelper, name: "getQuote" },
         { obj: this.swapHelper, name: "getSwapQuote" },
         { obj: this.swapHelper, name: "quote" },
+        { obj: this.swapHelper, name: "fetchQuote" },
+        { obj: this.swapHelper, name: "requestQuote" },
       ]
 
       for (const method of methods) {
         if (method.obj && typeof method.obj[method.name] === "function") {
           try {
-            console.log(`🔄 Trying ${method.name}...`)
+            console.log(`🔄 Trying ${method.obj.constructor.name}.${method.name}...`)
             quote = await method.obj[method.name](params)
-            console.log(`✅ ${method.name} succeeded!`)
+            console.log(`✅ ${method.obj.constructor.name}.${method.name} succeeded!`)
+            console.log(`📊 Quote result:`, quote)
             break
           } catch (error) {
-            console.log(`❌ ${method.name} failed:`, error.message)
+            console.log(`❌ ${method.obj.constructor.name}.${method.name} failed:`, error.message)
           }
+        } else if (method.obj) {
+          console.log(`⚠️ ${method.obj.constructor.name}.${method.name} is not a function`)
         }
       }
 
       if (!quote) {
+        // Listar todos os métodos disponíveis para debug
+        if (this.quoter) {
+          const quoterMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.quoter))
+          console.log(`🔍 Available Quoter methods: ${quoterMethods.join(", ")}`)
+        }
+        if (this.swapHelper) {
+          const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
+          console.log(`🔍 Available SwapHelper methods: ${swapMethods.join(", ")}`)
+        }
         throw new Error("No quote method worked")
       }
 
@@ -467,22 +533,29 @@ class HoldstationService {
       const methods = [
         { obj: this.swapHelper, name: "executeSwap" },
         { obj: this.swapHelper, name: "swap" },
+        { obj: this.swapHelper, name: "performSwap" },
+        { obj: this.swapHelper, name: "doSwap" },
       ]
 
       for (const method of methods) {
         if (method.obj && typeof method.obj[method.name] === "function") {
           try {
-            console.log(`🔄 Trying ${method.name}...`)
+            console.log(`🔄 Trying ${method.obj.constructor.name}.${method.name}...`)
             txHash = await method.obj[method.name](params)
-            console.log(`✅ ${method.name} succeeded!`)
+            console.log(`✅ ${method.obj.constructor.name}.${method.name} succeeded!`)
             break
           } catch (error) {
-            console.log(`❌ ${method.name} failed:`, error.message)
+            console.log(`❌ ${method.obj.constructor.name}.${method.name} failed:`, error.message)
           }
         }
       }
 
       if (!txHash) {
+        // Listar todos os métodos disponíveis para debug
+        if (this.swapHelper) {
+          const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
+          console.log(`🔍 Available SwapHelper methods: ${swapMethods.join(", ")}`)
+        }
         throw new Error("No swap method worked")
       }
 
