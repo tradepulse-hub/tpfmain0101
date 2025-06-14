@@ -493,22 +493,26 @@ class HoldstationService {
       }
 
       // Preparar parâmetros com MÚLTIPLAS ESTRATÉGIAS
-      console.log("🔧 Preparing quote parameters with multiple strategies...")
+      console.log("🔧 Preparing quote parameters with CORRECT DECIMALS...")
+
+      // Converter para wei (18 decimals)
+      const amountInWei = ethers.parseEther(params.amountIn).toString()
+      console.log(`💰 Amount conversion: ${params.amountIn} → ${amountInWei} wei`)
 
       const baseParams = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
-        amountIn: params.amountIn,
+        amountIn: amountInWei, // ← USAR VALOR COM DECIMAIS
         slippage: params.slippage || "3",
       }
 
-      console.log("📋 Base parameters:", JSON.stringify(baseParams, null, 2))
+      console.log("📋 Base parameters with decimals:", JSON.stringify(baseParams, null, 2))
 
-      // ESTRATÉGIA 1: Usar SwapHelper._quote (método disponível)
+      // ESTRATÉGIAS ATUALIZADAS COM DECIMAIS CORRETOS
       let quote = null
       const strategies = [
         {
-          name: "SwapHelper._quote with loaded modules",
+          name: "SwapHelper._quote with WEI amount",
           call: async () => {
             // Garantir que módulos estão carregados
             if (typeof this.swapHelper.load === "function") {
@@ -518,7 +522,18 @@ class HoldstationService {
                 console.log(`Load warning: ${loadError.message}`)
               }
             }
-            return this.swapHelper._quote(baseParams)
+            return this.swapHelper._quote(baseParams) // Agora com wei
+          },
+        },
+        {
+          name: "SwapHelper._quote with original string amount",
+          call: async () => {
+            return this.swapHelper._quote({
+              tokenIn: params.tokenIn,
+              tokenOut: params.tokenOut,
+              amountIn: params.amountIn, // Valor original "1"
+              slippage: params.slippage || "3",
+            })
           },
         },
         {
@@ -545,14 +560,13 @@ class HoldstationService {
               this.provider,
             )
 
-            const amountInWei = ethers.parseEther(baseParams.amountIn)
             const fee = 3000 // 0.3%
 
             const amountOut = await quoterContract.quoteExactInputSingle(
-              baseParams.tokenIn,
-              baseParams.tokenOut,
+              params.tokenIn,
+              params.tokenOut,
               fee,
-              amountInWei,
+              amountInWei, // ← USAR WEI AQUI TAMBÉM
               0,
             )
 
@@ -568,26 +582,21 @@ class HoldstationService {
           name: "SwapHelper.submitSwapTokensForTokens (simulation)",
           call: () =>
             this.swapHelper.submitSwapTokensForTokens({
-              tokenIn: baseParams.tokenIn,
-              tokenOut: baseParams.tokenOut,
-              amountIn: ethers.parseEther(baseParams.amountIn).toString(),
-              slippage: baseParams.slippage,
+              tokenIn: params.tokenIn,
+              tokenOut: params.tokenOut,
+              amountIn: amountInWei, // ← USAR WEI AQUI TAMBÉM
+              slippage: params.slippage || "3",
               tx: { data: "0x", to: "0x0000000000000000000000000000000000000000" },
             }),
         },
         {
-          name: "SwapHelper._quote with BigNumber amountIn",
+          name: "SwapHelper._quote with fee and wei",
           call: () =>
             this.swapHelper._quote({
-              ...baseParams,
-              amountIn: ethers.parseEther(baseParams.amountIn).toString(),
-            }),
-        },
-        {
-          name: "SwapHelper._quote with fee",
-          call: () =>
-            this.swapHelper._quote({
-              ...baseParams,
+              tokenIn: params.tokenIn,
+              tokenOut: params.tokenOut,
+              amountIn: amountInWei, // ← USAR WEI AQUI TAMBÉM
+              slippage: params.slippage || "3",
               fee: "0.2",
             }),
         },
