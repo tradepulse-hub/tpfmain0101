@@ -23,6 +23,7 @@ class HoldstationService {
   private quoter: any = null
   private swapHelper: any = null
   private provider: any = null
+  private networkReady = false
   private initialized = false
   private initializationPromise: Promise<void> | null = null
 
@@ -30,6 +31,27 @@ class HoldstationService {
     if (typeof window !== "undefined") {
       // Não inicializar automaticamente, apenas quando necessário
     }
+  }
+
+  private async waitForNetwork(maxRetries = 10, delay = 1000): Promise<void> {
+    if (this.networkReady) return
+
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        console.log(`🔄 Checking network connection (attempt ${i + 1}/${maxRetries})...`)
+        const network = await this.provider.getNetwork()
+        console.log("✅ Network is ready!", network.name, "ChainId:", network.chainId)
+        this.networkReady = true
+        return
+      } catch (error) {
+        console.log(`⚠️ Network not ready yet (attempt ${i + 1}/${maxRetries}):`, error.message)
+        if (i < maxRetries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, delay))
+        }
+      }
+    }
+
+    console.log("⚠️ Network not ready after all retries, continuing anyway...")
   }
 
   private async initialize() {
@@ -60,42 +82,36 @@ class HoldstationService {
 
       console.log("🔧 Setting up provider and client...")
 
-      // 1. Criar o provider do ethers v6 - SINTAXE CORRETA
+      // 1. Criar o provider do ethers v6
       this.provider = new ethers.JsonRpcProvider(WORLDCHAIN_CONFIG.rpcUrl, {
         chainId: WORLDCHAIN_CONFIG.chainId,
         name: WORLDCHAIN_CONFIG.name,
       })
       console.log("✅ Provider created!")
 
-      // AGUARDAR A REDE ESTAR PRONTA
-      try {
-        console.log("🔄 Waiting for network to be ready...")
-        await this.provider.getNetwork()
-        console.log("✅ Network is ready!")
-      } catch (error) {
-        console.log("⚠️ Network check failed, continuing anyway:", error.message)
-      }
+      // 2. Aguardar a rede estar pronta
+      await this.waitForNetwork()
 
-      // 2. Criar o Client da Holdstation - PASSANDO O PROVIDER
+      // 3. Criar o Client da Holdstation
       this.client = new Client(this.provider)
       console.log("✅ Client created!")
 
-      // 3. Configurar o config global - IGUAL AO SEU EXEMPLO
+      // 4. Configurar o config global
       config.client = this.client
       console.log("✅ Client set in global config!")
 
-      // 4. Criar Multicall3 - IGUAL AO SEU EXEMPLO
+      // 5. Criar Multicall3
       if (Multicall3) {
         this.multicall3 = new Multicall3(this.provider)
         config.multicall3 = this.multicall3
         console.log("✅ Multicall3 configured!")
       }
 
-      // 5. Criar TokenProvider - SEM PARÂMETROS COMO NO SEU EXEMPLO
+      // 6. Criar TokenProvider
       this.tokenProvider = new TokenProvider()
       console.log("✅ TokenProvider created!")
 
-      // 6. Tentar criar Quoter - PASSANDO O CLIENT
+      // 7. Tentar criar Quoter
       try {
         if (HoldstationModule.Quoter) {
           this.quoter = new HoldstationModule.Quoter(this.client)
@@ -110,7 +126,7 @@ class HoldstationService {
         console.log("⚠️ Quoter creation failed:", error.message)
       }
 
-      // 7. Criar SwapHelper - IGUAL AO SEU EXEMPLO
+      // 8. Criar SwapHelper
       try {
         if (HoldstationModule.SwapHelper) {
           this.swapHelper = new HoldstationModule.SwapHelper(this.client, {
@@ -152,32 +168,13 @@ class HoldstationService {
       this.quoter = null
       this.swapHelper = null
       this.provider = null
+      this.networkReady = false
       throw error
     }
   }
 
   private async testSDKFunctionality() {
     console.log("🧪 Testing SDK functionality...")
-
-    // Testar Provider
-    if (this.provider) {
-      try {
-        console.log("🔄 Testing provider connection...")
-        const network = await this.provider.getNetwork()
-        console.log("✅ Provider working! Network:", network.name, "ChainId:", network.chainId)
-      } catch (error) {
-        console.log("⚠️ Provider test failed:", error.message)
-        // Tentar novamente após um delay
-        setTimeout(async () => {
-          try {
-            const network = await this.provider.getNetwork()
-            console.log("✅ Provider working after retry! Network:", network.name, "ChainId:", network.chainId)
-          } catch (retryError) {
-            console.log("⚠️ Provider retry also failed:", retryError.message)
-          }
-        }, 2000)
-      }
-    }
 
     // Listar métodos disponíveis
     const components = [
@@ -198,10 +195,18 @@ class HoldstationService {
     console.log("✅ SDK functionality test completed")
   }
 
+  // Método para garantir que a rede está pronta antes de operações
+  private async ensureNetworkReady(): Promise<void> {
+    if (!this.networkReady && this.provider) {
+      await this.waitForNetwork()
+    }
+  }
+
   // Obter saldos de tokens
   async getTokenBalances(walletAddress: string): Promise<TokenBalance[]> {
     try {
       await this.initialize()
+      await this.ensureNetworkReady()
 
       console.log(`💰 Getting token balances for: ${walletAddress}`)
 
@@ -280,6 +285,7 @@ class HoldstationService {
   }): Promise<SwapQuote> {
     try {
       await this.initialize()
+      await this.ensureNetworkReady()
 
       console.log("💱 Getting swap quote...")
       console.log("📊 Quote parameters:", params)
@@ -360,6 +366,7 @@ class HoldstationService {
   }): Promise<string> {
     try {
       await this.initialize()
+      await this.ensureNetworkReady()
 
       console.log("🚀 Executing swap...")
       console.log("📊 Swap parameters:", params)
@@ -458,6 +465,10 @@ class HoldstationService {
     return this.initialized
   }
 
+  isNetworkReady(): boolean {
+    return this.networkReady
+  }
+
   getClient() {
     return this.client
   }
@@ -481,6 +492,7 @@ class HoldstationService {
   getSDKStatus() {
     return {
       initialized: this.initialized,
+      networkReady: this.networkReady,
       hasProvider: !!this.provider,
       hasClient: !!this.client,
       hasTokenProvider: !!this.tokenProvider,
