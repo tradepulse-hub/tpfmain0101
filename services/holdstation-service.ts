@@ -75,22 +75,35 @@ class HoldstationService {
 
   private async _doInitialize() {
     try {
-      console.log("🚀 Initializing Holdstation SDK (Following Official Docs)...")
+      console.log("🚀 Initializing Holdstation SDK (Fixed SwapHelper Creation)...")
 
-      // Importar os módulos EXATAMENTE como na documentação
+      // Importar os módulos
       const [HoldstationModule, EthersModule] = await Promise.all([
         import("@holdstation/worldchain-sdk"),
         import("@holdstation/worldchain-ethers-v6"),
       ])
 
       console.log("✅ Both packages imported successfully!")
-      console.log("🔍 DETAILED SDK ANALYSIS:")
+      console.log("🔍 DETAILED MODULE ANALYSIS:")
       console.log("├─ HoldstationModule exports:", Object.keys(HoldstationModule))
       console.log("├─ EthersModule exports:", Object.keys(EthersModule))
 
-      // Extrair EXATAMENTE como na documentação
-      const { Client, Multicall3, Quoter, SwapHelper } = EthersModule
+      // Analisar cada export em detalhes
+      for (const [key, value] of Object.entries(HoldstationModule)) {
+        console.log(`├─ HoldstationModule.${key}: ${typeof value}`)
+      }
+
+      for (const [key, value] of Object.entries(EthersModule)) {
+        console.log(`├─ EthersModule.${key}: ${typeof value}`)
+      }
+
+      // Extrair componentes de AMBOS os módulos
       const { config, inmemoryTokenStorage, TokenProvider } = HoldstationModule
+      const { Client, Multicall3 } = EthersModule
+
+      // Tentar extrair Quoter e SwapHelper de ambos os módulos
+      const Quoter = HoldstationModule.Quoter || EthersModule.Quoter
+      const SwapHelper = HoldstationModule.SwapHelper || EthersModule.SwapHelper
 
       console.log("📋 Components extracted:")
       console.log(`├─ Client: ${!!Client}`)
@@ -144,9 +157,9 @@ class HoldstationService {
       this.tokenProvider = new TokenProvider()
       console.log("✅ TokenProvider created!")
 
-      // 8. Criar Quoter EXATAMENTE como na documentação
-      console.log("🔧 Creating Quoter (following docs)...")
+      // 8. Criar Quoter (se disponível)
       if (Quoter) {
+        console.log("🔧 Creating Quoter...")
         try {
           this.quoter = new Quoter(this.client)
           console.log("✅ Quoter created successfully!")
@@ -156,28 +169,62 @@ class HoldstationService {
           console.log(`📋 Quoter methods: ${quoterMethods.join(", ")}`)
         } catch (quoterError) {
           console.log(`❌ Quoter creation failed: ${quoterError.message}`)
+          console.log(`📋 Quoter error details:`, quoterError)
         }
       } else {
-        console.log("❌ Quoter class not found in EthersModule")
+        console.log("⚠️ Quoter class not found in either module")
       }
 
-      // 9. Criar SwapHelper EXATAMENTE como na documentação
-      console.log("🔧 Creating SwapHelper (following docs)...")
+      // 9. Criar SwapHelper (CRÍTICO!)
+      console.log("🔧 Creating SwapHelper (CRITICAL)...")
       if (SwapHelper) {
         try {
-          this.swapHelper = new SwapHelper(this.client, {
-            tokenStorage: inmemoryTokenStorage,
-          })
-          console.log("✅ SwapHelper created successfully!")
+          console.log("🔄 Attempting SwapHelper creation with different parameters...")
 
-          // Testar métodos do SwapHelper
-          const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
-          console.log(`📋 SwapHelper methods: ${swapMethods.join(", ")}`)
-        } catch (swapError) {
-          console.log(`❌ SwapHelper creation failed: ${swapError.message}`)
+          // Tentar diferentes formas de criar o SwapHelper
+          const swapHelperAttempts = [
+            {
+              name: "Standard (client + tokenStorage)",
+              params: [this.client, { tokenStorage: inmemoryTokenStorage }],
+            },
+            {
+              name: "Client only",
+              params: [this.client],
+            },
+            {
+              name: "Client + empty config",
+              params: [this.client, {}],
+            },
+            {
+              name: "Provider + tokenStorage",
+              params: [this.provider, { tokenStorage: inmemoryTokenStorage }],
+            },
+          ]
+
+          for (const attempt of swapHelperAttempts) {
+            try {
+              console.log(`🔄 Trying SwapHelper creation: ${attempt.name}...`)
+              this.swapHelper = new SwapHelper(...attempt.params)
+              console.log(`✅ SwapHelper created successfully with: ${attempt.name}!`)
+
+              // Testar métodos do SwapHelper
+              const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
+              console.log(`📋 SwapHelper methods: ${swapMethods.join(", ")}`)
+              break
+            } catch (swapError) {
+              console.log(`❌ SwapHelper creation failed (${attempt.name}): ${swapError.message}`)
+            }
+          }
+
+          if (!this.swapHelper) {
+            console.log("❌ All SwapHelper creation attempts failed")
+          }
+        } catch (generalSwapError) {
+          console.log(`❌ General SwapHelper creation error: ${generalSwapError.message}`)
+          console.log(`📋 SwapHelper error details:`, generalSwapError)
         }
       } else {
-        console.log("❌ SwapHelper class not found in EthersModule")
+        console.log("❌ SwapHelper class not found in either module")
       }
 
       // 10. Verificar se temos pelo menos o essencial
@@ -193,11 +240,16 @@ class HoldstationService {
         throw new Error("Failed to create TokenProvider")
       }
 
+      // SwapHelper é crítico para quotes e swaps
+      if (!this.swapHelper) {
+        console.log("⚠️ SwapHelper not available - quotes and swaps will not work")
+      }
+
       // 11. Testar se o SDK está funcionando
       await this.testSDKFunctionality()
 
       this.initialized = true
-      console.log("✅ Holdstation SDK fully initialized!")
+      console.log("✅ Holdstation SDK initialization completed!")
       console.log("📊 Final SDK Status:", this.getSDKStatus())
     } catch (error) {
       console.error("❌ Failed to initialize Holdstation SDK:", error)
@@ -354,80 +406,65 @@ class HoldstationService {
       await this.initialize()
       await this.ensureNetworkReady()
 
-      console.log("💱 Getting swap quote (following docs)...")
+      console.log("💱 Getting swap quote (using swapHelper.quote)...")
       console.log("📊 Quote parameters:", params)
 
       if (!this.config?.client) {
         throw new Error("Global config.client not set")
       }
 
-      console.log("📡 Trying quote methods...")
+      if (!this.swapHelper) {
+        throw new Error("SwapHelper not available - this is critical!")
+      }
+
+      console.log("📡 Using swapHelper.quote() method from docs...")
+
+      // Preparar parâmetros exatamente como na documentação
+      const quoteParams = {
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: params.amountIn,
+        slippage: params.slippage || "3",
+        fee: "0.2", // Como mostrado na documentação
+      }
+
+      console.log("📋 Quote params (following docs):", quoteParams)
 
       let quote = null
 
-      // MÉTODO 1: Usar Quoter (como na documentação)
-      if (this.quoter) {
-        console.log("🔄 Method 1: Using Quoter (from docs)...")
+      // Tentar o método exato da documentação: swapHelper.quote(params)
+      try {
+        console.log("🔄 Trying swapHelper.quote(params)...")
+        quote = await this.swapHelper.quote(quoteParams)
+        console.log("✅ swapHelper.quote() succeeded!")
+        console.log("📊 Quote result:", quote)
+      } catch (quoteError) {
+        console.log("❌ swapHelper.quote() failed:", quoteError.message)
 
-        const quoterMethods = [
-          { name: "simple", params: [params.tokenIn, params.tokenOut, params.amountIn] },
-          { name: "smart", params: [params.tokenIn, params.tokenOut, params.amountIn] },
-          { name: "getQuote", params: [params] },
-          { name: "quote", params: [params] },
+        // Tentar outros métodos como fallback
+        const fallbackMethods = [
+          { name: "getQuote", params: [quoteParams] },
+          { name: "_quote", params: [quoteParams] },
+          { name: "estimateSwap", params: [quoteParams] },
         ]
 
-        for (const method of quoterMethods) {
-          if (typeof this.quoter[method.name] === "function") {
-            try {
-              console.log(`🔄 Trying quoter.${method.name}...`)
-              quote = await this.quoter[method.name](...method.params)
-              console.log(`✅ quoter.${method.name} succeeded!`)
-              console.log(`📊 Quote result:`, quote)
-              break
-            } catch (error) {
-              console.log(`❌ quoter.${method.name} failed:`, error.message)
-            }
-          } else {
-            console.log(`⚠️ quoter.${method.name} is not a function`)
-          }
-        }
-      } else {
-        console.log("⚠️ Quoter not available")
-      }
-
-      // MÉTODO 2: Usar SwapHelper._quote (visto nos logs)
-      if (!quote && this.swapHelper) {
-        console.log("🔄 Method 2: Using SwapHelper._quote...")
-
-        const swapMethods = [
-          { name: "_quote", params: [params] },
-          { name: "quote", params: [params] },
-          { name: "getQuote", params: [params] },
-        ]
-
-        for (const method of swapMethods) {
+        for (const method of fallbackMethods) {
           if (typeof this.swapHelper[method.name] === "function") {
             try {
-              console.log(`🔄 Trying swapHelper.${method.name}...`)
+              console.log(`🔄 Trying fallback: swapHelper.${method.name}...`)
               quote = await this.swapHelper[method.name](...method.params)
               console.log(`✅ swapHelper.${method.name} succeeded!`)
-              console.log(`📊 Quote result:`, quote)
+              console.log("📊 Quote result:", quote)
               break
-            } catch (error) {
-              console.log(`❌ swapHelper.${method.name} failed:`, error.message)
+            } catch (fallbackError) {
+              console.log(`❌ swapHelper.${method.name} failed:`, fallbackError.message)
             }
-          } else {
-            console.log(`⚠️ swapHelper.${method.name} is not a function`)
           }
         }
       }
 
       if (!quote) {
         // Listar todos os métodos disponíveis para debug
-        if (this.quoter) {
-          const quoterMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.quoter))
-          console.log(`🔍 Available Quoter methods: ${quoterMethods.join(", ")}`)
-        }
         if (this.swapHelper) {
           const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
           console.log(`🔍 Available SwapHelper methods: ${swapMethods.join(", ")}`)
@@ -481,7 +518,7 @@ class HoldstationService {
       await this.initialize()
       await this.ensureNetworkReady()
 
-      console.log("🚀 Executing swap (following docs)...")
+      console.log("🚀 Executing swap (using swapHelper.swap)...")
       console.log("📊 Swap parameters:", params)
       console.log("⚠️ This will execute a REAL transaction!")
 
@@ -497,25 +534,53 @@ class HoldstationService {
         throw new Error("Client not available")
       }
 
-      console.log("📡 Calling executeSwap...")
+      console.log("📡 Using swapHelper.swap() method from docs...")
+
+      // Primeiro obter a cotação
+      const quoteResponse = await this.getSwapQuote(params)
+
+      // Preparar parâmetros do swap como na documentação
+      const swapParams = {
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: params.amountIn,
+        tx: {
+          data: quoteResponse.data,
+          to: quoteResponse.to,
+        },
+        fee: "0.2",
+        feeAmountOut: quoteResponse.feeAmountOut,
+        feeReceiver: "0x0000000000000000000000000000000000000000", // Placeholder
+      }
+
+      console.log("📋 Swap params (following docs):", swapParams)
 
       let txHash = null
-      const methods = [
-        { obj: this.swapHelper, name: "swap" },
-        { obj: this.swapHelper, name: "executeSwap" },
-        { obj: this.swapHelper, name: "performSwap" },
-        { obj: this.swapHelper, name: "doSwap" },
-      ]
 
-      for (const method of methods) {
-        if (method.obj && typeof method.obj[method.name] === "function") {
-          try {
-            console.log(`🔄 Trying ${method.obj.constructor.name}.${method.name}...`)
-            txHash = await method.obj[method.name](params)
-            console.log(`✅ ${method.obj.constructor.name}.${method.name} succeeded!`)
-            break
-          } catch (error) {
-            console.log(`❌ ${method.obj.constructor.name}.${method.name} failed:`, error.message)
+      try {
+        console.log("🔄 Trying swapHelper.swap(swapParams)...")
+        txHash = await this.swapHelper.swap(swapParams)
+        console.log("✅ swapHelper.swap() succeeded!")
+      } catch (swapError) {
+        console.log("❌ swapHelper.swap() failed:", swapError.message)
+
+        // Tentar outros métodos como fallback
+        const fallbackMethods = [
+          { name: "executeSwap", params: [params] },
+          { name: "performSwap", params: [params] },
+          { name: "doSwap", params: [params] },
+        ]
+
+        for (const method of fallbackMethods) {
+          if (typeof this.swapHelper[method.name] === "function") {
+            try {
+              console.log(`🔄 Trying fallback: swapHelper.${method.name}...`)
+              txHash = await this.swapHelper[method.name](...method.params)
+              console.log(`✅ swapHelper.${method.name} succeeded!`)
+              break
+            } catch (fallbackError) {
+              console.log(`❌ swapHelper.${method.name} failed:`, fallbackError.message)
+            }
           }
         }
       }
