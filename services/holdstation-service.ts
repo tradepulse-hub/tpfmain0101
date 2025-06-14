@@ -1,7 +1,7 @@
 import type { TokenBalance, SwapQuote } from "./types"
 import { ethers } from "ethers"
 
-// Configuração para Worldchain
+// Configuração para Worldchain conforme documentação
 const WORLDCHAIN_CONFIG = {
   chainId: 480,
   rpcUrl: "https://worldchain-mainnet.g.alchemy.com/public",
@@ -16,391 +16,159 @@ const SUPPORTED_TOKENS = {
   WDD: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B",
 }
 
-console.log("🚀 HOLDSTATION SERVICE - INÍCIO DO ARQUIVO")
-console.log("📦 Imports realizados com sucesso")
-console.log("⚙️ Configurações definidas:", WORLDCHAIN_CONFIG)
-console.log("🪙 Tokens suportados:", SUPPORTED_TOKENS)
-
-console.log("🔧 Creating HoldstationService instance...")
+console.log("🚀 HOLDSTATION SERVICE - SEGUINDO DOCUMENTAÇÃO OFICIAL")
 
 class HoldstationService {
   private client: any = null
+  private manager: any = null
+  private walletHistory: any = null
   private multicall3: any = null
   private tokenProvider: any = null
   private quoter: any = null
   private swapHelper: any = null
   private provider: any = null
   private config: any = null
-  private networkReady = false
   private initialized = false
-  private initializationPromise: Promise<void> | null = null
 
   constructor() {
-    console.log("🔧 HoldstationService constructor chamado")
-    if (typeof window !== "undefined") {
-      console.log("✅ Ambiente browser detectado")
-      // Não inicializar automaticamente, apenas quando necessário
-    } else {
-      console.log("⚠️ Ambiente server-side detectado")
-    }
-    console.log("✅ HoldstationService constructor concluído")
-  }
-
-  private async waitForNetwork(maxRetries = 10, delay = 1500): Promise<void> {
-    if (this.networkReady) return
-
-    console.log("🔄 Starting network readiness check...")
-
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        console.log(`🔄 Network check attempt ${i + 1}/${maxRetries}...`)
-
-        // Teste múltiplas operações para garantir que a rede está realmente pronta
-        const [network, blockNumber] = await Promise.all([this.provider.getNetwork(), this.provider.getBlockNumber()])
-
-        console.log("✅ Network fully ready!")
-        console.log(`├─ Network: ${network.name} (ChainId: ${network.chainId})`)
-        console.log(`├─ Block Number: ${blockNumber}`)
-        console.log(`└─ Connection verified`)
-
-        this.networkReady = true
-        return
-      } catch (error) {
-        console.log(`⚠️ Network not ready (attempt ${i + 1}/${maxRetries}):`, error.message)
-        if (i < maxRetries - 1) {
-          console.log(`⏳ Waiting ${delay}ms before next attempt...`)
-          await new Promise((resolve) => setTimeout(resolve, delay))
-        }
-      }
-    }
-
-    console.log("⚠️ Network not ready after all retries, but continuing...")
+    console.log("🔧 HoldstationService constructor - SEGUINDO DOCS")
   }
 
   private async initialize() {
     if (this.initialized) return
-    if (this.initializationPromise) return this.initializationPromise
 
-    this.initializationPromise = this._doInitialize()
-    return this.initializationPromise
-  }
-
-  private async _doInitialize() {
     try {
-      console.log("🚀 Initializing Holdstation SDK (FIXED VERSION)...")
+      console.log("🚀 Inicializando conforme DOCUMENTAÇÃO OFICIAL...")
 
-      // Importar os módulos (volta para a forma que funcionava)
+      // 1. Importar módulos conforme documentação
+      console.log("📦 Importando módulos...")
       const [HoldstationModule, EthersModule] = await Promise.all([
         import("@holdstation/worldchain-sdk"),
         import("@holdstation/worldchain-ethers-v6"),
       ])
 
-      console.log("✅ Both packages imported successfully!")
-      console.log("🔍 DETAILED MODULE ANALYSIS:")
-      console.log("├─ HoldstationModule exports:", Object.keys(HoldstationModule))
-      console.log("├─ EthersModule exports:", Object.keys(EthersModule))
+      console.log("✅ Módulos importados!")
+      console.log("📋 HoldstationModule exports:", Object.keys(HoldstationModule))
+      console.log("📋 EthersModule exports:", Object.keys(EthersModule))
 
-      // Extrair componentes CORRETAMENTE (como na documentação)
+      // 2. Extrair componentes conforme documentação
       const { config, inmemoryTokenStorage, TokenProvider } = HoldstationModule
       const { Client, Multicall3, Quoter, SwapHelper } = EthersModule
 
-      console.log("📋 Components extracted (CORRECT WAY):")
-      console.log(`├─ Client: ${!!Client}`)
-      console.log(`├─ Multicall3: ${!!Multicall3}`)
-      console.log(`├─ Quoter: ${!!Quoter}`)
-      console.log(`├─ SwapHelper: ${!!SwapHelper}`)
-      console.log(`├─ config: ${!!config}`)
-      console.log(`├─ inmemoryTokenStorage: ${!!inmemoryTokenStorage}`)
-      console.log(`└─ TokenProvider: ${!!TokenProvider}`)
+      console.log("✅ Componentes extraídos conforme docs!")
 
-      // Guardar referência do config
-      this.config = config
-
-      console.log("🔧 Setting up provider...")
-
-      // 1. Criar o provider do ethers v6
+      // 3. Criar provider ethers v6
+      console.log("🔧 Criando provider ethers v6...")
       this.provider = new ethers.JsonRpcProvider(WORLDCHAIN_CONFIG.rpcUrl, {
         chainId: WORLDCHAIN_CONFIG.chainId,
         name: WORLDCHAIN_CONFIG.name,
       })
 
-      console.log("✅ Provider created!")
+      // 4. Aguardar rede estar pronta
+      console.log("⏳ Aguardando rede...")
+      const network = await this.provider.getNetwork()
+      const blockNumber = await this.provider.getBlockNumber()
+      console.log(`✅ Rede pronta: ${network.name} (${network.chainId}) - Block: ${blockNumber}`)
 
-      // 2. Aguardar a rede estar pronta
-      await this.waitForNetwork()
-
-      // 3. Criar o Client da Holdstation
-      console.log("🔧 Creating Holdstation Client...")
+      // 5. Criar Client conforme documentação
+      console.log("🔧 Criando Client conforme docs...")
       this.client = new Client(this.provider)
-      console.log("✅ Client created!")
+      console.log("✅ Client criado!")
 
-      // 4. IMPORTANTE: Configurar o config GLOBALMENTE
-      console.log("🔧 Setting global config...")
+      // 6. Criar Multicall3 conforme documentação
+      console.log("🔧 Criando Multicall3...")
+      this.multicall3 = new Multicall3(this.provider)
+      console.log("✅ Multicall3 criado!")
+
+      // 7. CONFIGURAR CONFIG GLOBAL conforme documentação
+      console.log("🔧 Configurando config global conforme docs...")
+      this.config = config
       this.config.client = this.client
-      this.config.multicall3 = new Multicall3(this.provider)
-      this.multicall3 = this.config.multicall3
-      console.log("✅ Global config set!")
+      this.config.multicall3 = this.multicall3
+      console.log("✅ Config global configurado!")
 
-      // 5. Aguardar estabilização
-      console.log("⏳ Stabilizing SDK configuration...")
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      // 6. Criar TokenProvider com client explícito
-      console.log("🔧 Creating TokenProvider with explicit client...")
+      // 8. Criar TokenProvider conforme documentação
+      console.log("🔧 Criando TokenProvider conforme docs...")
       this.tokenProvider = new TokenProvider({
         client: this.client,
         multicall3: this.multicall3,
         storage: inmemoryTokenStorage,
       })
-      console.log("✅ TokenProvider created with explicit client!")
+      console.log("✅ TokenProvider criado!")
 
-      // 7. Criar Quoter com client explícito (CORREÇÃO CRÍTICA)
-      console.log("🔧 Creating Quoter with explicit client...")
-      try {
-        if (Quoter && typeof Quoter === "function") {
-          console.log("🔄 Strategy 1: Direct Quoter constructor with client...")
-          try {
-            this.quoter = new Quoter(this.client)
-            console.log("✅ Quoter created with direct constructor!")
-          } catch (directError) {
-            console.log(`❌ Direct constructor failed: ${directError.message}`)
-          }
-        }
+      // 9. Criar Quoter conforme documentação
+      console.log("🔧 Criando Quoter conforme docs...")
+      this.quoter = new Quoter(this.client)
+      console.log("✅ Quoter criado!")
 
-        if (!this.quoter && EthersModule.Quoter && typeof EthersModule.Quoter === "function") {
-          console.log("🔄 Strategy 2: EthersModule.Quoter with client...")
-          try {
-            this.quoter = new EthersModule.Quoter(this.client)
-            console.log("✅ Quoter created from EthersModule!")
-          } catch (ethersError) {
-            console.log(`❌ EthersModule.Quoter failed: ${ethersError.message}`)
-          }
-        }
+      // 10. Criar SwapHelper conforme documentação
+      console.log("🔧 Criando SwapHelper conforme docs...")
+      this.swapHelper = new SwapHelper(this.client, {
+        tokenStorage: inmemoryTokenStorage,
+      })
+      console.log("✅ SwapHelper criado!")
 
-        if (this.quoter) {
-          const quoterMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.quoter))
-          console.log(`📋 Quoter methods: ${quoterMethods.join(", ")}`)
-        } else {
-          console.log("⚠️ QUOTER CREATION FAILED - Will use SwapHelper methods instead")
-        }
-      } catch (quoterError) {
-        console.log(`❌ Quoter creation completely failed: ${quoterError.message}`)
+      // 11. Carregar SwapHelper conforme documentação
+      console.log("🔄 Carregando SwapHelper...")
+      if (typeof this.swapHelper.load === "function") {
+        await this.swapHelper.load()
+        console.log("✅ SwapHelper carregado!")
       }
 
-      // 8. Criar SwapHelper com client explícito (CORREÇÃO CRÍTICA)
-      console.log("🔧 Creating SwapHelper with explicit client...")
-      try {
-        if (EthersModule.SwapHelper && inmemoryTokenStorage) {
-          this.swapHelper = new EthersModule.SwapHelper(this.client, {
-            tokenStorage: inmemoryTokenStorage,
-          })
-          console.log("✅ SwapHelper created from EthersModule with explicit client!")
-        } else if (HoldstationModule.SwapHelper && inmemoryTokenStorage) {
-          this.swapHelper = new HoldstationModule.SwapHelper(this.client, {
-            tokenStorage: inmemoryTokenStorage,
-          })
-          console.log("✅ SwapHelper created from HoldstationModule with explicit client!")
-        } else {
-          console.log("⚠️ SwapHelper or inmemoryTokenStorage not available")
-          console.log(`├─ EthersModule.SwapHelper: ${!!EthersModule.SwapHelper}`)
-          console.log(`├─ HoldstationModule.SwapHelper: ${!!HoldstationModule.SwapHelper}`)
-          console.log(`└─ inmemoryTokenStorage: ${!!inmemoryTokenStorage}`)
-        }
-
-        if (this.swapHelper) {
-          const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
-          console.log(`📋 SwapHelper methods: ${swapMethods.join(", ")}`)
-
-          // CARREGAR O SWAPHELPER BÁSICO
-          console.log("🔄 Loading SwapHelper basic functionality...")
-          if (typeof this.swapHelper.load === "function") {
-            try {
-              await this.swapHelper.load()
-              console.log("✅ SwapHelper basic load completed!")
-            } catch (basicLoadError) {
-              console.log(`⚠️ Basic load failed: ${basicLoadError.message}`)
-            }
-          }
-        }
-      } catch (swapError) {
-        console.log(`❌ SwapHelper creation failed: ${swapError.message}`)
-        console.log(`❌ SwapHelper error stack: ${swapError.stack}`)
-      }
-
-      // 9. IMPORTANTE: Definir config global DEPOIS de criar os componentes
-      console.log("🔧 Setting global config AFTER component creation...")
-      this.config.client = this.client
-      this.config.multicall3 = this.multicall3
-      console.log("✅ Global config set after component creation!")
-
-      // 9. Verificar se temos pelo menos o essencial
-      if (!this.client) {
-        throw new Error("Failed to create Client")
-      }
-
-      if (!this.config.client) {
-        throw new Error("Failed to set global config.client")
-      }
-
-      if (!this.tokenProvider) {
-        throw new Error("Failed to create TokenProvider")
-      }
-
-      if (!this.swapHelper) {
-        throw new Error("Failed to create SwapHelper - this is critical for quotes!")
-      }
-
-      // 10. Testar se o SDK está funcionando
-      await this.testSDKFunctionality()
+      // 12. Verificar se tudo está funcionando
+      console.log("🧪 Testando componentes...")
+      console.log(`├─ Client: ${!!this.client}`)
+      console.log(`├─ Multicall3: ${!!this.multicall3}`)
+      console.log(`├─ TokenProvider: ${!!this.tokenProvider}`)
+      console.log(`├─ Quoter: ${!!this.quoter}`)
+      console.log(`├─ SwapHelper: ${!!this.swapHelper}`)
+      console.log(`└─ Config: ${!!this.config?.client}`)
 
       this.initialized = true
-      console.log("✅ Holdstation SDK initialization completed!")
-      console.log("📊 Final SDK Status:", this.getSDKStatus())
+      console.log("✅ HoldStation SDK inicializado conforme DOCUMENTAÇÃO!")
     } catch (error) {
-      console.error("❌ Failed to initialize Holdstation SDK:", error)
+      console.error("❌ Erro ao inicializar conforme docs:", error)
+      console.error("❌ Stack:", error.stack)
       this.initialized = false
-      this.client = null
-      this.multicall3 = null
-      this.tokenProvider = null
-      this.quoter = null
-      this.swapHelper = null
-      this.provider = null
-      this.config = null
-      this.networkReady = false
       throw error
     }
   }
 
-  private async testSDKFunctionality() {
-    console.log("🧪 Testing SDK functionality...")
-
-    // Testar Provider
-    if (this.provider) {
-      try {
-        console.log("🔄 Testing provider operations...")
-        const [network, blockNumber] = await Promise.all([this.provider.getNetwork(), this.provider.getBlockNumber()])
-        console.log("✅ Provider fully operational!")
-        console.log(`├─ Network: ${network.name} (${network.chainId})`)
-        console.log(`└─ Latest Block: ${blockNumber}`)
-      } catch (error) {
-        console.log("⚠️ Provider test failed:", error.message)
-      }
-    }
-
-    // Testar Client
-    if (this.client) {
-      try {
-        console.log("🔄 Testing client operations...")
-        const clientName = this.client.name()
-        const chainId = this.client.getChainId()
-        const blockNumber = await this.client.getBlockNumber()
-        console.log("✅ Client fully operational!")
-        console.log(`├─ Client Name: ${clientName}`)
-        console.log(`├─ Chain ID: ${chainId}`)
-        console.log(`└─ Block Number: ${blockNumber}`)
-      } catch (error) {
-        console.log("⚠️ Client test failed:", error.message)
-      }
-    }
-
-    // Testar Config Global
-    if (this.config) {
-      console.log("🔄 Testing global config...")
-      console.log(`├─ config.client exists: ${!!this.config.client}`)
-      console.log(`├─ config.multicall3 exists: ${!!this.config.multicall3}`)
-      console.log("✅ Global config verified!")
-    }
-
-    console.log("✅ SDK functionality test completed")
-  }
-
-  // Método para garantir que a rede está pronta antes de operações
-  private async ensureNetworkReady(): Promise<void> {
-    if (!this.networkReady && this.provider) {
-      console.log("🔄 Ensuring network is ready for operation...")
-      await this.waitForNetwork()
-    }
-  }
-
-  // Obter saldos de tokens
+  // Obter saldos conforme documentação
   async getTokenBalances(walletAddress: string): Promise<TokenBalance[]> {
     try {
       await this.initialize()
-      await this.ensureNetworkReady()
 
-      console.log(`💰 Getting token balances for: ${walletAddress}`)
+      console.log(`💰 Obtendo saldos conforme docs para: ${walletAddress}`)
 
       if (!this.tokenProvider) {
-        throw new Error("TokenProvider not available")
+        throw new Error("TokenProvider não disponível")
       }
 
-      if (!this.config?.client) {
-        throw new Error("Global config.client not set")
-      }
+      // Usar método do TokenProvider conforme documentação
+      const balances = await this.tokenProvider.getTokenBalances(walletAddress)
+      console.log("📊 Saldos obtidos conforme docs:", balances)
 
-      console.log("📡 Calling getTokenBalances...")
-
-      let balances = null
-      const methods = [
-        { obj: this.tokenProvider, name: "getTokenBalances" },
-        { obj: this.tokenProvider, name: "getBalances" },
-        { obj: this.tokenProvider, name: "getTokens" },
-      ]
-
-      for (const method of methods) {
-        if (method.obj && typeof method.obj[method.name] === "function") {
-          try {
-            console.log(`🔄 Trying ${method.name}...`)
-            balances = await method.obj[method.name](walletAddress)
-            console.log(`✅ ${method.name} succeeded!`)
-            break
-          } catch (error) {
-            console.log(`❌ ${method.name} failed:`, error.message)
-          }
-        }
-      }
-
-      if (!balances) {
-        throw new Error("No balance method worked")
-      }
-
-      console.log("📊 Raw balances from SDK:", balances)
-
-      if (!Array.isArray(balances)) {
-        // Se não for array, tentar converter
-        if (balances && typeof balances === "object") {
-          balances = Object.entries(balances).map(([symbol, data]: [string, any]) => ({
-            symbol,
-            name: data.name || symbol,
-            address: data.address || SUPPORTED_TOKENS[symbol as keyof typeof SUPPORTED_TOKENS] || "",
-            balance: data.balance || data.amount || "0",
-            decimals: data.decimals || 18,
-          }))
-        } else {
-          throw new Error("Invalid balance response format")
-        }
-      }
-
-      // Processar e formatar saldos
+      // Processar conforme documentação
       const formattedBalances: TokenBalance[] = balances.map((balance: any) => ({
         symbol: balance.symbol,
         name: balance.name || balance.symbol,
-        address: balance.address || balance.tokenAddress || "",
+        address: balance.address || balance.tokenAddress,
         balance: balance.balance || balance.amount || "0",
         decimals: balance.decimals || 18,
         icon: this.getTokenIcon(balance.symbol),
-        formattedBalance: balance.formattedBalance || balance.balance || balance.amount || "0",
+        formattedBalance: balance.formattedBalance || balance.balance || "0",
       }))
 
-      console.log("✅ Formatted balances:", formattedBalances)
+      console.log("✅ Saldos formatados conforme docs:", formattedBalances)
       return formattedBalances
     } catch (error) {
-      console.error("❌ Error getting token balances:", error)
-      throw new Error(`Balance fetch failed: ${error.message}`)
+      console.error("❌ Erro ao obter saldos conforme docs:", error)
+      throw new Error(`Falha ao obter saldos: ${error.message}`)
     }
   }
 
-  // Obter cotação de swap - NOVA ABORDAGEM SEM MÓDULOS
+  // Obter cotação conforme documentação
   async getSwapQuote(params: {
     tokenIn: string
     tokenOut: string
@@ -408,149 +176,56 @@ class HoldstationService {
     slippage?: string
   }): Promise<SwapQuote> {
     try {
-      console.log("🚨 === HOLDSTATION QUOTE V3 - DIRECT APPROACH ===")
-      console.log("🚨 TIMESTAMP:", new Date().toISOString())
-      console.log("🚨 Usando abordagem DIRETA sem módulos")
+      console.log("🚨 === COTAÇÃO CONFORME DOCUMENTAÇÃO OFICIAL ===")
+      console.log("📋 Parâmetros:", params)
 
       await this.initialize()
-      await this.ensureNetworkReady()
 
-      if (!this.swapHelper) {
-        throw new Error("SwapHelper not available")
+      if (!this.quoter) {
+        throw new Error("Quoter não disponível")
       }
 
-      // Converter para wei (18 decimals)
-      const amountInWei = "1000000000000000000" // 1 * 10^18 HARDCODED
-      console.log(`🚨 Amount: ${params.amountIn} → ${amountInWei} wei`)
+      // Converter para wei conforme documentação
+      const amountInWei = ethers.parseEther(params.amountIn)
+      console.log(`💰 Amount: ${params.amountIn} → ${amountInWei.toString()} wei`)
 
-      // ESTRATÉGIA 1: Usar submitSwapTokensForTokens diretamente (não precisa de módulos)
-      console.log("🚨 ESTRATÉGIA 1: submitSwapTokensForTokens (DIRECT)")
-
-      try {
-        // Criar dados de transação fake para simular
-        const fakeQuoteData = {
-          tokenIn: params.tokenIn,
-          tokenOut: params.tokenOut,
-          amountIn: amountInWei,
-          slippage: params.slippage || "3",
-          tx: {
-            data: "0x", // Dados vazios para simulação
-            to: "0x0000000000000000000000000000000000000000", // Endereço zero para simulação
-          },
-        }
-
-        console.log("🚨 Calling submitSwapTokensForTokens with:", fakeQuoteData)
-
-        // Tentar usar o método direto
-        const result = await this.swapHelper.submitSwapTokensForTokens(fakeQuoteData)
-        console.log("🚨 submitSwapTokensForTokens result:", result)
-
-        // Se chegou aqui, simular uma cotação
-        const simulatedQuote: SwapQuote = {
-          amountOut: "1000", // Simular 1000 TPF por 1 WLD
-          data: "0x",
-          to: "0x0000000000000000000000000000000000000000",
-          value: "0",
-          feeAmountOut: "0",
-          addons: {
-            outAmount: "1000",
-            rateSwap: "1000",
-            amountOutUsd: "0",
-            minReceived: "950", // 95% do valor (5% slippage)
-            feeAmountOut: "0",
-          },
-        }
-
-        console.log("✅ Simulated quote created:", simulatedQuote)
-        return simulatedQuote
-      } catch (directError) {
-        console.log("🚨 submitSwapTokensForTokens failed:", directError.message)
+      // Usar Quoter conforme documentação
+      console.log("📡 Chamando quoter.getQuote conforme docs...")
+      const quoteParams = {
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: amountInWei.toString(),
+        slippage: params.slippage || "3",
       }
 
-      // ESTRATÉGIA 2: Usar contrato Uniswap diretamente
-      console.log("🚨 ESTRATÉGIA 2: Direct Uniswap Contract")
+      const quote = await this.quoter.getQuote(quoteParams)
+      console.log("✅ Cotação obtida conforme docs:", quote)
 
-      try {
-        // Endereço do Quoter V3 na Worldchain (se existir)
-        const quoterAddress = "0x61fFE014bA17989E743c5F6cB21bF9697530B21e"
-
-        const quoterContract = new ethers.Contract(
-          quoterAddress,
-          [
-            {
-              inputs: [
-                { name: "tokenIn", type: "address" },
-                { name: "tokenOut", type: "address" },
-                { name: "fee", type: "uint24" },
-                { name: "amountIn", type: "uint256" },
-                { name: "sqrtPriceLimitX96", type: "uint160" },
-              ],
-              name: "quoteExactInputSingle",
-              outputs: [{ name: "amountOut", type: "uint256" }],
-              type: "function",
-            },
-          ],
-          this.provider,
-        )
-
-        const fee = 3000 // 0.3%
-        const amountOut = await quoterContract.quoteExactInputSingle(
-          params.tokenIn,
-          params.tokenOut,
-          fee,
-          amountInWei,
-          0,
-        )
-
-        const directQuote: SwapQuote = {
-          amountOut: ethers.formatEther(amountOut),
-          data: "0x",
-          to: quoterAddress,
-          value: "0",
-          feeAmountOut: "0",
-          addons: {
-            outAmount: ethers.formatEther(amountOut),
-            rateSwap: ethers.formatEther(amountOut),
-            amountOutUsd: "0",
-            minReceived: (Number.parseFloat(ethers.formatEther(amountOut)) * 0.97).toString(), // 3% slippage
-            feeAmountOut: "0",
-          },
-        }
-
-        console.log("✅ Direct Uniswap quote:", directQuote)
-        return directQuote
-      } catch (uniswapError) {
-        console.log("🚨 Direct Uniswap failed:", uniswapError.message)
-      }
-
-      // ESTRATÉGIA 3: Cotação simulada baseada em preços conhecidos
-      console.log("🚨 ESTRATÉGIA 3: Simulated Quote")
-
-      // Simular cotação baseada em dados conhecidos
-      const simulatedQuote: SwapQuote = {
-        amountOut: "1500", // Simular 1500 TPF por 1 WLD (taxa aproximada)
-        data: "0x",
-        to: "0x0000000000000000000000000000000000000000",
-        value: "0",
-        feeAmountOut: "0",
+      // Formatar resposta conforme documentação
+      const formattedQuote: SwapQuote = {
+        amountOut: quote.amountOut || "0",
+        data: quote.data || "0x",
+        to: quote.to || "0x0000000000000000000000000000000000000000",
+        value: quote.value || "0",
+        feeAmountOut: quote.feeAmountOut || "0",
         addons: {
-          outAmount: "1500",
-          rateSwap: "1500",
-          amountOutUsd: "0",
-          minReceived: "1455", // 97% do valor (3% slippage)
-          feeAmountOut: "0",
+          outAmount: quote.amountOut || "0",
+          rateSwap: quote.rateSwap || "0",
+          amountOutUsd: quote.amountOutUsd || "0",
+          minReceived: quote.minReceived || "0",
+          feeAmountOut: quote.feeAmountOut || "0",
         },
       }
 
-      console.log("✅ Fallback simulated quote:", simulatedQuote)
-      return simulatedQuote
+      console.log("✅ Cotação formatada conforme docs:", formattedQuote)
+      return formattedQuote
     } catch (error) {
-      console.error("❌ Error getting swap quote:", error)
-      throw new Error(`Quote fetch failed: ${error.message}`)
+      console.error("❌ Erro na cotação conforme docs:", error)
+      throw new Error(`Falha na cotação: ${error.message}`)
     }
   }
 
-  // Executar swap
+  // Executar swap conforme documentação
   async executeSwap(params: {
     tokenIn: string
     tokenOut: string
@@ -558,123 +233,81 @@ class HoldstationService {
     slippage?: string
   }): Promise<string> {
     try {
+      console.log("🚀 Executando swap conforme DOCUMENTAÇÃO...")
+      console.log("📋 Parâmetros:", params)
+
       await this.initialize()
-      await this.ensureNetworkReady()
-
-      console.log("🚀 Executing swap (using swapHelper.swap)...")
-      console.log("📊 Swap parameters:", params)
-      console.log("⚠️ This will execute a REAL transaction!")
-
-      if (!this.config?.client) {
-        throw new Error("Global config.client not set")
-      }
 
       if (!this.swapHelper) {
-        throw new Error("SwapHelper not available")
+        throw new Error("SwapHelper não disponível")
       }
 
-      if (!this.client) {
-        throw new Error("Client not available")
-      }
+      // Primeiro obter cotação
+      const quote = await this.getSwapQuote(params)
 
-      console.log("📡 Using swapHelper.swap() method from docs...")
-
-      // Primeiro obter a cotação
-      const quoteResponse = await this.getSwapQuote(params)
-
-      // Preparar parâmetros do swap como na documentação
+      // Executar swap conforme documentação
+      console.log("📡 Chamando swapHelper.swap conforme docs...")
       const swapParams = {
         tokenIn: params.tokenIn,
         tokenOut: params.tokenOut,
         amountIn: params.amountIn,
         tx: {
-          data: quoteResponse.data,
-          to: quoteResponse.to,
+          data: quote.data,
+          to: quote.to,
         },
-        fee: "0.2",
-        feeAmountOut: quoteResponse.feeAmountOut,
-        feeReceiver: "0x0000000000000000000000000000000000000000", // Placeholder
+        fee: "0.3",
+        feeAmountOut: quote.feeAmountOut,
+        feeReceiver: "0x0000000000000000000000000000000000000000",
       }
 
-      console.log("📋 Swap params (following docs):", swapParams)
+      const txResult = await this.swapHelper.swap(swapParams)
+      console.log("✅ Swap executado conforme docs:", txResult)
 
-      let txHash = null
+      // Extrair hash conforme documentação
+      const txHash = txResult.hash || txResult.transactionHash || txResult
+      console.log("📋 Hash da transação:", txHash)
 
-      try {
-        console.log("🔄 Trying swapHelper.swap(swapParams)...")
-        txHash = await this.swapHelper.swap(swapParams)
-        console.log("✅ swapHelper.swap() succeeded!")
-      } catch (swapError) {
-        console.log("❌ swapHelper.swap() failed:", swapError.message)
-
-        // Tentar outros métodos como fallback
-        const fallbackMethods = [
-          { name: "executeSwap", params: [params] },
-          { name: "performSwap", params: [params] },
-          { name: "doSwap", params: [params] },
-        ]
-
-        for (const method of fallbackMethods) {
-          if (typeof this.swapHelper[method.name] === "function") {
-            try {
-              console.log(`🔄 Trying fallback: swapHelper.${method.name}...`)
-              txHash = await this.swapHelper[method.name](...method.params)
-              console.log(`✅ swapHelper.${method.name} succeeded!`)
-              break
-            } catch (fallbackError) {
-              console.log(`❌ swapHelper.${method.name} failed:`, fallbackError.message)
-            }
-          }
-        }
-      }
-
-      if (!txHash) {
-        // Listar todos os métodos disponíveis para debug
-        if (this.swapHelper) {
-          const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
-          console.log(`🔍 Available SwapHelper methods: ${swapMethods.join(", ")}`)
-        }
-        throw new Error("No swap method worked")
-      }
-
-      console.log("📋 Raw transaction result:", txHash)
-
-      // Extrair hash da transação
-      let finalTxHash = null
-      if (typeof txHash === "string") {
-        finalTxHash = txHash
-      } else if (txHash && txHash.hash) {
-        finalTxHash = txHash.hash
-      } else if (txHash && txHash.transactionHash) {
-        finalTxHash = txHash.transactionHash
-      } else if (txHash && txHash.txHash) {
-        finalTxHash = txHash.txHash
-      }
-
-      if (!finalTxHash || typeof finalTxHash !== "string" || !finalTxHash.startsWith("0x")) {
-        throw new Error("Invalid transaction hash received")
-      }
-
-      console.log("✅ Swap executed successfully!")
-      console.log("📋 Transaction hash:", finalTxHash)
-      return finalTxHash
+      return txHash
     } catch (error) {
-      console.error("❌ Error executing swap:", error)
-      throw new Error(`Swap execution failed: ${error.message}`)
+      console.error("❌ Erro no swap conforme docs:", error)
+      throw new Error(`Falha no swap: ${error.message}`)
     }
   }
 
-  // Método para obter histórico de transações
+  // Histórico conforme documentação
   async getTransactionHistory(walletAddress: string, offset = 0, limit = 50): Promise<any[]> {
     try {
-      await this.initialize()
+      console.log("=== BUSCAR HISTÓRICO CONFORME DOCUMENTAÇÃO ===")
+      console.log(`Endereço: ${walletAddress}`)
+      console.log(`Offset: ${offset}, Limit: ${limit}`)
 
-      console.log(`📜 Getting transaction history for: ${walletAddress}`)
-      console.log("⚠️ Transaction history not implemented in current SDK version")
-      return []
+      if (!this.initialized) {
+        console.log("❌ SDK não inicializado - inicializando...")
+        await this.initializeSDK()
+      }
+
+      if (!this.walletHistory) {
+        console.log("❌ walletHistory não disponível - reinicializando...")
+        await this.initializeSDK()
+      }
+
+      console.log("📡 Chamando walletHistory.fetch conforme documentação...")
+
+      // Usar método conforme documentação
+      const result = await this.walletHistory.fetch({
+        address: walletAddress,
+        offset,
+        limit,
+      })
+
+      console.log("✅ Histórico obtido:", result)
+      console.log(`📊 Total de transações: ${result?.length || 0}`)
+
+      return result || []
     } catch (error) {
-      console.error("❌ Error getting transaction history:", error)
-      return []
+      console.error("❌ Erro ao buscar histórico:", error.message)
+      console.error("Stack:", error.stack)
+      throw error
     }
   }
 
@@ -695,10 +328,6 @@ class HoldstationService {
 
   isInitialized(): boolean {
     return this.initialized
-  }
-
-  isNetworkReady(): boolean {
-    return this.networkReady
   }
 
   getClient() {
@@ -724,7 +353,6 @@ class HoldstationService {
   getSDKStatus() {
     return {
       initialized: this.initialized,
-      networkReady: this.networkReady,
       hasProvider: !!this.provider,
       hasClient: !!this.client,
       hasTokenProvider: !!this.tokenProvider,
@@ -732,58 +360,78 @@ class HoldstationService {
       hasSwapHelper: !!this.swapHelper,
       hasMulticall3: !!this.multicall3,
       hasGlobalConfig: !!this.config?.client,
-      sdkType: "NPM @holdstation/worldchain-sdk + ethers-v6",
+      sdkType: "OFICIAL - Seguindo documentação HoldStation",
       chainId: WORLDCHAIN_CONFIG.chainId,
       rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
     }
   }
 
-  // Método para debug - mostrar informações do SDK
   async debugSDK() {
     try {
       await this.initialize()
-
-      console.log("=== HOLDSTATION SDK DEBUG ===")
+      console.log("=== DEBUG CONFORME DOCUMENTAÇÃO ===")
       console.log("Status:", this.getSDKStatus())
-
-      const components = [
-        { name: "Provider", obj: this.provider },
-        { name: "Client", obj: this.client },
-        { name: "TokenProvider", obj: this.tokenProvider },
-        { name: "Quoter", obj: this.quoter },
-        { name: "SwapHelper", obj: this.swapHelper },
-        { name: "Multicall3", obj: this.multicall3 },
-      ]
-
-      for (const component of components) {
-        if (component.obj) {
-          console.log(`${component.name} Methods:`, Object.getOwnPropertyNames(Object.getPrototypeOf(component.obj)))
-          console.log(`${component.name} Properties:`, Object.keys(component.obj))
-        }
-      }
-
-      console.log("=== END DEBUG ===")
-
       return this.getSDKStatus()
     } catch (error) {
-      console.error("Debug failed:", error)
+      console.error("Debug falhou:", error)
       return { error: error.message }
     }
   }
+
+  async initializeSDK(): Promise<void> {
+    try {
+      console.log("🔧 Inicializando APENAS histórico conforme documentação HoldStation...")
+
+      // Importar módulos conforme documentação
+      const { Client } = await import("@holdstation/sdk")
+      const { config } = await import("@holdstation/sdk")
+
+      console.log("✅ Módulos importados")
+
+      // Criar provider
+      const provider = new ethers.JsonRpcProvider("https://worldchain-mainnet.g.alchemy.com/public")
+      console.log("✅ Provider criado")
+
+      // Criar client conforme documentação
+      this.client = new Client({
+        provider,
+        chainId: 480,
+      })
+
+      console.log("✅ Client criado conforme docs")
+
+      // Configurar config global conforme documentação
+      config.setGlobalConfig({
+        client: this.client,
+      })
+
+      console.log("✅ Config global definido")
+
+      // Importar WalletHistory conforme documentação
+      const { WalletHistory } = await import("@holdstation/sdk")
+
+      // Criar WalletHistory conforme documentação
+      this.walletHistory = new WalletHistory()
+
+      console.log("✅ WalletHistory criado conforme documentação")
+
+      this.initialized = true
+      console.log("✅ SDK inicializado APENAS para histórico!")
+    } catch (error) {
+      console.error("❌ Erro ao inicializar SDK:", error.message)
+      console.error("Stack:", error.stack)
+      throw error
+    }
+  }
+
+  getManager() {
+    return this.manager
+  }
 }
 
-console.log("✅ HoldstationService class defined")
+console.log("✅ HoldstationService definido conforme DOCUMENTAÇÃO")
 
 export const holdstationService = new HoldstationService()
 
-console.log("✅ holdstationService instance created:", !!holdstationService)
-console.log("✅ holdstationService type:", typeof holdstationService)
-console.log("✅ holdstationService constructor:", holdstationService.constructor.name)
-
-// Verificar se os métodos existem
-const criticalMethods = ["getSwapQuote", "executeSwap", "getSDKStatus", "debugSDK"]
-criticalMethods.forEach((method) => {
-  console.log(`✅ ${method} exists:`, typeof holdstationService[method] === "function")
-})
-
-console.log("🎯 HOLDSTATION SERVICE - ARQUIVO PROCESSADO COM SUCESSO")
+console.log("✅ holdstationService criado conforme DOCS:", !!holdstationService)
+console.log("🎯 HOLDSTATION SERVICE - SEGUINDO DOCUMENTAÇÃO OFICIAL")
