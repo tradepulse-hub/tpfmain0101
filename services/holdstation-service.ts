@@ -19,6 +19,7 @@ class HoldstationService {
   private manager: any = null
   private swapHelper: any = null
   private tokenProvider: any = null
+  private client: any = null
   private initialized = false
   private initializationPromise: Promise<void> | null = null
 
@@ -40,84 +41,165 @@ class HoldstationService {
     try {
       console.log("🚀 Initializing Holdstation SDK (Worldchain)...")
 
-      // Importação dinâmica do SDK da Holdstation
-      try {
-        console.log("📦 Importing @holdstation/worldchain-sdk...")
-        const HoldstationModule = await import("@holdstation/worldchain-sdk")
+      // Importar ambos os pacotes
+      const [HoldstationModule, EthersModule] = await Promise.all([
+        import("@holdstation/worldchain-sdk"),
+        import("@holdstation/worldchain-ethers-v6"),
+      ])
 
-        console.log("✅ @holdstation/worldchain-sdk imported successfully!")
-        console.log("Available exports:", Object.keys(HoldstationModule))
+      console.log("✅ Both packages imported successfully!")
+      console.log("SDK exports:", Object.keys(HoldstationModule))
+      console.log("Ethers exports:", Object.keys(EthersModule))
 
-        // Extrair as classes principais
-        const { Manager, SwapHelper, TokenProvider, HoldSo, defaultWorldchainConfig } = HoldstationModule
+      // Extrair as classes principais
+      const { Manager, SwapHelper, TokenProvider, HoldSo, defaultWorldchainConfig } = HoldstationModule
+      const { Client } = EthersModule
 
-        console.log("🔧 Initializing Holdstation components...")
+      console.log("🔧 Initializing Holdstation components...")
 
-        // Usar a configuração padrão da Worldchain se disponível
-        const config = defaultWorldchainConfig || {
-          chainId: WORLDCHAIN_CONFIG.chainId,
-          rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
+      // Usar a configuração padrão da Worldchain se disponível
+      const config = defaultWorldchainConfig || {
+        chainId: WORLDCHAIN_CONFIG.chainId,
+        rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
+      }
+
+      console.log("📋 Using config:", config)
+
+      // 1. Primeiro, inicializar o Client do Ethers
+      if (Client) {
+        try {
+          console.log("🔧 Initializing Ethers Client...")
+          this.client = new Client({
+            rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
+            chainId: WORLDCHAIN_CONFIG.chainId,
+          })
+          console.log("✅ Ethers Client initialized!")
+        } catch (error) {
+          console.log("⚠️ Ethers Client initialization failed:", error.message)
+          // Tentar sem configuração
+          try {
+            this.client = new Client()
+            console.log("✅ Ethers Client initialized without config!")
+          } catch (error2) {
+            console.log("❌ Ethers Client failed completely:", error2.message)
+          }
         }
+      }
 
-        console.log("📋 Using config:", config)
-
-        // Inicializar Manager
-        if (Manager) {
+      // 2. Inicializar Manager com o client
+      if (Manager) {
+        try {
+          const managerConfig = {
+            ...config,
+            client: this.client,
+          }
+          console.log("🔧 Initializing Manager with client...")
+          this.manager = new Manager(managerConfig)
+          console.log("✅ Manager initialized with client!")
+        } catch (error) {
+          console.log("⚠️ Manager with client failed:", error.message)
+          // Tentar sem client
           try {
             this.manager = new Manager(config)
-            console.log("✅ Manager initialized!")
-          } catch (error) {
-            console.log("⚠️ Manager initialization failed:", error.message)
-            // Tentar sem configuração
+            console.log("✅ Manager initialized without client!")
+          } catch (error2) {
+            console.log("⚠️ Manager without client failed:", error2.message)
+            // Último recurso: sem configuração
             this.manager = new Manager()
-            console.log("✅ Manager initialized without config!")
+            console.log("✅ Manager initialized with defaults!")
           }
         }
+      }
 
-        // Inicializar SwapHelper
-        if (SwapHelper) {
+      // 3. Inicializar SwapHelper com o client
+      if (SwapHelper) {
+        try {
+          const swapConfig = {
+            ...config,
+            client: this.client,
+          }
+          console.log("🔧 Initializing SwapHelper with client...")
+          this.swapHelper = new SwapHelper(swapConfig)
+          console.log("✅ SwapHelper initialized with client!")
+        } catch (error) {
+          console.log("⚠️ SwapHelper with client failed:", error.message)
+          // Tentar sem client
           try {
             this.swapHelper = new SwapHelper(config)
-            console.log("✅ SwapHelper initialized!")
-          } catch (error) {
-            console.log("⚠️ SwapHelper initialization failed:", error.message)
-            // Tentar sem configuração
+            console.log("✅ SwapHelper initialized without client!")
+          } catch (error2) {
+            console.log("⚠️ SwapHelper without client failed:", error2.message)
+            // Último recurso: sem configuração
             this.swapHelper = new SwapHelper()
-            console.log("✅ SwapHelper initialized without config!")
+            console.log("✅ SwapHelper initialized with defaults!")
           }
         }
+      }
 
-        // Inicializar TokenProvider
-        if (TokenProvider) {
+      // 4. Inicializar TokenProvider
+      if (TokenProvider) {
+        try {
+          const tokenConfig = {
+            ...config,
+            client: this.client,
+          }
+          console.log("🔧 Initializing TokenProvider with client...")
+          this.tokenProvider = new TokenProvider(tokenConfig)
+          console.log("✅ TokenProvider initialized with client!")
+        } catch (error) {
+          console.log("⚠️ TokenProvider with client failed:", error.message)
+          // Tentar sem client
           try {
             this.tokenProvider = new TokenProvider(config)
-            console.log("✅ TokenProvider initialized!")
-          } catch (error) {
-            console.log("⚠️ TokenProvider initialization failed:", error.message)
-            // Tentar sem configuração
+            console.log("✅ TokenProvider initialized without client!")
+          } catch (error2) {
+            console.log("⚠️ TokenProvider without client failed:", error2.message)
+            // Último recurso: sem configuração
             this.tokenProvider = new TokenProvider()
-            console.log("✅ TokenProvider initialized without config!")
+            console.log("✅ TokenProvider initialized with defaults!")
           }
         }
+      }
 
-        // Se não conseguiu nenhum, tentar HoldSo como fallback
-        if (!this.manager && !this.swapHelper && HoldSo) {
-          try {
-            const holdSo = new HoldSo(config)
-            this.manager = holdSo
-            this.swapHelper = holdSo
-            console.log("✅ HoldSo initialized as fallback!")
-          } catch (error) {
-            console.log("⚠️ HoldSo initialization failed:", error.message)
+      // 5. Se não conseguiu nenhum, tentar HoldSo como fallback
+      if (!this.manager && !this.swapHelper && HoldSo) {
+        try {
+          const holdSoConfig = {
+            ...config,
+            client: this.client,
+          }
+          console.log("🔧 Initializing HoldSo as fallback...")
+          const holdSo = new HoldSo(holdSoConfig)
+          this.manager = holdSo
+          this.swapHelper = holdSo
+          console.log("✅ HoldSo initialized as fallback!")
+        } catch (error) {
+          console.log("⚠️ HoldSo fallback failed:", error.message)
+        }
+      }
+
+      // 6. Configurar client nos componentes se eles tiverem método setClient
+      if (this.client) {
+        const components = [
+          { name: "Manager", obj: this.manager },
+          { name: "SwapHelper", obj: this.swapHelper },
+          { name: "TokenProvider", obj: this.tokenProvider },
+        ]
+
+        for (const component of components) {
+          if (component.obj && typeof component.obj.setClient === "function") {
+            try {
+              component.obj.setClient(this.client)
+              console.log(`✅ Client set on ${component.name}`)
+            } catch (error) {
+              console.log(`⚠️ Failed to set client on ${component.name}:`, error.message)
+            }
           }
         }
+      }
 
-        if (!this.manager && !this.swapHelper) {
-          throw new Error("Failed to initialize any Holdstation component")
-        }
-      } catch (importError) {
-        console.error("❌ Failed to import @holdstation/worldchain-sdk:", importError)
-        throw new Error(`NPM import failed: ${importError.message}`)
+      if (!this.manager && !this.swapHelper) {
+        throw new Error("Failed to initialize any Holdstation component")
       }
 
       // Testar se o SDK está funcionando
@@ -131,12 +213,19 @@ class HoldstationService {
       this.manager = null
       this.swapHelper = null
       this.tokenProvider = null
+      this.client = null
       throw error
     }
   }
 
   private async testSDKFunctionality() {
     console.log("🧪 Testing SDK functionality...")
+
+    // Testar Client
+    if (this.client) {
+      const clientMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.client))
+      console.log("📋 Client methods:", clientMethods)
+    }
 
     // Testar Manager
     if (this.manager) {
@@ -334,6 +423,10 @@ class HoldstationService {
         throw new Error("No swap provider available")
       }
 
+      if (!this.client) {
+        throw new Error("No client available for transaction execution")
+      }
+
       console.log("📡 Calling executeSwap...")
 
       let txHash = null
@@ -459,13 +552,18 @@ class HoldstationService {
     return this.tokenProvider
   }
 
+  getClient() {
+    return this.client
+  }
+
   getSDKStatus() {
     return {
       initialized: this.initialized,
       hasManager: !!this.manager,
       hasSwapHelper: !!this.swapHelper,
       hasTokenProvider: !!this.tokenProvider,
-      sdkType: "NPM @holdstation/worldchain-sdk",
+      hasClient: !!this.client,
+      sdkType: "NPM @holdstation/worldchain-sdk + ethers-v6",
       chainId: WORLDCHAIN_CONFIG.chainId,
       rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
     }
@@ -481,6 +579,12 @@ class HoldstationService {
       console.log("Has Manager:", !!this.manager)
       console.log("Has SwapHelper:", !!this.swapHelper)
       console.log("Has TokenProvider:", !!this.tokenProvider)
+      console.log("Has Client:", !!this.client)
+
+      if (this.client) {
+        console.log("Client Methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.client)))
+        console.log("Client Properties:", Object.keys(this.client))
+      }
 
       if (this.manager) {
         console.log("Manager Methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.manager)))
