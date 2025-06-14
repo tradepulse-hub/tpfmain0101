@@ -504,14 +504,42 @@ class HoldstationService {
 
       console.log("🚨 Base parameters:", JSON.stringify(baseParams, null, 2))
 
+      // VERIFICAR ESTADO DO SWAPHELPER DETALHADAMENTE
+      console.log("🚨 === SWAPHELPER DEBUG DETALHADO ===")
+      console.log(`🚨 SwapHelper exists: ${!!this.swapHelper}`)
+
+      if (this.swapHelper) {
+        // Verificar propriedades internas
+        console.log(`🚨 SwapHelper.modules:`, this.swapHelper.modules || "undefined")
+        console.log(`🚨 SwapHelper.client:`, !!this.swapHelper.client)
+        console.log(`🚨 SwapHelper.tokenStorage:`, !!this.swapHelper.tokenStorage)
+
+        // Verificar se tem módulos carregados
+        if (this.swapHelper.modules) {
+          const moduleKeys = Object.keys(this.swapHelper.modules)
+          console.log(`🚨 Loaded modules: ${moduleKeys.join(", ")}`)
+          console.log(`🚨 Module count: ${moduleKeys.length}`)
+        } else {
+          console.log("🚨 ❌ NO MODULES LOADED - This is the problem!")
+        }
+
+        // Listar todos os métodos e propriedades
+        const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
+        const properties = Object.keys(this.swapHelper)
+        console.log(`🚨 SwapHelper methods: ${methods.join(", ")}`)
+        console.log(`🚨 SwapHelper properties: ${properties.join(", ")}`)
+      }
+
       // ESTRATÉGIA 1: SwapHelper._quote (REAL)
       console.log("🚨 ESTRATÉGIA 1: SwapHelper._quote (REAL)")
 
       if (this.swapHelper && typeof this.swapHelper._quote === "function") {
         try {
           console.log("🚨 Calling swapHelper._quote with WEI params...")
+          console.log("🚨 Params being sent:", baseParams)
+
           const quote = await this.swapHelper._quote(baseParams)
-          console.log("🚨 swapHelper._quote SUCCESS:", quote)
+          console.log("🚨 swapHelper._quote RAW RESULT:", quote)
 
           if (quote && quote.amountOut && Number.parseFloat(quote.amountOut) > 0) {
             // Normalizar formato da cotação REAL
@@ -532,10 +560,47 @@ class HoldstationService {
 
             console.log("✅ REAL quote from SwapHelper:", realQuote)
             return realQuote
+          } else {
+            console.log("🚨 SwapHelper._quote returned invalid result:", quote)
           }
         } catch (swapHelperError) {
           console.log("🚨 swapHelper._quote FAILED:", swapHelperError.message)
           console.log("🚨 Error details:", swapHelperError.stack)
+
+          // Se o erro for "No router available", tentar carregar módulos
+          if (swapHelperError.message.includes("No router available")) {
+            console.log("🚨 DETECTED: No router available - trying to load modules...")
+            await this.tryLoadModules()
+
+            // Tentar novamente após carregar módulos
+            try {
+              console.log("🚨 RETRY: Calling swapHelper._quote after loading modules...")
+              const retryQuote = await this.swapHelper._quote(baseParams)
+              console.log("🚨 RETRY SUCCESS:", retryQuote)
+
+              if (retryQuote && retryQuote.amountOut && Number.parseFloat(retryQuote.amountOut) > 0) {
+                const realQuote: SwapQuote = {
+                  amountOut: retryQuote.amountOut || retryQuote.outputAmount || retryQuote.toAmount,
+                  data: retryQuote.data || retryQuote.calldata || "0x",
+                  to: retryQuote.to || retryQuote.target || retryQuote.router || "",
+                  value: retryQuote.value || retryQuote.ethValue || "0",
+                  feeAmountOut: retryQuote.feeAmountOut || retryQuote.fee || "0",
+                  addons: {
+                    outAmount: retryQuote.amountOut || retryQuote.outputAmount || "0",
+                    rateSwap: retryQuote.rate || retryQuote.exchangeRate || "1",
+                    amountOutUsd: retryQuote.amountOutUsd || "0",
+                    minReceived: retryQuote.minReceived || retryQuote.minimumAmountOut || "0",
+                    feeAmountOut: retryQuote.feeAmountOut || retryQuote.fee || "0",
+                  },
+                }
+
+                console.log("✅ REAL quote from SwapHelper (after retry):", realQuote)
+                return realQuote
+              }
+            } catch (retryError) {
+              console.log("🚨 RETRY FAILED:", retryError.message)
+            }
+          }
         }
       } else {
         console.log("🚨 swapHelper._quote not available")
@@ -640,6 +705,56 @@ class HoldstationService {
     } catch (error) {
       console.error("❌ Error getting swap quote:", error)
       throw new Error(`Quote fetch failed: ${error.message}`)
+    }
+  }
+
+  // Método auxiliar para tentar carregar módulos
+  private async tryLoadModules() {
+    console.log("🚨 === TRYING TO LOAD MODULES ===")
+
+    if (!this.swapHelper) {
+      console.log("🚨 No SwapHelper available")
+      return
+    }
+
+    try {
+      // Importar módulos novamente
+      const [HoldstationModule, EthersModule] = await Promise.all([
+        import("@holdstation/worldchain-sdk"),
+        import("@holdstation/worldchain-ethers-v6"),
+      ])
+
+      console.log("🚨 Modules imported for loading")
+
+      const modulesToTry = [
+        { name: "EthersModule.UniswapV3Module", module: EthersModule.UniswapV3Module },
+        { name: "EthersModule.UniswapV2Module", module: EthersModule.UniswapV2Module },
+        { name: "HoldstationModule.UniswapV3Module", module: HoldstationModule.UniswapV3Module },
+        { name: "HoldstationModule.UniswapV2Module", module: HoldstationModule.UniswapV2Module },
+      ]
+
+      for (const moduleInfo of modulesToTry) {
+        if (moduleInfo.module && typeof moduleInfo.module === "function") {
+          try {
+            console.log(`🚨 Trying to load: ${moduleInfo.name}`)
+            const moduleInstance = new moduleInfo.module(this.client)
+            await this.swapHelper.load(moduleInstance)
+            console.log(`✅ Successfully loaded: ${moduleInfo.name}`)
+          } catch (moduleError) {
+            console.log(`❌ Failed to load ${moduleInfo.name}:`, moduleError.message)
+          }
+        } else {
+          console.log(`🚨 ${moduleInfo.name} not available`)
+        }
+      }
+
+      // Verificar se agora temos módulos
+      if (this.swapHelper.modules) {
+        const moduleKeys = Object.keys(this.swapHelper.modules)
+        console.log(`🚨 After loading - modules: ${moduleKeys.join(", ")}`)
+      }
+    } catch (error) {
+      console.log("🚨 Error loading modules:", error.message)
     }
   }
 
