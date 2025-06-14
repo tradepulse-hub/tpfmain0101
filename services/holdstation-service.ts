@@ -118,13 +118,13 @@ class HoldstationService {
 
         return {
           amountOut: amountOut.toFixed(6),
-          data: "0x" + Math.random().toString(16).substring(2, 66), // Mock transaction data
-          to: "0xEE08Cef6EbCe1e037fFdbDF6ab657E5C19E86FF3", // Mock pool address
+          data: "0x" + Math.random().toString(16).substring(2, 66),
+          to: "0xHoldstationRouter",
           value: "0",
           addons: {
             outAmount: amountOut.toFixed(6),
             rateSwap: rate.toString(),
-            amountOutUsd: (amountOut * 1.2).toFixed(2), // Mock USD value
+            amountOutUsd: (amountOut * 1.2).toFixed(2),
             minReceived: minReceived.toFixed(6),
             feeAmountOut: feeAmount.toFixed(6),
           },
@@ -188,7 +188,6 @@ class HoldstationService {
     tokenOut: string
     amountIn: string
     slippage?: string
-    fee?: string
   }): Promise<SwapQuote> {
     try {
       if (!this.initialized) {
@@ -207,7 +206,6 @@ class HoldstationService {
         tokenOut: params.tokenOut,
         amountIn: params.amountIn,
         slippage: params.slippage || "0.5",
-        fee: params.fee,
       })
 
       console.log("📊 Raw quote from Holdstation:", quote)
@@ -231,8 +229,6 @@ class HoldstationService {
     tokenOut: string
     amountIn: string
     slippage?: string
-    fee?: string
-    feeReceiver?: string
   }): Promise<string> {
     try {
       if (!this.initialized) {
@@ -251,8 +247,6 @@ class HoldstationService {
         tokenOut: params.tokenOut,
         amountIn: params.amountIn,
         slippage: params.slippage || "0.5",
-        fee: params.fee,
-        feeReceiver: params.feeReceiver,
       })
 
       console.log("✅ Swap executed successfully:", txHash)
@@ -282,47 +276,12 @@ class HoldstationService {
     return this.initialized
   }
 
-  async getNetworkInfo() {
-    return WORLDCHAIN_CONFIG
-  }
-
-  isValidAddress(address: string): boolean {
-    return /^0x[a-fA-F0-9]{40}$/.test(address)
-  }
-
-  // Debug: Verificar status do SDK
   getSDKStatus() {
     return {
       initialized: this.initialized,
       hasSDK: !!this.holdstation,
-      sdkType: this.holdstation ? "Real Holdstation SDK" : "Mock Implementation",
+      sdkType: this.holdstation ? "Holdstation SDK" : "Mock Implementation",
       chainId: WORLDCHAIN_CONFIG.chainId,
-      rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
-    }
-  }
-
-  // Método para testar conectividade
-  async testConnection(): Promise<boolean> {
-    try {
-      if (!this.initialized) {
-        await this.initialize()
-      }
-
-      console.log("🧪 Testing Holdstation connection...")
-
-      if (!this.holdstation) {
-        console.log("❌ No Holdstation SDK available")
-        return false
-      }
-
-      // Tentar uma operação simples para testar
-      const status = this.getSDKStatus()
-      console.log("✅ Connection test passed:", status)
-
-      return true
-    } catch (error) {
-      console.error("❌ Connection test failed:", error)
-      return false
     }
   }
 }
