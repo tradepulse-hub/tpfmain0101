@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { holdstationHistoryService } from "@/services/holdstation-history-service"
+import type { Transaction } from "@/services/types"
+
 import {
   Modal,
   ModalContent,
@@ -18,15 +21,6 @@ import {
   Spinner,
 } from "@nextui-org/react"
 import { useWallet } from "@txnlab/use-wallet"
-import { holdstationHistoryService } from "@/services/holdstation-history-service"
-
-interface Transaction {
-  id: string
-  date: string
-  description: string
-  amount: number
-  status: "success" | "pending" | "failed"
-}
 
 export const TransactionHistoryModal = () => {
   const { isOpen, onOpen, onOpenChange } = useDisclosure()
