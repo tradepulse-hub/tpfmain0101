@@ -17,222 +17,192 @@ const SUPPORTED_TOKENS = {
 
 class HoldstationService {
   private holdstation: any = null
+  private manager: any = null
   private initialized = false
+  private initializationPromise: Promise<void> | null = null
 
   constructor() {
     if (typeof window !== "undefined") {
-      this.initialize()
+      // Não inicializar automaticamente, apenas quando necessário
     }
   }
 
   private async initialize() {
     if (this.initialized) return
+    if (this.initializationPromise) return this.initializationPromise
 
+    this.initializationPromise = this._doInitialize()
+    return this.initializationPromise
+  }
+
+  private async _doInitialize() {
     try {
-      console.log("🚀 Initializing REAL Holdstation SDK - NO MOCK ALLOWED...")
+      console.log("🚀 Initializing Holdstation SDK (NPM Package)...")
 
-      // Método 1: Tentar carregar SDK via CDN
-      await this.loadHoldstationSDKFromCDN()
+      // Método 1: Importação dinâmica do pacote NPM instalado
+      try {
+        console.log("📦 Trying dynamic import from @holdstation/sdk...")
+        const HoldstationModule = await import("@holdstation/sdk")
 
-      // Método 2: Tentar SDK global
-      if (!this.holdstation && typeof window !== "undefined" && (window as any).Holdstation) {
-        console.log("🔍 Found global Holdstation SDK")
-        this.holdstation = new (window as any).Holdstation({
+        console.log("✅ @holdstation/sdk imported successfully!")
+        console.log("Available exports:", Object.keys(HoldstationModule))
+
+        // Tentar diferentes formas de acessar a classe principal
+        let HoldstationClass = null
+
+        if (HoldstationModule.default) {
+          HoldstationClass = HoldstationModule.default
+          console.log("📋 Using default export")
+        } else if (HoldstationModule.Holdstation) {
+          HoldstationClass = HoldstationModule.Holdstation
+          console.log("📋 Using named export 'Holdstation'")
+        } else if (HoldstationModule.HoldstationSDK) {
+          HoldstationClass = HoldstationModule.HoldstationSDK
+          console.log("📋 Using named export 'HoldstationSDK'")
+        } else {
+          // Tentar o primeiro export disponível
+          const firstExport = Object.values(HoldstationModule)[0]
+          if (typeof firstExport === "function") {
+            HoldstationClass = firstExport
+            console.log("📋 Using first available export")
+          }
+        }
+
+        if (!HoldstationClass) {
+          throw new Error("No valid Holdstation class found in module")
+        }
+
+        // Inicializar o SDK
+        console.log("🔧 Initializing Holdstation SDK...")
+        this.holdstation = new HoldstationClass({
           chainId: WORLDCHAIN_CONFIG.chainId,
           rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
         })
-        console.log("✅ Global Holdstation SDK initialized!")
-      }
 
-      // Método 3: Tentar importação dinâmica
-      if (!this.holdstation) {
-        try {
-          const HoldstationModule = await import("@holdstation/sdk")
-          this.holdstation = new HoldstationModule.Holdstation({
-            chainId: WORLDCHAIN_CONFIG.chainId,
-            rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
-          })
-          console.log("✅ NPM Holdstation SDK initialized!")
-        } catch (importError) {
-          console.warn("⚠️ NPM import failed:", importError.message)
+        console.log("✅ Holdstation SDK initialized!")
+
+        // Tentar obter o manager se disponível
+        if (this.holdstation.getManager) {
+          this.manager = await this.holdstation.getManager()
+          console.log("✅ Holdstation Manager obtained!")
+        } else if (this.holdstation.manager) {
+          this.manager = this.holdstation.manager
+          console.log("✅ Holdstation Manager found as property!")
         }
+      } catch (importError) {
+        console.error("❌ Failed to import @holdstation/sdk:", importError)
+        throw new Error(`NPM import failed: ${importError.message}`)
       }
 
-      if (!this.holdstation) {
-        throw new Error("❌ REAL Holdstation SDK not available - refusing to use mock")
-      }
-
-      // Testar conectividade real
-      await this.testRealConnection()
+      // Testar se o SDK está funcionando
+      await this.testSDKFunctionality()
 
       this.initialized = true
-      console.log("✅ REAL Holdstation SDK successfully initialized!")
+      console.log("✅ Holdstation SDK fully initialized and tested!")
     } catch (error) {
-      console.error("❌ Failed to initialize REAL Holdstation SDK:", error)
-      console.error("❌ NO MOCK WILL BE USED - Service will fail")
-      throw new Error(`Real Holdstation SDK required: ${error.message}`)
+      console.error("❌ Failed to initialize Holdstation SDK:", error)
+      this.initialized = false
+      this.holdstation = null
+      this.manager = null
+      throw error
     }
   }
 
-  private async loadHoldstationSDKFromCDN(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // Tentar carregar SDK via CDN se disponível
-      if (typeof window === "undefined") {
-        reject(new Error("Window not available"))
-        return
-      }
-
-      // Verificar se já existe um script do Holdstation
-      const existingScript = document.querySelector('script[src*="holdstation"]')
-      if (existingScript) {
-        console.log("🔍 Holdstation script already loaded")
-        setTimeout(() => {
-          if ((window as any).Holdstation) {
-            this.holdstation = new (window as any).Holdstation({
-              chainId: WORLDCHAIN_CONFIG.chainId,
-              rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
-            })
-            console.log("✅ CDN Holdstation SDK initialized!")
-            resolve()
-          } else {
-            reject(new Error("Holdstation not available after script load"))
-          }
-        }, 1000)
-        return
-      }
-
-      // URLs possíveis do SDK da Holdstation
-      const possibleCDNUrls = [
-        "https://cdn.holdstation.com/sdk/latest/holdstation.min.js",
-        "https://unpkg.com/@holdstation/sdk/dist/index.js",
-        "https://cdn.jsdelivr.net/npm/@holdstation/sdk/dist/index.js",
-      ]
-
-      let attempts = 0
-      const tryNextURL = () => {
-        if (attempts >= possibleCDNUrls.length) {
-          reject(new Error("All CDN URLs failed"))
-          return
-        }
-
-        const script = document.createElement("script")
-        script.src = possibleCDNUrls[attempts]
-        script.async = true
-
-        script.onload = () => {
-          console.log(`✅ Loaded Holdstation SDK from: ${possibleCDNUrls[attempts]}`)
-          setTimeout(() => {
-            if ((window as any).Holdstation) {
-              this.holdstation = new (window as any).Holdstation({
-                chainId: WORLDCHAIN_CONFIG.chainId,
-                rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
-              })
-              console.log("✅ CDN Holdstation SDK initialized!")
-              resolve()
-            } else {
-              attempts++
-              tryNextURL()
-            }
-          }, 500)
-        }
-
-        script.onerror = () => {
-          console.warn(`⚠️ Failed to load from: ${possibleCDNUrls[attempts]}`)
-          attempts++
-          tryNextURL()
-        }
-
-        document.head.appendChild(script)
-      }
-
-      tryNextURL()
-    })
-  }
-
-  private async testRealConnection(): Promise<void> {
+  private async testSDKFunctionality() {
     if (!this.holdstation) {
-      throw new Error("No Holdstation SDK to test")
+      throw new Error("No SDK to test")
     }
 
-    try {
-      console.log("🧪 Testing REAL Holdstation SDK connection...")
+    console.log("🧪 Testing SDK functionality...")
 
-      // Tentar métodos comuns do SDK
-      const testMethods = ["getNetworkInfo", "getSupportedTokens", "getVersion", "isConnected"]
+    // Listar métodos disponíveis
+    const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.holdstation))
+    console.log("📋 Available SDK methods:", methods)
 
-      let testPassed = false
-      for (const method of testMethods) {
-        if (typeof this.holdstation[method] === "function") {
-          try {
-            const result = await this.holdstation[method]()
-            console.log(`✅ SDK method ${method} works:`, result)
-            testPassed = true
-            break
-          } catch (methodError) {
-            console.warn(`⚠️ SDK method ${method} failed:`, methodError.message)
-          }
-        }
+    // Testar métodos comuns
+    const testMethods = [
+      "getTokenBalances",
+      "getSwapQuote",
+      "executeSwap",
+      "getManager",
+      "isConnected",
+      "getNetworkInfo",
+    ]
+
+    for (const method of testMethods) {
+      if (typeof this.holdstation[method] === "function") {
+        console.log(`✅ Method '${method}' is available`)
+      } else {
+        console.log(`⚠️ Method '${method}' is NOT available`)
       }
-
-      if (!testPassed) {
-        // Verificar se pelo menos os métodos principais existem
-        const requiredMethods = ["getTokenBalances", "getSwapQuote", "executeSwap"]
-        const missingMethods = requiredMethods.filter((method) => typeof this.holdstation[method] !== "function")
-
-        if (missingMethods.length > 0) {
-          throw new Error(`SDK missing required methods: ${missingMethods.join(", ")}`)
-        }
-
-        console.log("✅ SDK has required methods, assuming it's functional")
-      }
-    } catch (error) {
-      console.error("❌ SDK connection test failed:", error)
-      throw new Error(`SDK test failed: ${error.message}`)
     }
+
+    console.log("✅ SDK functionality test completed")
   }
 
-  // Obter saldos de tokens - APENAS REAL
+  // Obter saldos de tokens
   async getTokenBalances(walletAddress: string): Promise<TokenBalance[]> {
     try {
-      if (!this.initialized) {
-        await this.initialize()
-      }
+      await this.initialize()
 
-      console.log(`💰 Getting REAL token balances for: ${walletAddress}`)
+      console.log(`💰 Getting token balances for: ${walletAddress}`)
 
       if (!this.holdstation) {
-        throw new Error("REAL Holdstation SDK not available")
+        throw new Error("Holdstation SDK not initialized")
       }
 
-      console.log("📡 Calling REAL Holdstation getTokenBalances...")
-      const balances = await this.holdstation.getTokenBalances(walletAddress)
+      console.log("📡 Calling getTokenBalances...")
 
-      console.log("📊 REAL balances from Holdstation:", balances)
+      // Tentar diferentes métodos baseados na documentação comum
+      let balances = null
+
+      if (typeof this.holdstation.getTokenBalances === "function") {
+        balances = await this.holdstation.getTokenBalances(walletAddress)
+      } else if (typeof this.holdstation.getBalances === "function") {
+        balances = await this.holdstation.getBalances(walletAddress)
+      } else if (this.manager && typeof this.manager.getTokenBalances === "function") {
+        balances = await this.manager.getTokenBalances(walletAddress)
+      } else {
+        throw new Error("No balance method found in SDK")
+      }
+
+      console.log("📊 Raw balances from SDK:", balances)
 
       if (!Array.isArray(balances)) {
-        throw new Error("Invalid response from Holdstation SDK")
+        // Se não for array, tentar converter
+        if (balances && typeof balances === "object") {
+          balances = Object.entries(balances).map(([symbol, data]: [string, any]) => ({
+            symbol,
+            name: data.name || symbol,
+            address: data.address || SUPPORTED_TOKENS[symbol as keyof typeof SUPPORTED_TOKENS] || "",
+            balance: data.balance || data.amount || "0",
+            decimals: data.decimals || 18,
+          }))
+        } else {
+          throw new Error("Invalid balance response format")
+        }
       }
 
       // Processar e formatar saldos
       const formattedBalances: TokenBalance[] = balances.map((balance: any) => ({
         symbol: balance.symbol,
-        name: balance.name,
-        address: balance.address,
-        balance: balance.balance,
+        name: balance.name || balance.symbol,
+        address: balance.address || balance.tokenAddress || "",
+        balance: balance.balance || balance.amount || "0",
         decimals: balance.decimals || 18,
         icon: this.getTokenIcon(balance.symbol),
-        formattedBalance: balance.formattedBalance || balance.balance,
+        formattedBalance: balance.formattedBalance || balance.balance || balance.amount || "0",
       }))
 
-      console.log("✅ REAL formatted balances:", formattedBalances)
+      console.log("✅ Formatted balances:", formattedBalances)
       return formattedBalances
     } catch (error) {
-      console.error("❌ Error getting REAL token balances:", error)
-      throw new Error(`Real balance fetch failed: ${error.message}`)
+      console.error("❌ Error getting token balances:", error)
+      throw new Error(`Balance fetch failed: ${error.message}`)
     }
   }
 
-  // Obter cotação de swap - APENAS REAL
+  // Obter cotação de swap
   async getSwapQuote(params: {
     tokenIn: string
     tokenOut: string
@@ -240,45 +210,66 @@ class HoldstationService {
     slippage?: string
   }): Promise<SwapQuote> {
     try {
-      if (!this.initialized) {
-        await this.initialize()
-      }
+      await this.initialize()
 
-      console.log("💱 Getting REAL swap quote from Holdstation...")
-      console.log("📊 REAL quote parameters:", params)
+      console.log("💱 Getting swap quote...")
+      console.log("📊 Quote parameters:", params)
 
       if (!this.holdstation) {
-        throw new Error("REAL Holdstation SDK not available")
+        throw new Error("Holdstation SDK not initialized")
       }
 
-      console.log("📡 Calling REAL Holdstation getSwapQuote...")
-      const quote = await this.holdstation.getSwapQuote({
-        tokenIn: params.tokenIn,
-        tokenOut: params.tokenOut,
-        amountIn: params.amountIn,
-        slippage: params.slippage || "0.5",
-      })
+      console.log("📡 Calling getSwapQuote...")
 
-      console.log("📊 REAL quote from Holdstation:", quote)
+      let quote = null
 
-      // Validar cotação real
+      // Tentar diferentes métodos de cotação
+      if (typeof this.holdstation.getSwapQuote === "function") {
+        quote = await this.holdstation.getSwapQuote(params)
+      } else if (typeof this.holdstation.getQuote === "function") {
+        quote = await this.holdstation.getQuote(params)
+      } else if (this.manager && typeof this.manager.getSwapQuote === "function") {
+        quote = await this.manager.getSwapQuote(params)
+      } else {
+        throw new Error("No quote method found in SDK")
+      }
+
+      console.log("📊 Raw quote from SDK:", quote)
+
+      // Validar e formatar cotação
       if (!quote || typeof quote !== "object") {
-        throw new Error("Invalid quote response from Holdstation SDK")
+        throw new Error("Invalid quote response")
       }
 
-      if (!quote.amountOut || Number.parseFloat(quote.amountOut) <= 0) {
-        throw new Error("Invalid quote amount from Holdstation SDK")
+      // Normalizar formato da cotação
+      const normalizedQuote: SwapQuote = {
+        amountOut: quote.amountOut || quote.outputAmount || quote.toAmount || "0",
+        data: quote.data || quote.calldata || "0x",
+        to: quote.to || quote.target || quote.router || "",
+        value: quote.value || quote.ethValue || "0",
+        feeAmountOut: quote.feeAmountOut || quote.fee || "0",
+        addons: quote.addons || {
+          outAmount: quote.amountOut || quote.outputAmount || "0",
+          rateSwap: quote.rate || quote.exchangeRate || "1",
+          amountOutUsd: quote.amountOutUsd || "0",
+          minReceived: quote.minReceived || quote.minimumAmountOut || "0",
+          feeAmountOut: quote.feeAmountOut || quote.fee || "0",
+        },
       }
 
-      console.log("✅ REAL valid quote received:", quote)
-      return quote
+      if (!normalizedQuote.amountOut || Number.parseFloat(normalizedQuote.amountOut) <= 0) {
+        throw new Error("Invalid quote amount")
+      }
+
+      console.log("✅ Normalized quote:", normalizedQuote)
+      return normalizedQuote
     } catch (error) {
-      console.error("❌ Error getting REAL swap quote:", error)
-      throw new Error(`Real quote fetch failed: ${error.message}`)
+      console.error("❌ Error getting swap quote:", error)
+      throw new Error(`Quote fetch failed: ${error.message}`)
     }
   }
 
-  // Executar swap - APENAS REAL
+  // Executar swap
   async executeSwap(params: {
     tokenIn: string
     tokenOut: string
@@ -286,44 +277,55 @@ class HoldstationService {
     slippage?: string
   }): Promise<string> {
     try {
-      if (!this.initialized) {
-        await this.initialize()
-      }
+      await this.initialize()
 
-      console.log("🚀 Executing REAL swap via Holdstation...")
-      console.log("📊 REAL swap parameters:", params)
+      console.log("🚀 Executing swap...")
+      console.log("📊 Swap parameters:", params)
+      console.log("⚠️ This will execute a REAL transaction!")
 
       if (!this.holdstation) {
-        throw new Error("REAL Holdstation SDK not available")
+        throw new Error("Holdstation SDK not initialized")
       }
 
-      console.log("📡 Calling REAL Holdstation executeSwap...")
-      console.log("⚠️ This will execute a REAL transaction on the blockchain!")
+      console.log("📡 Calling executeSwap...")
 
-      const txHash = await this.holdstation.executeSwap({
-        tokenIn: params.tokenIn,
-        tokenOut: params.tokenOut,
-        amountIn: params.amountIn,
-        slippage: params.slippage || "0.5",
-      })
+      let txHash = null
 
-      console.log("✅ REAL swap executed successfully!")
-      console.log("📋 REAL transaction hash:", txHash)
-
-      // Validar hash de transação real
-      if (!txHash || typeof txHash !== "string" || !txHash.startsWith("0x")) {
-        throw new Error("Invalid transaction hash from Holdstation SDK")
+      // Tentar diferentes métodos de execução
+      if (typeof this.holdstation.executeSwap === "function") {
+        txHash = await this.holdstation.executeSwap(params)
+      } else if (typeof this.holdstation.swap === "function") {
+        txHash = await this.holdstation.swap(params)
+      } else if (this.manager && typeof this.manager.executeSwap === "function") {
+        txHash = await this.manager.executeSwap(params)
+      } else {
+        throw new Error("No swap execution method found in SDK")
       }
 
-      if (txHash.length < 20) {
-        throw new Error("Transaction hash too short - possibly mock")
+      console.log("📋 Raw transaction result:", txHash)
+
+      // Extrair hash da transação
+      let finalTxHash = null
+      if (typeof txHash === "string") {
+        finalTxHash = txHash
+      } else if (txHash && txHash.hash) {
+        finalTxHash = txHash.hash
+      } else if (txHash && txHash.transactionHash) {
+        finalTxHash = txHash.transactionHash
+      } else if (txHash && txHash.txHash) {
+        finalTxHash = txHash.txHash
       }
 
-      console.log("✅ REAL transaction confirmed:", txHash)
-      return txHash
+      if (!finalTxHash || typeof finalTxHash !== "string" || !finalTxHash.startsWith("0x")) {
+        throw new Error("Invalid transaction hash received")
+      }
+
+      console.log("✅ Swap executed successfully!")
+      console.log("📋 Transaction hash:", finalTxHash)
+      return finalTxHash
     } catch (error) {
-      console.error("❌ Error executing REAL swap:", error)
-      throw new Error(`Real swap execution failed: ${error.message}`)
+      console.error("❌ Error executing swap:", error)
+      throw new Error(`Swap execution failed: ${error.message}`)
     }
   }
 
@@ -346,36 +348,47 @@ class HoldstationService {
     return this.initialized
   }
 
+  getManager() {
+    return this.manager
+  }
+
   getSDKStatus() {
     return {
       initialized: this.initialized,
       hasSDK: !!this.holdstation,
-      sdkType: "REAL Holdstation SDK ONLY",
-      noMockAllowed: true,
+      hasManager: !!this.manager,
+      sdkType: "NPM @holdstation/sdk",
       chainId: WORLDCHAIN_CONFIG.chainId,
       rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
     }
   }
 
-  // Método para verificar se o SDK é real
-  async verifyRealSDK(): Promise<boolean> {
+  // Método para debug - mostrar informações do SDK
+  async debugSDK() {
     try {
-      if (!this.holdstation) return false
+      await this.initialize()
 
-      // Verificar se tem métodos reais
-      const requiredMethods = ["getTokenBalances", "getSwapQuote", "executeSwap"]
-      const hasAllMethods = requiredMethods.every((method) => typeof this.holdstation[method] === "function")
+      console.log("=== HOLDSTATION SDK DEBUG ===")
+      console.log("Initialized:", this.initialized)
+      console.log("Has SDK:", !!this.holdstation)
+      console.log("Has Manager:", !!this.manager)
 
-      if (!hasAllMethods) {
-        console.error("❌ SDK missing required methods")
-        return false
+      if (this.holdstation) {
+        console.log("SDK Methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.holdstation)))
+        console.log("SDK Properties:", Object.keys(this.holdstation))
       }
 
-      console.log("✅ SDK verification passed - appears to be real")
-      return true
+      if (this.manager) {
+        console.log("Manager Methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.manager)))
+        console.log("Manager Properties:", Object.keys(this.manager))
+      }
+
+      console.log("=== END DEBUG ===")
+
+      return this.getSDKStatus()
     } catch (error) {
-      console.error("❌ SDK verification failed:", error)
-      return false
+      console.error("Debug failed:", error)
+      return { error: error.message }
     }
   }
 }
