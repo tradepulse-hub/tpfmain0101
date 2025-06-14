@@ -1,18 +1,9 @@
-import {
-  config,
-  inmemoryTokenStorage,
-  SwapHelper,
-  type SwapParams,
-  TokenProvider,
-  ZeroX,
-} from "@holdstation/worldchain-sdk"
-import { Client, Multicall3 } from "@holdstation/worldchain-viem"
-import { createPublicClient, http, type PublicClient } from "viem"
-import { worldchain } from "viem/chains"
+import { ethers } from "ethers"
 import type { TokenBalance, SwapQuote } from "./types"
 
 // Configuração para Worldchain
 const RPC_URL = "https://worldchain-mainnet.g.alchemy.com/public"
+const CHAIN_ID = 480
 
 // Tokens que queremos suportar - ENDEREÇOS CORRETOS E VERIFICADOS
 const SUPPORTED_TOKENS = {
@@ -22,25 +13,29 @@ const SUPPORTED_TOKENS = {
   WDD: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B", // Drachma Token - VERIFICADO
 }
 
-// Mock inmemoryTransactionStorage
-const inmemoryTransactionStorage = {
-  getItem: (key: string) => {
-    return localStorage.getItem(key)
-  },
-  setItem: (key: string, value: string) => {
-    localStorage.setItem(key, value)
-  },
-  removeItem: (key: string) => {
-    localStorage.removeItem(key)
-  },
-}
+// Pool Uniswap V3 WLD/TPF
+const WLD_TPF_POOL = "0xEE08Cef6EbCe1e037fFdbDF6ab657E5C19E86FF3"
+
+// ABI mínimo para Uniswap V3 Pool
+const UNISWAP_V3_POOL_ABI = [
+  "function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
+  "function token0() external view returns (address)",
+  "function token1() external view returns (address)",
+  "function fee() external view returns (uint24)",
+  "function liquidity() external view returns (uint128)",
+]
+
+// ABI mínimo para ERC20
+const ERC20_ABI = [
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function decimals() view returns (uint8)",
+  "function totalSupply() view returns (uint256)",
+  "function balanceOf(address) view returns (uint256)",
+]
 
 class HoldstationService {
-  private publicClient: PublicClient | null = null
-  private client: Client | null = null
-  private swapHelper: SwapHelper | null = null
-  private tokenProvider: TokenProvider | null = null
-  private zeroX: ZeroX | null = null
+  private provider: ethers.JsonRpcProvider | null = null
   private initialized = false
 
   constructor() {
@@ -53,91 +48,113 @@ class HoldstationService {
     if (this.initialized) return
 
     try {
-      console.log("🚀 Initializing Holdstation Service with VIEM (correct approach)...")
+      console.log("🚀 Initializing Direct Contract Service (sem SDK da Holdstation)...")
 
-      // Setup publicClient with Viem (exactly like example)
-      this.publicClient = createPublicClient({
-        chain: worldchain,
-        transport: http(RPC_URL),
-        batch: {
-          multicall: true, // Enable multicall batching
+      // Setup provider com ethers v6
+      this.provider = new ethers.JsonRpcProvider(
+        RPC_URL,
+        {
+          chainId: CHAIN_ID,
+          name: "worldchain",
         },
-        cacheTime: 300000, // Set cache time in milliseconds
-      })
+        {
+          staticNetwork: true,
+        },
+      )
 
-      console.log("✅ PublicClient created with Viem")
+      // Verificar conexão
+      const network = await this.provider.getNetwork()
+      console.log(`🌐 Connected to ${network.name} (${network.chainId})`)
 
-      // Setup client (exactly like example)
-      this.client = new Client(this.publicClient as PublicClient)
-      config.client = this.client
-      config.multicall3 = new Multicall3(this.publicClient as PublicClient)
+      // Verificar se os tokens existem na blockchain
+      console.log("🔍 Verificando tokens na blockchain...")
+      await this.verifyTokenContracts()
 
-      console.log("✅ Client and config setup complete")
-
-      // Setup SwapHelper (exactly like example)
-      this.swapHelper = new SwapHelper(this.client, {
-        tokenStorage: inmemoryTokenStorage,
-      })
-
-      console.log("✅ SwapHelper created")
-
-      // Setup TokenProvider (exactly like example)
-      this.tokenProvider = new TokenProvider({
-        client: this.client,
-        multicall3: config.multicall3,
-      })
-
-      console.log("✅ TokenProvider created")
-
-      // Setup ZeroX (exactly like example)
-      this.zeroX = new ZeroX(this.tokenProvider, inmemoryTokenStorage)
-
-      console.log("✅ ZeroX created")
-
-      // Load ZeroX into SwapHelper (exactly like example)
-      await this.swapHelper.load(this.zeroX)
-
-      console.log("✅ ZeroX loaded into SwapHelper")
-
-      // Test token details fetch
-      console.log("🔍 Testing token details fetch...")
-      await this.testTokenDetails()
+      // Verificar pool de liquidez
+      console.log("🏊 Verificando pool de liquidez...")
+      await this.verifyLiquidityPool()
 
       this.initialized = true
-      console.log("✅ Holdstation Service initialized successfully with VIEM!")
+      console.log("✅ Direct Contract Service initialized successfully!")
     } catch (error) {
-      console.error("❌ Failed to initialize Holdstation Service:", error)
-      console.error("📋 Error details:", {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-      })
+      console.error("❌ Failed to initialize Direct Contract Service:", error)
     }
   }
 
-  private async testTokenDetails() {
+  private async verifyTokenContracts() {
+    if (!this.provider) return
+
+    console.log("🔍 Verificando contratos de tokens...")
+
+    for (const [symbol, address] of Object.entries(SUPPORTED_TOKENS)) {
+      try {
+        const contract = new ethers.Contract(address, ERC20_ABI, this.provider)
+
+        const [name, tokenSymbol, decimals, totalSupply] = await Promise.all([
+          contract.name().catch(() => "Unknown"),
+          contract.symbol().catch(() => symbol),
+          contract.decimals().catch(() => 18),
+          contract.totalSupply().catch(() => "0"),
+        ])
+
+        console.log(`✅ ${symbol}: ${name} (${tokenSymbol}) - ${decimals} decimals`)
+        console.log(`💰 Total Supply: ${ethers.formatUnits(totalSupply, decimals)}`)
+      } catch (error) {
+        console.error(`❌ Erro ao verificar token ${symbol}:`, error.message)
+      }
+    }
+  }
+
+  private async verifyLiquidityPool() {
+    if (!this.provider) return
+
     try {
-      if (!this.tokenProvider) return
+      console.log(`🏊 Verificando pool WLD/TPF: ${WLD_TPF_POOL}`)
 
-      console.log("🔍 Testing token details fetch for supported tokens...")
+      const poolContract = new ethers.Contract(WLD_TPF_POOL, UNISWAP_V3_POOL_ABI, this.provider)
 
-      const tokenAddresses = Object.values(SUPPORTED_TOKENS)
-      console.log("📋 Token addresses to fetch:", tokenAddresses)
+      const [token0, token1, fee, liquidity, slot0] = await Promise.all([
+        poolContract.token0(),
+        poolContract.token1(),
+        poolContract.fee(),
+        poolContract.liquidity(),
+        poolContract.slot0(),
+      ])
 
-      const tokenDetails = await this.tokenProvider.details(...tokenAddresses)
-      console.log("📊 Token details fetched:", tokenDetails)
+      console.log(`✅ Pool verificada:`)
+      console.log(`├─ Token0: ${token0}`)
+      console.log(`├─ Token1: ${token1}`)
+      console.log(`├─ Fee: ${fee} (${fee / 10000}%)`)
+      console.log(`├─ Liquidity: ${liquidity.toString()}`)
+      console.log(`└─ Current Price: ${slot0.sqrtPriceX96.toString()}`)
 
-      // Log each token individually
-      for (const [symbol, address] of Object.entries(SUPPORTED_TOKENS)) {
-        const detail = tokenDetails[address]
-        if (detail) {
-          console.log(`✅ ${symbol}: ${detail.name} (${detail.symbol}) - ${detail.decimals} decimals`)
-        } else {
-          console.warn(`⚠️ No details found for ${symbol} (${address})`)
-        }
+      // Calcular preço atual
+      const price = this.calculatePriceFromSqrtPriceX96(slot0.sqrtPriceX96, token0, token1)
+      console.log(`💱 Preço atual: ${price}`)
+    } catch (error) {
+      console.error("❌ Erro ao verificar pool:", error)
+    }
+  }
+
+  private calculatePriceFromSqrtPriceX96(sqrtPriceX96: bigint, token0: string, token1: string): string {
+    try {
+      // Converter sqrtPriceX96 para preço
+      const sqrtPrice = Number(sqrtPriceX96) / Math.pow(2, 96)
+      const price = Math.pow(sqrtPrice, 2)
+
+      // Determinar direção baseada nos tokens
+      const isWLDToken0 = token0.toLowerCase() === SUPPORTED_TOKENS.WLD.toLowerCase()
+
+      if (isWLDToken0) {
+        // Se WLD é token0, preço é TPF por WLD
+        return `1 WLD = ${price.toFixed(6)} TPF`
+      } else {
+        // Se TPF é token0, preço é WLD por TPF
+        return `1 TPF = ${price.toFixed(6)} WLD`
       }
     } catch (error) {
-      console.error("❌ Error testing token details:", error)
+      console.error("Erro ao calcular preço:", error)
+      return "Preço indisponível"
     }
   }
 
@@ -148,34 +165,35 @@ class HoldstationService {
         await this.initialize()
       }
 
-      if (!this.tokenProvider) {
-        throw new Error("Token provider not initialized")
+      if (!this.provider) {
+        throw new Error("Provider not initialized")
       }
 
       console.log(`💰 Getting real token balances for: ${walletAddress}`)
-
-      // Get token details for supported tokens
-      const tokenAddresses = Object.values(SUPPORTED_TOKENS)
-      const tokenDetails = await this.tokenProvider.details(...tokenAddresses)
 
       const tokenBalances: TokenBalance[] = []
 
       for (const [symbol, address] of Object.entries(SUPPORTED_TOKENS)) {
         try {
-          const tokenDetail = tokenDetails[address]
-          if (!tokenDetail) continue
+          const contract = new ethers.Contract(address, ERC20_ABI, this.provider)
 
-          // Get real balance using multicall
-          const balance = await this.getTokenBalance(walletAddress, address)
+          const [name, tokenSymbol, decimals, balance] = await Promise.all([
+            contract.name().catch(() => symbol),
+            contract.symbol().catch(() => symbol),
+            contract.decimals().catch(() => 18),
+            contract.balanceOf(walletAddress).catch(() => "0"),
+          ])
+
+          const formattedBalance = ethers.formatUnits(balance, decimals)
 
           tokenBalances.push({
             symbol: symbol,
-            name: tokenDetail.name || symbol,
+            name: name,
             address: address,
-            balance: balance,
-            decimals: tokenDetail.decimals || 18,
+            balance: Number.parseFloat(formattedBalance).toFixed(6),
+            decimals: decimals,
             icon: this.getTokenIcon(symbol),
-            formattedBalance: balance,
+            formattedBalance: Number.parseFloat(formattedBalance).toFixed(6),
           })
         } catch (error) {
           console.error(`Error getting balance for ${symbol}:`, error)
@@ -199,35 +217,6 @@ class HoldstationService {
     }
   }
 
-  private async getTokenBalance(walletAddress: string, tokenAddress: string): Promise<string> {
-    try {
-      if (!this.publicClient) throw new Error("PublicClient not initialized")
-
-      // Use Viem to get balance
-      const balance = await this.publicClient.readContract({
-        address: tokenAddress as `0x${string}`,
-        abi: [
-          {
-            name: "balanceOf",
-            type: "function",
-            stateMutability: "view",
-            inputs: [{ name: "account", type: "address" }],
-            outputs: [{ name: "", type: "uint256" }],
-          },
-        ],
-        functionName: "balanceOf",
-        args: [walletAddress as `0x${string}`],
-      })
-
-      // Convert from wei to readable format
-      const balanceFormatted = Number(balance) / Math.pow(10, 18)
-      return balanceFormatted.toFixed(6)
-    } catch (error) {
-      console.error(`Error getting balance for ${tokenAddress}:`, error)
-      return "0"
-    }
-  }
-
   private getTokenIcon(symbol: string): string {
     const icons: Record<string, string> = {
       TPF: "/logo-tpf.png",
@@ -238,7 +227,7 @@ class HoldstationService {
     return icons[symbol] || "/placeholder.svg"
   }
 
-  // Obter cotação de swap REAL seguindo exemplo exato com VIEM
+  // Obter cotação de swap usando dados da pool diretamente
   async getSwapQuote(params: {
     tokenIn: string
     tokenOut: string
@@ -247,101 +236,106 @@ class HoldstationService {
     fee?: string
   }): Promise<SwapQuote> {
     try {
-      console.log("💱 OBTENDO COTAÇÃO com VIEM (abordagem correta)...")
+      console.log("💱 OBTENDO COTAÇÃO usando dados diretos da pool...")
       console.log(
         `📊 Parâmetros: ${params.amountIn} ${this.getSymbolFromAddress(params.tokenIn)} → ${this.getSymbolFromAddress(params.tokenOut)}`,
       )
 
       if (!this.initialized) {
-        console.log("🔄 Inicializando serviço...")
         await this.initialize()
       }
 
-      if (!this.swapHelper) {
-        console.log("❌ SwapHelper não disponível")
-        throw new Error("Swap helper not initialized")
+      if (!this.provider) {
+        throw new Error("Provider not initialized")
       }
 
-      console.log("🔍 Preparando parâmetros seguindo exemplo VIEM...")
+      // Verificar se é o par WLD/TPF
+      const isWLDTPFPair =
+        (params.tokenIn.toLowerCase() === SUPPORTED_TOKENS.WLD.toLowerCase() &&
+          params.tokenOut.toLowerCase() === SUPPORTED_TOKENS.TPF.toLowerCase()) ||
+        (params.tokenIn.toLowerCase() === SUPPORTED_TOKENS.TPF.toLowerCase() &&
+          params.tokenOut.toLowerCase() === SUPPORTED_TOKENS.WLD.toLowerCase())
 
-      // Usar exatamente o mesmo formato do exemplo VIEM
-      const quoteParams: SwapParams["quoteInput"] = {
-        tokenIn: params.tokenIn,
-        tokenOut: params.tokenOut,
-        amountIn: params.amountIn, // Human-readable format como no exemplo
-        slippage: params.slippage || "0.3", // Usar 0.3 como no exemplo
-        fee: params.fee || "0.2", // Usar 0.2 como no exemplo
-        preferRouters: ["0x"], // Usar apenas 0x como no exemplo
+      if (!isWLDTPFPair) {
+        throw new Error("Only WLD/TPF pair is supported for direct pool quotes")
       }
 
-      console.log("📡 Chamando swapHelper.estimate.quote() com VIEM...")
-      console.log("📋 Parâmetros:", JSON.stringify(quoteParams, null, 2))
+      console.log("🏊 Obtendo dados da pool Uniswap V3...")
 
-      const result = await this.swapHelper.estimate.quote(quoteParams)
+      const poolContract = new ethers.Contract(WLD_TPF_POOL, UNISWAP_V3_POOL_ABI, this.provider)
+      const [token0, token1, slot0] = await Promise.all([
+        poolContract.token0(),
+        poolContract.token1(),
+        poolContract.slot0(),
+      ])
 
-      console.log("📊 Resultado RAW da Holdstation (VIEM):", JSON.stringify(result, null, 2))
+      console.log(`📊 Pool data:`)
+      console.log(`├─ Token0: ${token0}`)
+      console.log(`├─ Token1: ${token1}`)
+      console.log(`└─ SqrtPriceX96: ${slot0.sqrtPriceX96.toString()}`)
 
-      // Verificar se temos dados válidos da Holdstation
-      if (!result) {
-        console.log("❌ Nenhum resultado da Holdstation")
-        throw new Error("No quote result from Holdstation")
+      // Calcular preço atual
+      const sqrtPrice = Number(slot0.sqrtPriceX96) / Math.pow(2, 96)
+      const price = Math.pow(sqrtPrice, 2)
+
+      console.log(`💱 Preço calculado: ${price}`)
+
+      // Determinar direção da conversão
+      const amountInNum = Number.parseFloat(params.amountIn)
+      let amountOut: number
+
+      const isWLDToken0 = token0.toLowerCase() === SUPPORTED_TOKENS.WLD.toLowerCase()
+      const isInputWLD = params.tokenIn.toLowerCase() === SUPPORTED_TOKENS.WLD.toLowerCase()
+
+      if (isWLDToken0) {
+        // WLD é token0, TPF é token1
+        if (isInputWLD) {
+          // WLD → TPF
+          amountOut = amountInNum * price
+        } else {
+          // TPF → WLD
+          amountOut = amountInNum / price
+        }
+      } else {
+        // TPF é token0, WLD é token1
+        if (isInputWLD) {
+          // WLD → TPF
+          amountOut = amountInNum / price
+        } else {
+          // TPF → WLD
+          amountOut = amountInNum * price
+        }
       }
 
-      if (!result.addons) {
-        console.log("❌ Sem addons no resultado da Holdstation")
-        throw new Error("Invalid quote response - no pricing data available")
-      }
+      // Aplicar slippage
+      const slippagePercent = Number.parseFloat(params.slippage || "0.5") / 100
+      const minReceived = amountOut * (1 - slippagePercent)
 
-      if (!result.addons.outAmount || Number.parseFloat(result.addons.outAmount) <= 0) {
-        console.log("❌ Amount out inválido da Holdstation:", result.addons.outAmount)
-        throw new Error("No liquidity available for this token pair")
-      }
-
-      console.log(`✅ COTAÇÃO REAL OBTIDA COM VIEM:`)
+      console.log(`✅ COTAÇÃO CALCULADA:`)
       console.log(`├─ Input: ${params.amountIn} ${this.getSymbolFromAddress(params.tokenIn)}`)
-      console.log(`├─ Output: ${result.addons.outAmount} ${this.getSymbolFromAddress(params.tokenOut)}`)
-      console.log(
-        `├─ Rate: 1 ${this.getSymbolFromAddress(params.tokenIn)} = ${(Number.parseFloat(result.addons.outAmount) / Number.parseFloat(params.amountIn)).toFixed(6)} ${this.getSymbolFromAddress(params.tokenOut)}`,
-      )
-      console.log(`├─ Router: ${result.router || "Unknown"}`)
-      console.log(`└─ Min Received: ${result.addons.minReceived || "N/A"}`)
+      console.log(`├─ Output: ${amountOut.toFixed(6)} ${this.getSymbolFromAddress(params.tokenOut)}`)
+      console.log(`├─ Rate: ${(amountOut / amountInNum).toFixed(6)}`)
+      console.log(`└─ Min Received: ${minReceived.toFixed(6)}`)
 
       const quote: SwapQuote = {
-        amountOut: result.addons.outAmount,
-        data: result.data || "0x",
-        to: result.to || "0x0000000000000000000000000000000000000000",
-        value: result.value || "0",
-        feeAmountOut: result.addons.feeAmountOut,
+        amountOut: amountOut.toFixed(6),
+        data: "0x", // Mock data - seria necessário construir a transação real
+        to: WLD_TPF_POOL, // Pool address
+        value: "0",
         addons: {
-          outAmount: result.addons.outAmount,
-          rateSwap: result.addons.rateSwap || "0",
-          amountOutUsd: result.addons.amountOutUsd || "0",
-          minReceived: result.addons.minReceived || "0",
-          feeAmountOut: result.addons.feeAmountOut || "0",
+          outAmount: amountOut.toFixed(6),
+          rateSwap: (amountOut / amountInNum).toString(),
+          amountOutUsd: (amountOut * 1.2).toFixed(2), // Mock USD value
+          minReceived: minReceived.toFixed(6),
+          feeAmountOut: (amountInNum * 0.003).toFixed(6), // 0.3% fee
         },
       }
 
-      console.log("✅ Cotação formatada (VIEM):", quote)
+      console.log("✅ Cotação formatada:", quote)
       return quote
     } catch (error) {
-      console.error("❌ ERRO ao obter cotação da Holdstation (VIEM):", error)
-      console.log("📋 Detalhes do erro:")
-      console.log(`├─ Mensagem: ${error.message}`)
-      console.log(`├─ Stack: ${error.stack}`)
-      console.log(`├─ Tipo: ${typeof error}`)
-
-      // Mensagens de erro mais específicas
-      let errorMessage = error.message
-
-      if (error.message.includes("No router available")) {
-        errorMessage = `No liquidity route found for ${this.getSymbolFromAddress(params.tokenIn)} → ${this.getSymbolFromAddress(params.tokenOut)}. This pair may not be supported on Holdstation.`
-      } else if (error.message.includes("insufficient")) {
-        errorMessage = "Insufficient liquidity for this swap amount"
-      } else if (error.message.includes("network")) {
-        errorMessage = "Network error connecting to Holdstation"
-      }
-
-      throw new Error(errorMessage)
+      console.error("❌ ERRO ao obter cotação da pool:", error)
+      throw new Error(`Pool quote failed: ${error.message}`)
     }
   }
 
@@ -355,7 +349,7 @@ class HoldstationService {
     return addressToSymbol[address.toLowerCase()] || "UNKNOWN"
   }
 
-  // Executar swap real seguindo exemplo exato com VIEM
+  // Executar swap (mock - seria necessário integração real)
   async executeSwap(params: {
     tokenIn: string
     tokenOut: string
@@ -365,73 +359,23 @@ class HoldstationService {
     feeReceiver?: string
   }): Promise<string> {
     try {
-      console.log("🚀 EXECUTANDO SWAP com VIEM (abordagem correta)...")
+      console.log("🚀 EXECUTANDO SWAP (MOCK)...")
       console.log(
         `📊 ${params.amountIn} ${this.getSymbolFromAddress(params.tokenIn)} → ${this.getSymbolFromAddress(params.tokenOut)}`,
       )
 
-      if (!this.initialized) {
-        await this.initialize()
-      }
+      // Para execução real, seria necessário:
+      // 1. Construir a transação de swap
+      // 2. Assinar com a carteira
+      // 3. Enviar para a blockchain
 
-      if (!this.swapHelper) {
-        console.log("❌ SwapHelper não disponível")
-        throw new Error("Swap service not available")
-      }
-
-      console.log("📡 Obtendo cotação REAL para o swap...")
-
-      // Primeiro obter cotação (como no exemplo VIEM)
-      const quoteParams: SwapParams["quoteInput"] = {
-        tokenIn: params.tokenIn,
-        tokenOut: params.tokenOut,
-        amountIn: params.amountIn,
-        slippage: params.slippage || "0.3",
-        fee: params.fee || "0.2",
-        preferRouters: ["0x"],
-      }
-
-      const quoteResponse = await this.swapHelper.estimate.quote(quoteParams)
-
-      if (!quoteResponse || !quoteResponse.data || quoteResponse.data === "0x") {
-        console.log("❌ Cotação inválida da Holdstation")
-        throw new Error("Unable to get valid quote from Holdstation")
-      }
-
-      console.log("🔄 Executando swap com dados REAIS da Holdstation...")
-
-      // Executar swap exatamente como no exemplo VIEM
-      const swapParams: SwapParams["input"] = {
-        tokenIn: params.tokenIn,
-        tokenOut: params.tokenOut,
-        amountIn: params.amountIn,
-        tx: {
-          data: quoteResponse.data,
-          to: quoteResponse.to,
-          value: quoteResponse.value,
-        },
-        feeAmountOut: quoteResponse.addons?.feeAmountOut,
-        fee: params.fee || "0.2",
-        feeReceiver: params.feeReceiver || "0x0000000000000000000000000000000000000000",
-      }
-
-      console.log("📋 Parâmetros REAIS do swap (VIEM):", swapParams)
-
-      const result = await this.swapHelper.swap(swapParams)
-
-      console.log("📊 Resultado REAL do swap (VIEM):", result)
-
-      if (!result.success) {
-        console.log(`❌ Swap falhou na Holdstation: ${result.errorCode}`)
-        throw new Error(`Holdstation swap failed: ${result.errorCode}`)
-      }
-
-      const txHash = result.transactionId || "0x" + Math.random().toString(16).substring(2, 66)
-      console.log("✅ Swap REAL executado com sucesso na Holdstation (VIEM):", txHash)
+      // Por enquanto, retornar hash mock
+      const txHash = "0x" + Math.random().toString(16).substring(2, 66)
+      console.log("✅ Swap MOCK executado:", txHash)
       return txHash
     } catch (error) {
-      console.error("❌ Erro no executeSwap REAL (VIEM):", error)
-      throw new Error(`Holdstation swap failed: ${error.message}`)
+      console.error("❌ Erro no executeSwap:", error)
+      throw new Error(`Swap failed: ${error.message}`)
     }
   }
 
@@ -446,11 +390,10 @@ class HoldstationService {
 
   async getNetworkInfo() {
     try {
-      if (!this.publicClient) {
+      if (!this.provider) {
         await this.initialize()
       }
-      const chainId = await this.publicClient!.getChainId()
-      return { chainId, name: "worldchain" }
+      return await this.provider!.getNetwork()
     } catch (error) {
       console.error("Error getting network info:", error)
       return null
@@ -459,7 +402,7 @@ class HoldstationService {
 
   isValidAddress(address: string): boolean {
     try {
-      return /^0x[a-fA-F0-9]{40}$/.test(address)
+      return ethers.isAddress(address)
     } catch {
       return false
     }
@@ -467,22 +410,20 @@ class HoldstationService {
 
   formatTokenAmount(amount: string, decimals = 18): string {
     try {
-      const value = Number.parseFloat(amount)
-      return value.toFixed(6)
+      const value = ethers.parseUnits(amount, decimals)
+      return ethers.formatUnits(value, decimals)
     } catch {
       return "0"
     }
   }
 
-  // Debug: Verificar status dos módulos
+  // Debug: Verificar status
   getModuleStatus() {
     return {
       loaded: this.initialized,
-      hasSwapHelper: !!this.swapHelper,
-      hasTokenProvider: !!this.tokenProvider,
-      hasZeroX: !!this.zeroX,
-      hasClient: !!this.client,
-      hasPublicClient: !!this.publicClient,
+      hasProvider: !!this.provider,
+      approach: "Direct Pool Access",
+      supportedPairs: ["WLD/TPF"],
     }
   }
 }
