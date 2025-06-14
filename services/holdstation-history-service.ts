@@ -7,6 +7,14 @@ class HoldstationHistoryService {
   private debugLogs: string[] = []
   private provider: ethers.JsonRpcProvider | null = null
 
+  // Mapeamento correto de endereços para símbolos (case-insensitive)
+  private readonly TOKEN_ADDRESS_MAP: Record<string, string> = {
+    "0x834a73c0a83f3bce349a116ffb2a4c2d1c651e45": "TPF", // TPulseFi
+    "0x2cfc85d8e48f8eab294be644d9e25c3030863003": "WLD", // Worldcoin
+    "0xed49fe44fd4249a09843c2ba4bba7e50beca7113": "DNA", // DNA Token
+    "0xede54d9c024ee80c85ec0a75ed2d8774c7fbac9b": "WDD", // Drachma Token
+  }
+
   constructor() {
     // Inicializar provider para consultas diretas à blockchain
     this.provider = new ethers.JsonRpcProvider("https://worldchain-mainnet.g.alchemy.com/public")
@@ -131,10 +139,11 @@ class HoldstationHistoryService {
         uniqueTransactions.push(...mockTransactions)
       }
 
-      // Log resumo das transações
+      // Log resumo das transações com tokens corretos
       const summary = uniqueTransactions.reduce(
         (acc, tx) => {
-          acc[tx.type] = (acc[tx.type] || 0) + 1
+          const key = `${tx.type}_${tx.tokenSymbol}`
+          acc[key] = (acc[key] || 0) + 1
           return acc
         },
         {} as Record<string, number>,
@@ -142,6 +151,16 @@ class HoldstationHistoryService {
 
       this.addDebugLog(`📈 Resumo final: ${JSON.stringify(summary)}`)
       this.addDebugLog(`✅ Retornando ${uniqueTransactions.length} transações únicas`)
+
+      // Log detalhado das primeiras transações com tokens corretos
+      if (uniqueTransactions.length > 0) {
+        this.addDebugLog("=== PRIMEIRAS 5 TRANSAÇÕES (CORRIGIDAS) ===")
+        uniqueTransactions.slice(0, 5).forEach((tx, index) => {
+          this.addDebugLog(
+            `${index + 1}. ${tx.type.toUpperCase()} - ${Number.parseFloat(tx.amount).toLocaleString()} ${tx.tokenSymbol} - ${tx.hash}`,
+          )
+        })
+      }
 
       return uniqueTransactions.slice(0, limit)
     } catch (error) {
@@ -232,7 +251,7 @@ class HoldstationHistoryService {
               const tx = await this.parseTransferLog(log, walletAddress)
               if (tx) {
                 transactions.push(tx)
-                this.addDebugLog(`✅ Transação parseada: ${tx.hash}`)
+                this.addDebugLog(`✅ Transação parseada: ${tx.hash} - ${tx.tokenSymbol}`)
               }
             } catch (parseError) {
               this.addDebugLog(`⚠️ Erro ao parsear log: ${parseError.message}`)
@@ -340,13 +359,19 @@ class HoldstationHistoryService {
   }
 
   private getTokenSymbolFromAddress(address: string): string {
-    const tokenMap: Record<string, string> = {
-      "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45": "TPF",
-      "0x2cFc85d8E48F8EAB294be644d9E25C3030863003": "WLD",
-      "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113": "DNA",
-      "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B": "WDD",
+    this.addDebugLog(`🔍 Mapeando endereço para símbolo: ${address}`)
+
+    const normalizedAddress = address.toLowerCase()
+    const symbol = this.TOKEN_ADDRESS_MAP[normalizedAddress]
+
+    this.addDebugLog(`📍 Endereço ${address} -> ${symbol || "UNKNOWN"}`)
+
+    if (!symbol) {
+      this.addDebugLog(`⚠️ Endereço não reconhecido: ${address}`)
+      this.addDebugLog(`📋 Endereços conhecidos: ${Object.keys(this.TOKEN_ADDRESS_MAP).join(", ")}`)
     }
-    return tokenMap[address.toLowerCase()] || "UNKNOWN"
+
+    return symbol || "UNKNOWN"
   }
 
   private deduplicateTransactions(transactions: Transaction[]): Transaction[] {
@@ -432,7 +457,7 @@ class HoldstationHistoryService {
     return transactions.map((tx, index) => {
       this.addDebugLog(`Processando transação Holdstation ${index + 1}/${transactions.length}: ${tx.hash}`)
 
-      return {
+      const formatted = {
         id: tx.hash || `tx_${index}`,
         hash: tx.hash || "",
         type: this.determineTransactionType(tx, walletAddress),
@@ -445,6 +470,9 @@ class HoldstationHistoryService {
         status: tx.success === 2 ? "completed" : tx.success === 1 ? "failed" : "pending",
         blockNumber: tx.block,
       }
+
+      this.addDebugLog(`✅ Transação formatada: ${formatted.type} ${formatted.amount} ${formatted.tokenSymbol}`)
+      return formatted
     })
   }
 
@@ -471,17 +499,14 @@ class HoldstationHistoryService {
   }
 
   private extractTokenSymbol(tx: any): string {
-    const tokenMap: Record<string, string> = {
-      "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45": "TPF",
-      "0x2cFc85d8E48F8EAB294be644d9E25C3030863003": "WLD",
-      "0xED49fE44fD4249A09843C2Ba4bba7e50BECa7113": "DNA",
-      "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B": "WDD",
-    }
-
     if (tx.transfers && tx.transfers.length > 0) {
-      const tokenAddress = tx.transfers[0].tokenAddress.toLowerCase()
-      return tokenMap[tokenAddress] || "UNKNOWN"
+      const tokenAddress = tx.transfers[0].tokenAddress
+      this.addDebugLog(`🔍 Extraindo símbolo do token: ${tokenAddress}`)
+      const symbol = this.getTokenSymbolFromAddress(tokenAddress)
+      this.addDebugLog(`✅ Símbolo extraído: ${symbol}`)
+      return symbol
     }
+    this.addDebugLog(`⚠️ Nenhum transfer encontrado - retornando ETH`)
     return "ETH"
   }
 
