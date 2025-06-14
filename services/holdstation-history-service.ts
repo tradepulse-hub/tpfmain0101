@@ -1,4 +1,4 @@
-import { alchemyExplorerService } from "./alchemy-explorer-service"
+import { blockchainTransactionService } from "./blockchain-transaction-service"
 import type { Transaction } from "./types"
 
 class HoldstationHistoryService {
@@ -18,34 +18,37 @@ class HoldstationHistoryService {
 
   async getTransactionHistory(walletAddress: string, offset = 0, limit = 50): Promise<Transaction[]> {
     try {
-      this.addDebugLog(`=== APENAS DADOS REAIS - SEM FALLBACKS ===`)
+      this.addDebugLog(`=== USANDO BLOCKCHAIN SERVICE REAL ===`)
       this.addDebugLog(`Endereço: ${walletAddress}`)
       this.addDebugLog(`Offset: ${offset}, Limit: ${limit}`)
 
-      // Usar Alchemy Explorer Service diretamente
-      this.addDebugLog("🔍 Buscando APENAS dados reais no Alchemy Explorer...")
-      const transactions = await alchemyExplorerService.getTransactionHistory(walletAddress, offset, limit)
+      // Usar Blockchain Transaction Service para buscar dados reais
+      this.addDebugLog("🔗 Buscando transações reais da blockchain...")
+      const transactions = await blockchainTransactionService.getTransactionHistory(walletAddress, limit)
 
-      this.addDebugLog(`📊 Alchemy Explorer retornou: ${transactions.length} transações REAIS`)
+      this.addDebugLog(`📊 Blockchain service retornou: ${transactions.length} transações REAIS`)
 
       if (transactions.length > 0) {
-        this.addDebugLog(`✅ ${transactions.length} transações REAIS obtidas`)
+        this.addDebugLog(`✅ ${transactions.length} transações REAIS da blockchain`)
 
         // Log das primeiras transações para debug
         transactions.slice(0, 3).forEach((tx, index) => {
           this.addDebugLog(`${index + 1}. ${tx.type.toUpperCase()} - ${tx.amount} ${tx.tokenSymbol} - ${tx.hash}`)
         })
 
-        return transactions
+        // Aplicar offset se necessário
+        const offsetTransactions = offset > 0 ? transactions.slice(offset) : transactions
+
+        return offsetTransactions
       }
 
-      this.addDebugLog("📊 NENHUMA TRANSAÇÃO REAL ENCONTRADA")
+      this.addDebugLog("📊 NENHUMA TRANSAÇÃO REAL ENCONTRADA NA BLOCKCHAIN")
       this.addDebugLog("📊 Retornando array vazio - SEM MOCKS/FALLBACKS")
       return []
     } catch (error) {
-      this.addDebugLog(`❌ Erro ao buscar dados reais: ${error.message}`)
+      this.addDebugLog(`❌ Erro ao buscar dados reais da blockchain: ${error.message}`)
       this.addDebugLog("📊 Retornando array vazio - SEM FALLBACKS")
-      console.error("Error getting real transaction history:", error)
+      console.error("Error getting real blockchain transaction history:", error)
 
       // SEM FALLBACK - apenas array vazio
       return []
@@ -53,23 +56,23 @@ class HoldstationHistoryService {
   }
 
   async watchTransactions(walletAddress: string, callback?: () => void) {
-    this.addDebugLog(`🔍 Configurando watcher REAL para: ${walletAddress}`)
+    this.addDebugLog(`🔍 Configurando watcher BLOCKCHAIN para: ${walletAddress}`)
     return {
       start: async () => {
-        this.addDebugLog("🔄 Watcher REAL iniciado")
+        this.addDebugLog("🔄 Watcher BLOCKCHAIN iniciado")
       },
       stop: async () => {
-        this.addDebugLog("🛑 Watcher REAL parado")
+        this.addDebugLog("🛑 Watcher BLOCKCHAIN parado")
       },
     }
   }
 
   async stopWatching(walletAddress: string): Promise<void> {
-    this.addDebugLog(`🛑 Parando watcher REAL para: ${walletAddress}`)
+    this.addDebugLog(`🛑 Parando watcher BLOCKCHAIN para: ${walletAddress}`)
   }
 
   async cleanup(): Promise<void> {
-    this.addDebugLog("🧹 Limpeza REAL concluída")
+    this.addDebugLog("🧹 Limpeza BLOCKCHAIN concluída")
   }
 }
 
