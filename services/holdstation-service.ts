@@ -23,6 +23,28 @@ const SUPPORTED_TOKENS = {
   WDD: "0xEdE54d9c024ee80C85ec0a75eD2d8774c7Fbac9B", // Drachma Token - VERIFICADO
 }
 
+// Pool de liquidez Uniswap V3 para WLD/TPF
+const LIQUIDITY_POOLS = {
+  WLD_TPF: "0xEE08Cef6EbCe1e037fFdbDF6ab657E5C19E86FF3", // Pool Uniswap V3 WLD/TPF
+}
+
+// Configuração de pools para a Holdstation
+const POOL_CONFIG = {
+  // WLD/TPF pool configuration
+  [`${SUPPORTED_TOKENS.WLD}_${SUPPORTED_TOKENS.TPF}`]: {
+    pool: LIQUIDITY_POOLS.WLD_TPF,
+    fee: 3000, // 0.3% fee tier
+    token0: SUPPORTED_TOKENS.WLD,
+    token1: SUPPORTED_TOKENS.TPF,
+  },
+  [`${SUPPORTED_TOKENS.TPF}_${SUPPORTED_TOKENS.WLD}`]: {
+    pool: LIQUIDITY_POOLS.WLD_TPF,
+    fee: 3000, // 0.3% fee tier
+    token0: SUPPORTED_TOKENS.WLD,
+    token1: SUPPORTED_TOKENS.TPF,
+  },
+}
+
 // Mock inmemoryTransactionStorage
 const inmemoryTransactionStorage = {
   getItem: (key: string) => {
@@ -83,6 +105,10 @@ class HoldstationService {
         storage: inmemoryTokenStorage,
       })
 
+      // Configure pools for Holdstation
+      console.log("🏊 Configurando pools de liquidez...")
+      await this.configureLiquidityPools()
+
       console.log("🔧 Loading token details from Holdstation...")
       // Pre-load token details
       const tokenAddresses = Object.values(SUPPORTED_TOKENS)
@@ -127,6 +153,66 @@ class HoldstationService {
         stack: error.stack,
         name: error.name,
       })
+    }
+  }
+
+  private async configureLiquidityPools() {
+    try {
+      console.log("🏊 Configurando pools de liquidez Uniswap V3...")
+
+      for (const [pairKey, poolConfig] of Object.entries(POOL_CONFIG)) {
+        console.log(`📊 Configurando pool ${pairKey}:`, poolConfig)
+
+        // Verificar se a pool existe
+        const poolCode = await this.provider!.getCode(poolConfig.pool)
+        if (poolCode === "0x") {
+          console.warn(`⚠️ Pool ${poolConfig.pool} não encontrada`)
+          continue
+        }
+
+        // Verificar detalhes da pool
+        const poolContract = new ethers.Contract(
+          poolConfig.pool,
+          [
+            "function token0() view returns (address)",
+            "function token1() view returns (address)",
+            "function fee() view returns (uint24)",
+            "function liquidity() view returns (uint128)",
+          ],
+          this.provider!,
+        )
+
+        try {
+          const [token0, token1, fee, liquidity] = await Promise.all([
+            poolContract.token0(),
+            poolContract.token1(),
+            poolContract.fee(),
+            poolContract.liquidity(),
+          ])
+
+          console.log(`✅ Pool ${poolConfig.pool} verificada:`)
+          console.log(`├─ Token0: ${token0}`)
+          console.log(`├─ Token1: ${token1}`)
+          console.log(`├─ Fee: ${fee}`)
+          console.log(`└─ Liquidity: ${liquidity.toString()}`)
+
+          // Configurar a pool no tokenProvider se possível
+          if (this.tokenProvider && typeof this.tokenProvider.configurePool === "function") {
+            await this.tokenProvider.configurePool(poolConfig.pool, {
+              token0: poolConfig.token0,
+              token1: poolConfig.token1,
+              fee: poolConfig.fee,
+            })
+            console.log(`🔧 Pool ${poolConfig.pool} configurada no tokenProvider`)
+          }
+        } catch (poolError) {
+          console.warn(`⚠️ Erro ao verificar pool ${poolConfig.pool}:`, poolError.message)
+        }
+      }
+
+      console.log("✅ Configuração de pools concluída")
+    } catch (error) {
+      console.error("❌ Erro ao configurar pools:", error)
     }
   }
 
@@ -327,6 +413,20 @@ class HoldstationService {
         fee: params.fee || "0.2",
         // Tentar diferentes routers
         preferRouters: ["holdso", "0x"], // HoldSo primeiro, depois 0x
+      }
+
+      // Verificar se temos pool configurada para este par
+      const pairKey = `${params.tokenIn}_${params.tokenOut}`
+      const poolConfig = POOL_CONFIG[pairKey]
+
+      if (poolConfig) {
+        console.log(`🏊 Usando pool configurada: ${poolConfig.pool}`)
+        quoteParams.poolAddress = poolConfig.pool
+        quoteParams.poolFee = poolConfig.fee
+      } else {
+        console.log(
+          `⚠️ Nenhuma pool específica configurada para ${this.getSymbolFromAddress(params.tokenIn)} → ${this.getSymbolFromAddress(params.tokenOut)}`,
+        )
       }
 
       console.log("📡 Chamando Holdstation SDK para cotação...")
