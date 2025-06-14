@@ -67,6 +67,15 @@ class HoldstationService {
       })
       console.log("✅ Provider created!")
 
+      // AGUARDAR A REDE ESTAR PRONTA
+      try {
+        console.log("🔄 Waiting for network to be ready...")
+        await this.provider.getNetwork()
+        console.log("✅ Network is ready!")
+      } catch (error) {
+        console.log("⚠️ Network check failed, continuing anyway:", error.message)
+      }
+
       // 2. Criar o Client da Holdstation - PASSANDO O PROVIDER
       this.client = new Client(this.provider)
       console.log("✅ Client created!")
@@ -153,10 +162,20 @@ class HoldstationService {
     // Testar Provider
     if (this.provider) {
       try {
+        console.log("🔄 Testing provider connection...")
         const network = await this.provider.getNetwork()
-        console.log("📋 Network:", network)
+        console.log("✅ Provider working! Network:", network.name, "ChainId:", network.chainId)
       } catch (error) {
         console.log("⚠️ Provider test failed:", error.message)
+        // Tentar novamente após um delay
+        setTimeout(async () => {
+          try {
+            const network = await this.provider.getNetwork()
+            console.log("✅ Provider working after retry! Network:", network.name, "ChainId:", network.chainId)
+          } catch (retryError) {
+            console.log("⚠️ Provider retry also failed:", retryError.message)
+          }
+        }, 2000)
       }
     }
 
