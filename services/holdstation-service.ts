@@ -1,10 +1,11 @@
 import type { TokenBalance, SwapQuote } from "./types"
+import { ethers } from "ethers"
 
 // Configuração para Worldchain
 const WORLDCHAIN_CONFIG = {
   chainId: 480,
   rpcUrl: "https://worldchain-mainnet.g.alchemy.com/public",
-  name: "Worldchain",
+  name: "worldchain",
 }
 
 // Tokens suportados pela Holdstation
@@ -16,10 +17,12 @@ const SUPPORTED_TOKENS = {
 }
 
 class HoldstationService {
-  private manager: any = null
-  private swapHelper: any = null
-  private tokenProvider: any = null
   private client: any = null
+  private multicall3: any = null
+  private tokenProvider: any = null
+  private quoter: any = null
+  private swapHelper: any = null
+  private provider: any = null
   private initialized = false
   private initializationPromise: Promise<void> | null = null
 
@@ -41,7 +44,7 @@ class HoldstationService {
     try {
       console.log("🚀 Initializing Holdstation SDK (Worldchain)...")
 
-      // Importar ambos os pacotes
+      // Importar os módulos
       const [HoldstationModule, EthersModule] = await Promise.all([
         import("@holdstation/worldchain-sdk"),
         import("@holdstation/worldchain-ethers-v6"),
@@ -51,155 +54,79 @@ class HoldstationService {
       console.log("SDK exports:", Object.keys(HoldstationModule))
       console.log("Ethers exports:", Object.keys(EthersModule))
 
-      // Extrair as classes principais
-      const { Manager, SwapHelper, TokenProvider, HoldSo, defaultWorldchainConfig } = HoldstationModule
-      const { Client } = EthersModule
+      // Extrair as classes e configurações
+      const { config, inmemoryTokenStorage, TokenProvider } = HoldstationModule
+      const { Client, Multicall3 } = EthersModule
 
-      console.log("🔧 Initializing Holdstation components...")
+      console.log("🔧 Setting up provider and client...")
 
-      // Usar a configuração padrão da Worldchain se disponível
-      const config = defaultWorldchainConfig || {
+      // 1. Criar o provider do ethers v6 - SINTAXE CORRETA
+      this.provider = new ethers.JsonRpcProvider(WORLDCHAIN_CONFIG.rpcUrl, {
         chainId: WORLDCHAIN_CONFIG.chainId,
-        rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
+        name: WORLDCHAIN_CONFIG.name,
+      })
+      console.log("✅ Provider created!")
+
+      // 2. Criar o Client da Holdstation - PASSANDO O PROVIDER
+      this.client = new Client(this.provider)
+      console.log("✅ Client created!")
+
+      // 3. Configurar o config global - IGUAL AO SEU EXEMPLO
+      config.client = this.client
+      console.log("✅ Client set in global config!")
+
+      // 4. Criar Multicall3 - IGUAL AO SEU EXEMPLO
+      if (Multicall3) {
+        this.multicall3 = new Multicall3(this.provider)
+        config.multicall3 = this.multicall3
+        console.log("✅ Multicall3 configured!")
       }
 
-      console.log("📋 Using config:", config)
+      // 5. Criar TokenProvider - SEM PARÂMETROS COMO NO SEU EXEMPLO
+      this.tokenProvider = new TokenProvider()
+      console.log("✅ TokenProvider created!")
 
-      // 1. Primeiro, inicializar o Client do Ethers
-      if (Client) {
-        try {
-          console.log("🔧 Initializing Ethers Client...")
-          this.client = new Client({
-            rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
-            chainId: WORLDCHAIN_CONFIG.chainId,
+      // 6. Tentar criar Quoter - PASSANDO O CLIENT
+      try {
+        if (HoldstationModule.Quoter) {
+          this.quoter = new HoldstationModule.Quoter(this.client)
+          console.log("✅ Quoter created from SDK!")
+        } else if (EthersModule.Quoter) {
+          this.quoter = new EthersModule.Quoter(this.client)
+          console.log("✅ Quoter created from Ethers module!")
+        } else {
+          console.log("⚠️ Quoter not found in either module")
+        }
+      } catch (error) {
+        console.log("⚠️ Quoter creation failed:", error.message)
+      }
+
+      // 7. Criar SwapHelper - IGUAL AO SEU EXEMPLO
+      try {
+        if (HoldstationModule.SwapHelper) {
+          this.swapHelper = new HoldstationModule.SwapHelper(this.client, {
+            tokenStorage: inmemoryTokenStorage,
           })
-          console.log("✅ Ethers Client initialized!")
-        } catch (error) {
-          console.log("⚠️ Ethers Client initialization failed:", error.message)
-          // Tentar sem configuração
-          try {
-            this.client = new Client()
-            console.log("✅ Ethers Client initialized without config!")
-          } catch (error2) {
-            console.log("❌ Ethers Client failed completely:", error2.message)
-          }
+          console.log("✅ SwapHelper created from SDK!")
+        } else if (EthersModule.SwapHelper) {
+          this.swapHelper = new EthersModule.SwapHelper(this.client, {
+            tokenStorage: inmemoryTokenStorage,
+          })
+          console.log("✅ SwapHelper created from Ethers module!")
+        } else {
+          console.log("⚠️ SwapHelper not found in either module")
         }
+      } catch (error) {
+        console.log("⚠️ SwapHelper creation failed:", error.message)
       }
 
-      // 2. Inicializar Manager com o client
-      if (Manager) {
-        try {
-          const managerConfig = {
-            ...config,
-            client: this.client,
-          }
-          console.log("🔧 Initializing Manager with client...")
-          this.manager = new Manager(managerConfig)
-          console.log("✅ Manager initialized with client!")
-        } catch (error) {
-          console.log("⚠️ Manager with client failed:", error.message)
-          // Tentar sem client
-          try {
-            this.manager = new Manager(config)
-            console.log("✅ Manager initialized without client!")
-          } catch (error2) {
-            console.log("⚠️ Manager without client failed:", error2.message)
-            // Último recurso: sem configuração
-            this.manager = new Manager()
-            console.log("✅ Manager initialized with defaults!")
-          }
-        }
+      // Verificar se temos pelo menos o essencial
+      if (!this.client) {
+        throw new Error("Failed to create Client")
       }
 
-      // 3. Inicializar SwapHelper com o client
-      if (SwapHelper) {
-        try {
-          const swapConfig = {
-            ...config,
-            client: this.client,
-          }
-          console.log("🔧 Initializing SwapHelper with client...")
-          this.swapHelper = new SwapHelper(swapConfig)
-          console.log("✅ SwapHelper initialized with client!")
-        } catch (error) {
-          console.log("⚠️ SwapHelper with client failed:", error.message)
-          // Tentar sem client
-          try {
-            this.swapHelper = new SwapHelper(config)
-            console.log("✅ SwapHelper initialized without client!")
-          } catch (error2) {
-            console.log("⚠️ SwapHelper without client failed:", error2.message)
-            // Último recurso: sem configuração
-            this.swapHelper = new SwapHelper()
-            console.log("✅ SwapHelper initialized with defaults!")
-          }
-        }
-      }
-
-      // 4. Inicializar TokenProvider
-      if (TokenProvider) {
-        try {
-          const tokenConfig = {
-            ...config,
-            client: this.client,
-          }
-          console.log("🔧 Initializing TokenProvider with client...")
-          this.tokenProvider = new TokenProvider(tokenConfig)
-          console.log("✅ TokenProvider initialized with client!")
-        } catch (error) {
-          console.log("⚠️ TokenProvider with client failed:", error.message)
-          // Tentar sem client
-          try {
-            this.tokenProvider = new TokenProvider(config)
-            console.log("✅ TokenProvider initialized without client!")
-          } catch (error2) {
-            console.log("⚠️ TokenProvider without client failed:", error2.message)
-            // Último recurso: sem configuração
-            this.tokenProvider = new TokenProvider()
-            console.log("✅ TokenProvider initialized with defaults!")
-          }
-        }
-      }
-
-      // 5. Se não conseguiu nenhum, tentar HoldSo como fallback
-      if (!this.manager && !this.swapHelper && HoldSo) {
-        try {
-          const holdSoConfig = {
-            ...config,
-            client: this.client,
-          }
-          console.log("🔧 Initializing HoldSo as fallback...")
-          const holdSo = new HoldSo(holdSoConfig)
-          this.manager = holdSo
-          this.swapHelper = holdSo
-          console.log("✅ HoldSo initialized as fallback!")
-        } catch (error) {
-          console.log("⚠️ HoldSo fallback failed:", error.message)
-        }
-      }
-
-      // 6. Configurar client nos componentes se eles tiverem método setClient
-      if (this.client) {
-        const components = [
-          { name: "Manager", obj: this.manager },
-          { name: "SwapHelper", obj: this.swapHelper },
-          { name: "TokenProvider", obj: this.tokenProvider },
-        ]
-
-        for (const component of components) {
-          if (component.obj && typeof component.obj.setClient === "function") {
-            try {
-              component.obj.setClient(this.client)
-              console.log(`✅ Client set on ${component.name}`)
-            } catch (error) {
-              console.log(`⚠️ Failed to set client on ${component.name}:`, error.message)
-            }
-          }
-        }
-      }
-
-      if (!this.manager && !this.swapHelper) {
-        throw new Error("Failed to initialize any Holdstation component")
+      if (!this.tokenProvider) {
+        throw new Error("Failed to create TokenProvider")
       }
 
       // Testar se o SDK está funcionando
@@ -210,10 +137,12 @@ class HoldstationService {
     } catch (error) {
       console.error("❌ Failed to initialize Holdstation SDK:", error)
       this.initialized = false
-      this.manager = null
-      this.swapHelper = null
-      this.tokenProvider = null
       this.client = null
+      this.multicall3 = null
+      this.tokenProvider = null
+      this.quoter = null
+      this.swapHelper = null
+      this.provider = null
       throw error
     }
   }
@@ -221,28 +150,30 @@ class HoldstationService {
   private async testSDKFunctionality() {
     console.log("🧪 Testing SDK functionality...")
 
-    // Testar Client
-    if (this.client) {
-      const clientMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.client))
-      console.log("📋 Client methods:", clientMethods)
+    // Testar Provider
+    if (this.provider) {
+      try {
+        const network = await this.provider.getNetwork()
+        console.log("📋 Network:", network)
+      } catch (error) {
+        console.log("⚠️ Provider test failed:", error.message)
+      }
     }
 
-    // Testar Manager
-    if (this.manager) {
-      const managerMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.manager))
-      console.log("📋 Manager methods:", managerMethods)
-    }
+    // Listar métodos disponíveis
+    const components = [
+      { name: "Client", obj: this.client },
+      { name: "TokenProvider", obj: this.tokenProvider },
+      { name: "Quoter", obj: this.quoter },
+      { name: "SwapHelper", obj: this.swapHelper },
+      { name: "Multicall3", obj: this.multicall3 },
+    ]
 
-    // Testar SwapHelper
-    if (this.swapHelper) {
-      const swapMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper))
-      console.log("📋 SwapHelper methods:", swapMethods)
-    }
-
-    // Testar TokenProvider
-    if (this.tokenProvider) {
-      const tokenMethods = Object.getOwnPropertyNames(Object.getPrototypeOf(this.tokenProvider))
-      console.log("📋 TokenProvider methods:", tokenMethods)
+    for (const component of components) {
+      if (component.obj) {
+        const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(component.obj))
+        console.log(`📋 ${component.name} methods:`, methods)
+      }
     }
 
     console.log("✅ SDK functionality test completed")
@@ -255,8 +186,8 @@ class HoldstationService {
 
       console.log(`💰 Getting token balances for: ${walletAddress}`)
 
-      if (!this.manager && !this.tokenProvider) {
-        throw new Error("No balance provider available")
+      if (!this.tokenProvider) {
+        throw new Error("TokenProvider not available")
       }
 
       console.log("📡 Calling getTokenBalances...")
@@ -266,9 +197,6 @@ class HoldstationService {
         { obj: this.tokenProvider, name: "getTokenBalances" },
         { obj: this.tokenProvider, name: "getBalances" },
         { obj: this.tokenProvider, name: "getTokens" },
-        { obj: this.manager, name: "getTokenBalances" },
-        { obj: this.manager, name: "getBalances" },
-        { obj: this.manager, name: "getTokens" },
       ]
 
       for (const method of methods) {
@@ -337,20 +265,19 @@ class HoldstationService {
       console.log("💱 Getting swap quote...")
       console.log("📊 Quote parameters:", params)
 
-      if (!this.swapHelper && !this.manager) {
-        throw new Error("No swap provider available")
+      if (!this.quoter && !this.swapHelper) {
+        throw new Error("No quote provider available")
       }
 
       console.log("📡 Calling getSwapQuote...")
 
       let quote = null
       const methods = [
+        { obj: this.quoter, name: "getQuote" },
+        { obj: this.quoter, name: "quote" },
         { obj: this.swapHelper, name: "getQuote" },
         { obj: this.swapHelper, name: "getSwapQuote" },
         { obj: this.swapHelper, name: "quote" },
-        { obj: this.manager, name: "getQuote" },
-        { obj: this.manager, name: "getSwapQuote" },
-        { obj: this.manager, name: "quote" },
       ]
 
       for (const method of methods) {
@@ -419,12 +346,12 @@ class HoldstationService {
       console.log("📊 Swap parameters:", params)
       console.log("⚠️ This will execute a REAL transaction!")
 
-      if (!this.swapHelper && !this.manager) {
-        throw new Error("No swap provider available")
+      if (!this.swapHelper) {
+        throw new Error("SwapHelper not available")
       }
 
       if (!this.client) {
-        throw new Error("No client available for transaction execution")
+        throw new Error("Client not available")
       }
 
       console.log("📡 Calling executeSwap...")
@@ -433,8 +360,6 @@ class HoldstationService {
       const methods = [
         { obj: this.swapHelper, name: "executeSwap" },
         { obj: this.swapHelper, name: "swap" },
-        { obj: this.manager, name: "executeSwap" },
-        { obj: this.manager, name: "swap" },
       ]
 
       for (const method of methods) {
@@ -487,34 +412,8 @@ class HoldstationService {
       await this.initialize()
 
       console.log(`📜 Getting transaction history for: ${walletAddress}`)
-
-      if (!this.manager) {
-        console.log("⚠️ No transaction history provider available")
-        return []
-      }
-
-      let transactions = null
-      const methods = [
-        { obj: this.manager, name: "getTransactionHistory" },
-        { obj: this.manager, name: "getHistory" },
-        { obj: this.manager, name: "getTransactions" },
-      ]
-
-      for (const method of methods) {
-        if (method.obj && typeof method.obj[method.name] === "function") {
-          try {
-            console.log(`🔄 Trying ${method.name}...`)
-            transactions = await method.obj[method.name](walletAddress, offset, limit)
-            console.log(`✅ ${method.name} succeeded!`)
-            break
-          } catch (error) {
-            console.log(`❌ ${method.name} failed:`, error.message)
-          }
-        }
-      }
-
-      console.log("📊 Raw transactions from SDK:", transactions)
-      return transactions || []
+      console.log("⚠️ Transaction history not implemented in current SDK version")
+      return []
     } catch (error) {
       console.error("❌ Error getting transaction history:", error)
       return []
@@ -540,29 +439,35 @@ class HoldstationService {
     return this.initialized
   }
 
-  getManager() {
-    return this.manager
+  getClient() {
+    return this.client
   }
 
-  getSwapHelper() {
-    return this.swapHelper
+  getProvider() {
+    return this.provider
   }
 
   getTokenProvider() {
     return this.tokenProvider
   }
 
-  getClient() {
-    return this.client
+  getQuoter() {
+    return this.quoter
+  }
+
+  getSwapHelper() {
+    return this.swapHelper
   }
 
   getSDKStatus() {
     return {
       initialized: this.initialized,
-      hasManager: !!this.manager,
-      hasSwapHelper: !!this.swapHelper,
-      hasTokenProvider: !!this.tokenProvider,
+      hasProvider: !!this.provider,
       hasClient: !!this.client,
+      hasTokenProvider: !!this.tokenProvider,
+      hasQuoter: !!this.quoter,
+      hasSwapHelper: !!this.swapHelper,
+      hasMulticall3: !!this.multicall3,
       sdkType: "NPM @holdstation/worldchain-sdk + ethers-v6",
       chainId: WORLDCHAIN_CONFIG.chainId,
       rpcUrl: WORLDCHAIN_CONFIG.rpcUrl,
@@ -575,30 +480,22 @@ class HoldstationService {
       await this.initialize()
 
       console.log("=== HOLDSTATION SDK DEBUG ===")
-      console.log("Initialized:", this.initialized)
-      console.log("Has Manager:", !!this.manager)
-      console.log("Has SwapHelper:", !!this.swapHelper)
-      console.log("Has TokenProvider:", !!this.tokenProvider)
-      console.log("Has Client:", !!this.client)
+      console.log("Status:", this.getSDKStatus())
 
-      if (this.client) {
-        console.log("Client Methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.client)))
-        console.log("Client Properties:", Object.keys(this.client))
-      }
+      const components = [
+        { name: "Provider", obj: this.provider },
+        { name: "Client", obj: this.client },
+        { name: "TokenProvider", obj: this.tokenProvider },
+        { name: "Quoter", obj: this.quoter },
+        { name: "SwapHelper", obj: this.swapHelper },
+        { name: "Multicall3", obj: this.multicall3 },
+      ]
 
-      if (this.manager) {
-        console.log("Manager Methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.manager)))
-        console.log("Manager Properties:", Object.keys(this.manager))
-      }
-
-      if (this.swapHelper) {
-        console.log("SwapHelper Methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.swapHelper)))
-        console.log("SwapHelper Properties:", Object.keys(this.swapHelper))
-      }
-
-      if (this.tokenProvider) {
-        console.log("TokenProvider Methods:", Object.getOwnPropertyNames(Object.getPrototypeOf(this.tokenProvider)))
-        console.log("TokenProvider Properties:", Object.keys(this.tokenProvider))
+      for (const component of components) {
+        if (component.obj) {
+          console.log(`${component.name} Methods:`, Object.getOwnPropertyNames(Object.getPrototypeOf(component.obj)))
+          console.log(`${component.name} Properties:`, Object.keys(component.obj))
+        }
       }
 
       console.log("=== END DEBUG ===")
