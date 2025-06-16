@@ -75,7 +75,7 @@ export function ReceiveTokenModal({ address, chains }: ReceiveTokenModalProps) {
                 <div className="flex flex-col items-center space-y-3">
                   <QRCode
                     value={address || "0x"}
-                    size={128}
+                    size={48}
                     level="H"
                     ecLevel="H"
                     qrStyle="dots"
