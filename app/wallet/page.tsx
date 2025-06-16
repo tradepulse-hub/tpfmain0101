@@ -19,6 +19,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { BackgroundEffect } from "@/components/background-effect"
+import { BottomNav } from "@/components/bottom-nav"
 import { walletService } from "@/services/wallet-service"
 import { balanceSyncService } from "@/services/balance-sync-service"
 import { SetBalanceModal } from "@/components/set-balance-modal"
@@ -166,9 +168,9 @@ export default function WalletPage() {
     }))
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-4 relative overflow-hidden pb-24 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-      {/* Background Effect */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-900/10 via-purple-900/5 to-gray-900/10" />
+    <main className="relative flex min-h-screen flex-col items-center pt-6 pb-20 overflow-hidden">
+      {/* Background effects */}
+      <BackgroundEffect />
 
       {/* Modals */}
       <SetBalanceModal
@@ -196,7 +198,7 @@ export default function WalletPage() {
         walletAddress={walletAddress}
       />
 
-      <div className="z-10 w-full max-w-md mx-auto">
+      <div className="relative z-10 w-full max-w-md mx-auto px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -205,7 +207,11 @@ export default function WalletPage() {
         >
           {/* Header */}
           <div className="w-full flex flex-col mb-6">
-            <h1 className="text-2xl font-bold text-white mb-2">{t.wallet?.title || "Wallet"}</h1>
+            <h1 className="text-2xl font-bold tracking-tighter mb-2">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-200 via-white to-gray-300">
+                {t.wallet?.title || "Wallet"}
+              </span>
+            </h1>
 
             {walletAddress && (
               <motion.div
@@ -490,22 +496,9 @@ export default function WalletPage() {
           )}
         </motion.div>
       </div>
-      {/* Navigation Bar - Fixed Bottom */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 z-50">
-        <div className="flex justify-around items-center py-3 px-4 max-w-md mx-auto">
-          <button onClick={() => router.push("/wallet")} className="flex flex-col items-center space-y-1 text-blue-400">
-            <Wallet className="w-5 h-5" />
-            <span className="text-xs">Wallet</span>
-          </button>
-          <button
-            onClick={() => router.push("/profile")}
-            className="flex flex-col items-center space-y-1 text-gray-400 hover:text-white"
-          >
-            <div className="w-5 h-5 rounded-full bg-gray-600"></div>
-            <span className="text-xs">Profile</span>
-          </button>
-        </div>
-      </div>
+
+      {/* Bottom navigation */}
+      <BottomNav activeTab="wallet" />
     </main>
   )
 }
