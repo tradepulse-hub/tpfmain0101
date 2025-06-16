@@ -14,18 +14,21 @@ interface EditProfileModalProps {
   onSave: (data: { profileImage?: string; name?: string; bio?: string }) => void
 }
 
-const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, currentData, onSave }) => {
+export function EditProfileModal({ isOpen, onClose, onSave, currentData }: EditProfileModalProps) {
+  const { profileImage: initialProfileImage, name: initialName, bio: initialBio } = currentData || {}
   const [previewImage, setPreviewImage] = useState<string | null>(null)
-  const [name, setName] = useState(currentData?.name || "")
-  const [bio, setBio] = useState(currentData?.bio || "")
+  const [name, setName] = useState(initialName || "")
+  const [bio, setBio] = useState(initialBio || "")
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [profileImage, setProfileImage] = useState(initialProfileImage)
 
   useEffect(() => {
-    setName(currentData?.name || "")
-    setBio(currentData?.bio || "")
+    setName(initialName || "")
+    setBio(initialBio || "")
     setPreviewImage(null)
     setSelectedImage(null)
-  }, [currentData])
+    setProfileImage(initialProfileImage)
+  }, [initialName, initialBio, initialProfileImage])
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -50,9 +53,9 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, cu
       // In a real application, you would upload the image to a server here
       // and get the URL of the uploaded image.
       // For this example, we'll just use the preview image as the profileImage.
-      newData.profileImage = previewImage || currentData.profileImage
+      newData.profileImage = previewImage || profileImage
     } else {
-      newData.profileImage = currentData.profileImage
+      newData.profileImage = profileImage
     }
 
     onSave(newData)
@@ -76,9 +79,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, cu
             <img
               src={
                 previewImage ||
-                (currentData.profileImage && currentData.profileImage !== "/placeholder.png"
-                  ? currentData.profileImage
-                  : "/default-avatar.jpg")
+                (profileImage && profileImage !== "/placeholder.png" ? profileImage : "/default-avatar.jpg")
               }
               alt="Profile Preview"
               className="w-20 h-20 rounded-full object-cover mr-4"
@@ -133,5 +134,3 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, cu
     </div>
   )
 }
-
-export default EditProfileModal
