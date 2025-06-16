@@ -870,7 +870,7 @@ export default function ProfilePage() {
               src={
                 user.profileImage && user.profileImage !== "/placeholder.png"
                   ? user.profileImage
-                  : "/placeholder.svg?height=128&width=128&query=user+avatar"
+                  : "/default-avatar.jpg"
               }
               alt="Profile"
               width={128}
