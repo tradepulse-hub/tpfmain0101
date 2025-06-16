@@ -868,12 +868,14 @@ export default function ProfilePage() {
           <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-gray-700 relative">
             <Image
               src={
-                user.profileImage && user.profileImage !== "/placeholder.png" ? user.profileImage : "/burn-token.png"
+                user.profileImage && user.profileImage !== "/placeholder.png"
+                  ? user.profileImage
+                  : "/placeholder.svg?height=128&width=128&query=user+avatar"
               }
               alt="Profile"
               width={128}
               height={128}
-              className={`w-full h-full object-cover ${!user.profileImage || user.profileImage === "/placeholder.png" ? "opacity-20 grayscale brightness-50" : ""}`}
+              className="w-full h-full object-cover"
             />
 
             {/* Glow effect */}
@@ -900,24 +902,6 @@ export default function ProfilePage() {
             className="absolute -inset-4 rounded-full border border-gray-600/20"
             animate={{ scale: [1.05, 1, 1.05], opacity: [0.2, 0.4, 0.2] }}
             transition={{ duration: 4, repeat: Number.POSITIVE_INFINITY }}
-          />
-
-          {/* Feixe de luz girando 360 graus */}
-          <motion.div
-            className="absolute -inset-2 w-[calc(100%+16px)] h-[calc(100%+16px)] rounded-full"
-            style={{
-              background:
-                "conic-gradient(from 0deg, transparent 85%, rgba(255,255,255,0.8) 90%, rgba(255,255,255,0.4) 95%, transparent 100%)",
-              filter: "blur(1px)",
-            }}
-            animate={{
-              rotate: [0, 360],
-            }}
-            transition={{
-              duration: 4,
-              ease: "linear",
-              repeat: Number.POSITIVE_INFINITY,
-            }}
           />
         </motion.div>
 
