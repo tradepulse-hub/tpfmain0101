@@ -306,7 +306,7 @@ export default function WalletPage() {
 
               <CardContent className="relative z-10 pt-6 pb-4">
                 {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-2">
                   <Button
                     variant="secondary"
                     className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
@@ -316,6 +316,22 @@ export default function WalletPage() {
                       <ArrowUpRight className="w-4 h-4 text-gray-400" />
                     </div>
                     <span className="text-xs font-medium">{t.wallet?.send || "Send"}</span>
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
+                    onClick={() =>
+                      window.open(
+                        "https://worldcoin.org/mini-app?app_id=app_2637c582c7f19027cda2fd6803ba4f68&draft_id=meta_0761da6d7f99fc683e28bab7fca6ee70",
+                        "_blank",
+                      )
+                    }
+                  >
+                    <div className="rounded-full bg-gray-700 p-2 mb-1">
+                      <TrendingUp className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <span className="text-xs font-medium">Stake</span>
                   </Button>
 
                   <Button
