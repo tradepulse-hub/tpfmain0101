@@ -309,6 +309,11 @@ export default function ProfilePage() {
     // Atualizar o estado
     setUser(updatedUser)
 
+    // Se uma nova imagem foi definida, usar tpf.png, senão manter burn-token.png
+    if (newData.profileImage && newData.profileImage !== "/placeholder.png") {
+      updatedUser.profileImage = "/tpf.png"
+    }
+
     // Salvar no localStorage de forma mais robusta
     try {
       if (newData.nickname) {
@@ -827,9 +832,8 @@ export default function ProfilePage() {
                   <p className="text-white/80 text-xs truncate">{partnerships[currentPartnershipIndex].description}</p>
                 </div>
               </div>
-              <div className="ml-3 flex-shrink-0 bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-full text-xs font-medium transition-colors flex items-center">
-                <ExternalLink className="w-3 h-3 mr-1" />
-                Visit
+              <div className="ml-3 flex-shrink-0">
+                <ExternalLink className="w-4 h-4 text-white/80" />
               </div>
             </div>
 
@@ -872,11 +876,11 @@ export default function ProfilePage() {
         >
           <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-gray-700 relative">
             <Image
-              src={user.profileImage || "/placeholder.svg?height=128&width=128&query=user"}
+              src={user.profileImage && user.profileImage !== "/placeholder.png" ? "/tpf.png" : "/burn-token.png"}
               alt="Profile"
               width={128}
               height={128}
-              className="w-full h-full object-cover"
+              className={`w-full h-full object-cover ${!user.profileImage || user.profileImage === "/placeholder.png" ? "opacity-50" : ""}`}
             />
 
             {/* Glow effect */}
