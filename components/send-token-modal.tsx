@@ -255,11 +255,11 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-gray-900 rounded-lg border border-gray-800 p-2 w-full max-w-sm"
+            className="bg-gray-900 rounded-lg border border-gray-800 p-1 w-full max-w-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-lg font-bold text-white flex items-center">
+            <div className="flex justify-between items-center mb-1">
+              <h3 className="text-base font-bold text-white flex items-center">
                 <Send size={20} className="mr-2 text-blue-400" />
                 {t.sendToken?.title || "Send Tokens"}
               </h3>
@@ -273,7 +273,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
-                className={`mb-2 p-2 rounded-lg border ${
+                className={`mb-1 p-1 rounded-lg border ${
                   transactionStatus === "success"
                     ? "bg-green-900/20 border-green-800/30"
                     : transactionStatus === "error"
@@ -320,7 +320,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
-                className="mb-2 p-2 bg-yellow-900/20 border border-yellow-800/30 rounded-lg"
+                className="mb-1 p-2 bg-yellow-900/20 border border-yellow-800/30 rounded-lg"
               >
                 <div className="flex items-start">
                   <AlertTriangle className="w-5 h-5 text-yellow-400 mt-0.5 mr-3 flex-shrink-0" />
@@ -343,7 +343,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
               </motion.div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-2">
+            <form onSubmit={handleSubmit} className="space-y-1">
               {/* Token Selection */}
               <div>
                 <label className="block text-sm text-gray-400 mb-1">{t.sendToken?.selectToken || "Select Token"}</label>
@@ -351,7 +351,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
                   <button
                     type="button"
                     onClick={() => setShowTokenSelector(!showTokenSelector)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 flex items-center justify-between"
+                    className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white focus:outline-none focus:ring-1 focus:ring-blue-500 flex items-center justify-between"
                     disabled={isLoadingTokens || isLoading}
                   >
                     {isLoadingTokens ? (
@@ -434,7 +434,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
                   value={recipient}
                   onChange={(e) => setRecipient(e.target.value)}
                   placeholder="0x..."
-                  className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   required
                   disabled={isLoading}
                 />
@@ -464,7 +464,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
                     step="0.000001"
                     min="0"
                     max={selectedToken?.balance}
-                    className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     required
                     disabled={isLoading}
                   />
@@ -479,7 +479,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
               <button
                 type="submit"
                 disabled={isLoading || !selectedToken || isLoadingTokens || transactionStatus === "success"}
-                className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-1 px-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
