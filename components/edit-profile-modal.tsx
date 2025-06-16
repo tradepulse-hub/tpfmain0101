@@ -68,7 +68,7 @@ export function EditProfileModal({ isOpen, onClose, onSave, currentData }: EditP
           >
             <div className="p-5">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-white">Editar Perfil</h3>
+                <h3 className="text-lg font-medium text-white">Edit Profile</h3>
                 <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path
@@ -86,7 +86,7 @@ export function EditProfileModal({ isOpen, onClose, onSave, currentData }: EditP
                   <div className="relative w-24 h-24 mb-2">
                     <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-700">
                       <Image
-                        src={previewImage || profileImage || "/default-avatar.jpg"}
+                        src={previewImage || profileImage || ""}
                         alt="Profile"
                         width={96}
                         height={96}
@@ -119,7 +119,7 @@ export function EditProfileModal({ isOpen, onClose, onSave, currentData }: EditP
                 {/* Nickname */}
                 <div>
                   <label htmlFor="nickname" className="block text-sm font-medium text-gray-400 mb-1">
-                    Nome de usuário
+                    Username
                   </label>
                   <input
                     type="text"
@@ -136,13 +136,13 @@ export function EditProfileModal({ isOpen, onClose, onSave, currentData }: EditP
                   onClick={onClose}
                   className="px-4 py-2 bg-gray-800 text-gray-300 rounded-md hover:bg-gray-700 transition-colors"
                 >
-                  Cancelar
+                  Cancel
                 </button>
                 <button
                   onClick={handleSave}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 transition-colors"
                 >
-                  Salvar
+                  Save
                 </button>
               </div>
             </div>
