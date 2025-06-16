@@ -24,7 +24,7 @@ const partnerships = [
   {
     id: 1,
     name: "HoldStation",
-    description: "Advanced trading and swap platform for WorldChain",
+    description: "Swap Plataform for Worldchain",
     image: "/holdstation-logo.jpg",
     gradient: "from-purple-600 to-blue-600",
     url: "https://world.org/mini-app?app_id=app_0d4b759921490adc1f2bd569fda9b53a&path=/ref/f5S3wA",
@@ -40,7 +40,7 @@ const partnerships = [
   {
     id: 3,
     name: "Drop Wallet",
-    description: "Claim crypto airdrops & earn by swapping - Up to 10 HUB",
+    description: "Claim crypto airdrops - Up to 10 HUB",
     image: "/HUB.png",
     gradient: "from-yellow-600 to-orange-600",
     url: "https://worldcoin.org/mini-app?app_id=app_459cd0d0d3125864ea42bd4c19d1986c&path=/dlink/TPulseFi",
@@ -56,7 +56,7 @@ const partnerships = [
   {
     id: 5,
     name: "AstraCoin",
-    description: "Decentralized finance platform with advanced trading",
+    description: "Decentralized finance platform",
     image: "/astracoin-logo.jpg",
     gradient: "from-orange-600 to-purple-600",
     url: "https://worldcoin.org/mini-app?app_id=app_f50d7c645d30623eb495a81d58b838e6&app_mode=mini-app",
