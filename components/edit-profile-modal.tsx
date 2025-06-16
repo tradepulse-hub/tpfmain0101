@@ -87,7 +87,7 @@ export function EditProfileModal({ isOpen, onClose, onSave, currentData }: EditP
                     <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-700">
                       <Image
                         src={previewImage || profileImage || ""}
-                        alt="Profile"
+                        alt=""
                         width={96}
                         height={96}
                         className="w-full h-full object-cover"
