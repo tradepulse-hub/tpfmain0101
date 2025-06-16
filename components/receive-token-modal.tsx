@@ -1,118 +1,124 @@
 "use client"
-import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { X, Download, Copy, Check, QrCode, Info } from "lucide-react"
-import { toast } from "sonner"
-import { useTranslation } from "@/lib/i18n"
+
+import {
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Button,
+  useDisclosure,
+  Tooltip,
+} from "@nextui-org/react"
+import { useState, useCallback } from "react"
+import { useTranslation } from "react-i18next"
+import { toast } from "react-hot-toast"
+import { QRCode } from "react-qrcode-logo"
+
+import { useWallet } from "@/liveblocks.config"
+import { shortenAddress } from "@/lib/utils"
+import type { Chain } from "@/types"
 
 interface ReceiveTokenModalProps {
-  isOpen: boolean
-  onClose: () => void
-  walletAddress: string
+  address: string | undefined
+  chains: Chain[]
 }
 
-export function ReceiveTokenModal({ isOpen, onClose, walletAddress }: ReceiveTokenModalProps) {
+export function ReceiveTokenModal({ address, chains }: ReceiveTokenModalProps) {
+  const { isOpen, onOpen, onOpenChange } = useDisclosure()
   const { t } = useTranslation()
-  const [copied, setCopied] = useState(false)
+  const wallet = useWallet()
+  const [selectedChain, setSelectedChain] = useState(chains[0])
 
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(walletAddress)
-      setCopied(true)
-      toast.success(t.wallet?.addressCopied || "Address copied!")
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error("Error copying:", err)
-      toast.error(t.receiveToken?.errorCopyingAddress || "Error copying address")
-    }
-  }
+  const handleCopyAddress = useCallback(() => {
+    if (!address) return
+    navigator.clipboard.writeText(address)
+    toast.success(t("receive_token.address_copied"))
+  }, [address, t])
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-gray-900 rounded-lg border border-gray-800 p-4 w-full max-w-sm"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-white flex items-center">
-                <Download size={20} className="mr-2 text-green-400" />
-                {t.receiveToken?.title || "Receive Tokens"}
-              </h3>
-              <button onClick={onClose} className="text-gray-400 hover:text-white">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="text-center space-y-4">
-              {/* QR Code Placeholder */}
-              <div className="w-48 h-48 mx-auto bg-gray-800 border border-gray-700 rounded-lg flex items-center justify-center">
-                <QrCode size={64} className="text-gray-600" />
-              </div>
-
-              <div>
-                <p className="text-gray-400 text-sm mb-2">
-                  {t.receiveToken?.yourWalletAddress || "Your wallet address:"}
-                </p>
-                <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
-                  <p className="text-white font-mono text-sm break-all">{walletAddress}</p>
-                </div>
-              </div>
-
-              <button
-                onClick={copyToClipboard}
-                className="w-full py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg shadow-lg flex items-center justify-center"
-              >
-                {copied ? (
-                  <>
-                    <Check size={16} className="mr-2" />
-                    {t.receiveToken?.copied || "Copied!"}
-                  </>
-                ) : (
-                  <>
-                    <Copy size={16} className="mr-2" />
-                    {t.receiveToken?.copyAddress || "Copy Address"}
-                  </>
-                )}
-              </button>
-
-              {/* Instructions */}
-              <div className="bg-blue-900/20 border border-blue-800/30 rounded-lg p-3">
-                <div className="flex items-start">
-                  <Info className="w-4 h-4 text-blue-400 mt-0.5 mr-2 flex-shrink-0" />
-                  <p className="text-blue-200/80 text-xs text-left">
-                    {t.receiveToken?.receiveInstructions ||
-                      "Share this address to receive TPF tokens and other Worldchain tokens"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Supported Networks */}
-              <div className="bg-gray-800/30 rounded-lg p-3">
-                <h4 className="text-gray-300 font-medium mb-2 text-sm">
-                  {t.receiveToken?.supportedNetworks || "Supported Networks:"}
-                </h4>
-                <div className="flex items-center space-x-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">W</span>
+    <>
+      <Button color="primary" variant="shadow" onPress={onOpen}>
+        {t("receive_token.receive_tokens")}
+      </Button>
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={onOpenChange}
+        motionProps={{
+          variants: {
+            enter: {
+              y: 0,
+              opacity: 1,
+              transition: {
+                duration: 0.3,
+                ease: "easeOut",
+              },
+            },
+            exit: {
+              y: -20,
+              opacity: 0,
+              transition: {
+                duration: 0.2,
+                ease: "easeIn",
+              },
+            },
+          },
+        }}
+        size="sm"
+        className="dark:bg-zinc-800"
+      >
+        <ModalContent className="dark:bg-zinc-800">
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1 mb-3">{t("receive_token.receive_tokens")}</ModalHeader>
+              <ModalBody className="p-3">
+                <div className="flex flex-col items-center space-y-3">
+                  <QRCode
+                    value={address || "0x"}
+                    size={128}
+                    level="H"
+                    ecLevel="H"
+                    qrStyle="dots"
+                    eyeRadius={5}
+                    logoImage="/ethereum-logo.png"
+                    logoWidth={30}
+                    logoHeight={30}
+                    logoOpacity={1}
+                  />
+                  <div className="flex items-center justify-center">
+                    <Tooltip content={t("receive_token.copy_address")}>
+                      <Button size="sm" variant="light" className="py-2 px-3" onClick={handleCopyAddress}>
+                        {shortenAddress(address)}
+                      </Button>
+                    </Tooltip>
                   </div>
-                  <span className="text-gray-400 text-sm">Worldchain Mainnet</span>
                 </div>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+                <div className="mt-4">
+                  <h4 className="mb-1 font-semibold">{t("receive_token.instructions_title")}</h4>
+                  <ol className="list-decimal pl-5 space-y-1">
+                    <li className="p-2">{t("receive_token.instructions_1")}</li>
+                    <li className="p-2">{t("receive_token.instructions_2")}</li>
+                    <li className="p-2">{t("receive_token.instructions_3")}</li>
+                  </ol>
+                </div>
+                <div>
+                  <h4 className="mb-1 font-semibold">{t("receive_token.supported_networks")}</h4>
+                  <div className="p-2">
+                    {chains.map((chain) => (
+                      <div key={chain.id}>{chain.name}</div>
+                    ))}
+                  </div>
+                </div>
+              </ModalBody>
+              <ModalFooter>
+                <Button color="danger" variant="flat" onPress={onClose}>
+                  {t("common.close")}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+    </>
   )
 }
