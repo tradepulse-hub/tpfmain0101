@@ -199,7 +199,6 @@ export default function ProfilePage() {
       console.log(`TPF Balance: ${balance.toLocaleString()}`)
       console.log(`Level: ${levelInfo.level}`)
       console.log(`Total XP: ${levelInfo.totalXP.toLocaleString()}`)
-      console.log(`Multiplier: ${levelInfo.rewardMultiplier}x`)
       console.log("=====================================")
     } catch (error) {
       console.error("Error updating level:", error)
@@ -308,11 +307,6 @@ export default function ProfilePage() {
 
     // Atualizar o estado
     setUser(updatedUser)
-
-    // Se uma nova imagem foi definida, usar tpf.png, senão manter burn-token.png
-    if (newData.profileImage && newData.profileImage !== "/placeholder.png") {
-      updatedUser.profileImage = "/tpf.png"
-    }
 
     // Salvar no localStorage de forma mais robusta
     try {
@@ -832,9 +826,6 @@ export default function ProfilePage() {
                   <p className="text-white/80 text-xs truncate">{partnerships[currentPartnershipIndex].description}</p>
                 </div>
               </div>
-              <div className="ml-3 flex-shrink-0">
-                <ExternalLink className="w-4 h-4 text-white/80" />
-              </div>
             </div>
 
             {/* Indicadores de progresso */}
@@ -876,11 +867,13 @@ export default function ProfilePage() {
         >
           <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-gray-700 relative">
             <Image
-              src={user.profileImage && user.profileImage !== "/placeholder.png" ? "/tpf.png" : "/burn-token.png"}
+              src={
+                user.profileImage && user.profileImage !== "/placeholder.png" ? user.profileImage : "/burn-token.png"
+              }
               alt="Profile"
               width={128}
               height={128}
-              className={`w-full h-full object-cover ${!user.profileImage || user.profileImage === "/placeholder.png" ? "opacity-50" : ""}`}
+              className={`w-full h-full object-cover ${!user.profileImage || user.profileImage === "/placeholder.png" ? "opacity-20 grayscale brightness-50" : ""}`}
             />
 
             {/* Glow effect */}
@@ -909,38 +902,19 @@ export default function ProfilePage() {
             transition={{ duration: 4, repeat: Number.POSITIVE_INFINITY }}
           />
 
-          {/* Luz branca girando */}
+          {/* Feixe de luz girando 360 graus */}
           <motion.div
-            className="absolute -inset-1 w-[calc(100%+8px)] h-[calc(100%+8px)] rounded-full"
+            className="absolute -inset-2 w-[calc(100%+16px)] h-[calc(100%+16px)] rounded-full"
             style={{
-              background: "conic-gradient(from 0deg, transparent, white, transparent, transparent)",
-              filter: "blur(2px)",
-              mixBlendMode: "overlay",
+              background:
+                "conic-gradient(from 0deg, transparent 85%, rgba(255,255,255,0.8) 90%, rgba(255,255,255,0.4) 95%, transparent 100%)",
+              filter: "blur(1px)",
             }}
             animate={{
               rotate: [0, 360],
             }}
             transition={{
-              duration: 3,
-              ease: "linear",
-              repeat: Number.POSITIVE_INFINITY,
-            }}
-          />
-
-          {/* Segundo efeito de luz girando na direção oposta */}
-          <motion.div
-            className="absolute -inset-1 w-[calc(100%+8px)] h-[calc(100%+8px)] rounded-full"
-            style={{
-              background:
-                "conic-gradient(from 180deg, transparent 60%, rgba(255,255,255,0.5), transparent 80%, transparent)",
-              filter: "blur(3px)",
-              mixBlendMode: "overlay",
-            }}
-            animate={{
-              rotate: [360, 0],
-            }}
-            transition={{
-              duration: 5,
+              duration: 4,
               ease: "linear",
               repeat: Number.POSITIVE_INFINITY,
             }}
