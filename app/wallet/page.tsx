@@ -17,7 +17,6 @@ import {
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { BackgroundEffect } from "@/components/background-effect"
 import { BottomNav } from "@/components/bottom-nav"
@@ -164,7 +163,6 @@ export default function WalletPage() {
       name: info.name || symbol,
       logo: info.logo || "/placeholder.svg?height=32&width=32",
       balance: tokenBalances[symbol] || 0,
-      change: symbol === "WLD" ? "+2.8%" : symbol === "DNA" ? "-1.4%" : "+0.7%",
     }))
 
   return (
@@ -362,33 +360,26 @@ export default function WalletPage() {
             transition={{ delay: 0.4 }}
             className="w-full"
           >
-            <div className="space-y-4">
+            <div className="space-y-2">
               {/* TPF Token Card */}
               <Card className="w-full bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 overflow-hidden">
-                <CardContent className="p-4">
+                <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-900/30 to-purple-900/30 border border-gray-700/50">
+                      <div className="relative w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-blue-900/30 to-purple-900/30 border border-gray-700/50">
                         <Image src="/logo-tpf.png" alt="TPF" fill className="object-cover p-1" />
                       </div>
                       <div>
-                        <h3 className="font-medium text-white">TPulseFi</h3>
+                        <h3 className="text-sm font-medium text-white">TPulseFi</h3>
                         <div className="flex items-center space-x-2">
-                          <p className="text-sm text-gray-400">TPF</p>
-                          <Badge
-                            variant="outline"
-                            className="text-xs bg-green-900/20 text-green-400 border-green-500/30"
-                          >
-                            <TrendingUp className="w-3 h-3 mr-1" />
-                            +5.2%
-                          </Badge>
+                          <p className="text-xs text-gray-400">TPF</p>
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center space-x-2">
                       <div className="text-right">
-                        <p className="font-medium text-white">
+                        <p className="text-sm font-medium text-white">
                           {loading ? (
                             <span className="inline-block w-20 h-5 bg-gray-700 animate-pulse rounded"></span>
                           ) : (
@@ -413,16 +404,16 @@ export default function WalletPage() {
                   ))}
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {otherTokens.map((token) => (
                     <Card
                       key={token.symbol}
                       className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 border border-gray-700/50 overflow-hidden"
                     >
-                      <CardContent className="p-4">
+                      <CardContent className="p-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
-                            <div className="relative w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/50">
+                            <div className="relative w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/50">
                               <Image
                                 src={token.logo || "/placeholder.svg"}
                                 alt={token.name}
@@ -431,27 +422,16 @@ export default function WalletPage() {
                               />
                             </div>
                             <div>
-                              <h3 className="font-medium text-white">{token.name}</h3>
+                              <h3 className="text-sm font-medium text-white">{token.name}</h3>
                               <div className="flex items-center space-x-2">
-                                <p className="text-sm text-gray-400">{token.symbol}</p>
-                                <Badge
-                                  variant="outline"
-                                  className={`text-xs ${
-                                    token.change.startsWith("+")
-                                      ? "bg-green-900/20 text-green-400 border-green-500/30"
-                                      : "bg-red-900/20 text-red-400 border-red-500/30"
-                                  }`}
-                                >
-                                  <TrendingUp className="w-3 h-3 mr-1" />
-                                  {token.change}
-                                </Badge>
+                                <p className="text-xs text-gray-400">{token.symbol}</p>
                               </div>
                             </div>
                           </div>
 
                           <div className="flex items-center space-x-2">
                             <div className="text-right">
-                              <p className="font-medium text-white">{token.balance.toLocaleString("pt-BR")}</p>
+                              <p className="text-sm font-medium text-white">{token.balance.toLocaleString("pt-BR")}</p>
                               <p className="text-xs text-gray-400">{token.symbol}</p>
                             </div>
                             <ChevronRight className="w-4 h-4 text-gray-500" />
