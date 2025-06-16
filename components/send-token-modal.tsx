@@ -370,9 +370,7 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
                             className="w-full h-full object-cover"
                           />
                         </div>
-                        <span>
-                          {selectedToken.symbol} - {selectedToken.name}
-                        </span>
+                        <span>{selectedToken.symbol}</span>
                         <span className="ml-auto text-gray-400 text-sm">
                           {Number.parseFloat(selectedToken.balance).toFixed(4)}
                         </span>
@@ -410,7 +408,6 @@ export function SendTokenModal({ isOpen, onClose, walletAddress }: SendTokenModa
                               </div>
                               <div>
                                 <div className="text-white text-sm">{token.symbol}</div>
-                                <div className="text-gray-400 text-xs">{token.name}</div>
                               </div>
                             </div>
                             <div className="text-gray-300 text-sm">{Number.parseFloat(token.balance).toFixed(4)}</div>
