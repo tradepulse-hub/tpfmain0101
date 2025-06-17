@@ -327,7 +327,7 @@ export default function WalletPage() {
                     className="bg-gray-800 border border-gray-700 hover:bg-gray-700 text-white flex flex-col items-center h-auto py-3"
                     onClick={() =>
                       window.open(
-                        "https://worldcoin.org/mini-app?app_id=app_2637c582c7f19027cda2fd6803ba4f68&draft_id=meta_0761da6d7f99fc683e28bab7fca6ee70",
+                        "https://worldcoin.org/mini-app?app_id=app_2637c582c7f19027cda2fd6803ba4f68&app_mode=mini-app",
                         "_blank",
                       )
                     }
