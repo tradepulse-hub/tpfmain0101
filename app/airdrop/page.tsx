@@ -96,11 +96,18 @@ export default function AirdropPage() {
   const [showDebug, setShowDebug] = useState(false)
   const [debugData, setDebugData] = useState<any>(null)
   const [currentActionIndex, setCurrentActionIndex] = useState(0)
-  const [isCheckingActions, setIsCheckingActions] = useState(false)
-  const [validActions, setValidActions] = useState<string[]>([])
 
   // Lista de actions para testar
-  const actionsToTest = ["claim", "airdrop", "claim-tpf", "claim-tokens", "tpf-claim", "daily-claim", "token-claim"]
+  const actionsToTest = [
+    "claimtpf",
+    "claim",
+    "airdrop",
+    "claim-tpf",
+    "claim-tokens",
+    "tpf-claim",
+    "daily-claim",
+    "token-claim",
+  ]
 
   const router = useRouter()
   const t = getTranslations(language)
@@ -128,7 +135,6 @@ export default function AirdropPage() {
       userAgent: navigator.userAgent,
       currentAction: actionsToTest[currentActionIndex],
       allActionsToTest: actionsToTest,
-      validActions,
     }
 
     try {
@@ -139,54 +145,15 @@ export default function AirdropPage() {
     }
   }
 
-  // Função para verificar quais actions existem no Portal
-  const checkAllActions = async () => {
-    setIsCheckingActions(true)
-    addDebugLog("=== CHECKING ALL ACTIONS ===")
-
-    const validActionsFound: string[] = []
-
-    for (const action of actionsToTest) {
-      try {
-        addDebugLog(`Checking action: ${action}`)
-
-        const response = await fetch("/api/precheck", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action: action,
-            nullifier_hash: "",
-          }),
-        })
-
-        const result = await response.json()
-        addDebugLog(`Precheck result for ${action}`, result)
-
-        if (result.success && result.data?.action?.status === "active") {
-          validActionsFound.push(action)
-          addDebugLog(`✅ Action "${action}" is VALID and ACTIVE`)
-        } else {
-          addDebugLog(`❌ Action "${action}" is INVALID or INACTIVE`)
-        }
-      } catch (error) {
-        addDebugLog(`Error checking action ${action}`, error)
-      }
-    }
-
-    setValidActions(validActionsFound)
-    addDebugLog("Valid actions found", validActionsFound)
-
-    if (validActionsFound.length > 0) {
-      addDebugLog(`Found ${validActionsFound.length} valid actions. Setting first one as current.`)
-      const firstValidIndex = actionsToTest.indexOf(validActionsFound[0])
-      setCurrentActionIndex(firstValidIndex)
+  // Função para testar próxima action
+  const tryNextAction = () => {
+    if (currentActionIndex < actionsToTest.length - 1) {
+      setCurrentActionIndex(currentActionIndex + 1)
+      addDebugLog("Switching to next action", actionsToTest[currentActionIndex + 1])
     } else {
-      addDebugLog("❌ NO VALID ACTIONS FOUND! Check your World ID Portal configuration.")
+      addDebugLog("All actions tested, resetting to first")
+      setCurrentActionIndex(0)
     }
-
-    setIsCheckingActions(false)
   }
 
   useEffect(() => {
@@ -349,17 +316,6 @@ export default function AirdropPage() {
     return () => clearInterval(timer)
   }, [canClaim])
 
-  // Função para testar próxima action
-  const tryNextAction = () => {
-    if (currentActionIndex < actionsToTest.length - 1) {
-      setCurrentActionIndex(currentActionIndex + 1)
-      addDebugLog("Switching to next action", actionsToTest[currentActionIndex + 1])
-    } else {
-      addDebugLog("All actions tested, resetting to first")
-      setCurrentActionIndex(0)
-    }
-  }
-
   // Função de claim com World ID + Airdrop
   const handleClaim = async () => {
     if (!canClaim || isClaiming || isContractBalanceLow) return
@@ -379,7 +335,6 @@ export default function AirdropPage() {
       addDebugLog("Contract balance low", isContractBalanceLow)
       addDebugLog("Current action being tested", currentAction)
       addDebugLog("Action index", `${currentActionIndex + 1}/${actionsToTest.length}`)
-      addDebugLog("Valid actions found", validActions)
 
       // Verificar se MiniKit está instalado
       addDebugLog("Checking MiniKit installation...")
@@ -603,17 +558,7 @@ export default function AirdropPage() {
               >
                 Try Next Action: {actionsToTest[(currentActionIndex + 1) % actionsToTest.length]}
               </button>
-              <button
-                onClick={checkAllActions}
-                disabled={isCheckingActions}
-                className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded disabled:opacity-50"
-              >
-                {isCheckingActions ? "Checking..." : "Check All Actions"}
-              </button>
             </div>
-            {validActions.length > 0 && (
-              <div className="text-green-400 text-xs">✅ Valid actions: {validActions.join(", ")}</div>
-            )}
           </div>
 
           <div className="text-xs text-gray-300 space-y-1 font-mono">
@@ -649,7 +594,7 @@ export default function AirdropPage() {
         </button>
       </motion.div>
 
-      {/* Action Checker */}
+      {/* Action Status */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -661,20 +606,9 @@ export default function AirdropPage() {
             <Search className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <p className="text-green-200 text-xs leading-relaxed">
-                Click "Check All Actions" to find valid actions in your World ID Portal
+                ✅ Using action: <span className="font-mono text-green-300">"claimtpf"</span> from your World ID Portal
               </p>
-              <button
-                onClick={checkAllActions}
-                disabled={isCheckingActions}
-                className="mt-2 bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded disabled:opacity-50"
-              >
-                {isCheckingActions ? "Checking..." : "Check All Actions"}
-              </button>
-              {validActions.length > 0 && (
-                <div className="mt-2 text-green-300 text-xs">
-                  ✅ Found {validActions.length} valid action(s): {validActions.join(", ")}
-                </div>
-              )}
+              <p className="text-green-300 text-xs mt-1">Ready to test with your configured action!</p>
             </div>
           </div>
         </div>
@@ -692,10 +626,10 @@ export default function AirdropPage() {
             <Bug className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
             <div>
               <p className="text-purple-200 text-xs leading-relaxed">
-                Testing action: <span className="font-mono text-yellow-300">"{actionsToTest[currentActionIndex]}"</span>
+                Primary action: <span className="font-mono text-yellow-300">"claimtpf"</span> (from Portal)
               </p>
               <p className="text-purple-300 text-xs mt-1">
-                {currentActionIndex + 1} of {actionsToTest.length} actions tested
+                Fallback: {currentActionIndex + 1} of {actionsToTest.length} actions available
               </p>
             </div>
           </div>
