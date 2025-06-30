@@ -466,18 +466,68 @@ export default function AirdropPage() {
 
       addDebugLog("Airdrop request body", airdropRequestBody)
 
-      const airdropResponse = await fetch("/api/airdrop", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(airdropRequestBody),
-      })
+      addDebugLog("Calling airdrop API...")
+
+      let airdropResponse: Response
+      try {
+        airdropResponse = await fetch("/api/airdrop", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(airdropRequestBody),
+        })
+      } catch (fetchError) {
+        addDebugLog("Fetch error", fetchError)
+        throw new Error(`Network error: ${fetchError instanceof Error ? fetchError.message : "Unknown fetch error"}`)
+      }
 
       addDebugLog("Airdrop response status", airdropResponse.status)
+      addDebugLog("Airdrop response ok", airdropResponse.ok)
+      addDebugLog("Airdrop response headers", Object.fromEntries(airdropResponse.headers.entries()))
 
-      const airdropResult = await airdropResponse.json()
-      addDebugLog("Airdrop response JSON", airdropResult)
+      // Verificar se a resposta tem conteúdo
+      const contentLength = airdropResponse.headers.get("content-length")
+      const contentType = airdropResponse.headers.get("content-type")
+
+      addDebugLog("Content-Length", contentLength)
+      addDebugLog("Content-Type", contentType)
+
+      if (airdropResponse.status === 405) {
+        addDebugLog("405 Method Not Allowed - checking route configuration")
+        setClaimError("API route configuration error (405). Please check server logs.")
+        return
+      }
+
+      // Tentar ler a resposta como texto primeiro
+      let responseText: string
+      try {
+        responseText = await airdropResponse.text()
+        addDebugLog("Airdrop response text", responseText)
+      } catch (textError) {
+        addDebugLog("Error reading response text", textError)
+        setClaimError("Failed to read server response")
+        return
+      }
+
+      // Se não há conteúdo, reportar erro
+      if (!responseText || responseText.trim() === "") {
+        addDebugLog("Empty response received")
+        setClaimError("Server returned empty response")
+        return
+      }
+
+      // Tentar fazer parse do JSON
+      let airdropResult: any
+      try {
+        airdropResult = JSON.parse(responseText)
+        addDebugLog("Airdrop response JSON", airdropResult)
+      } catch (jsonError) {
+        addDebugLog("Failed to parse airdrop response JSON", { error: jsonError, responseText })
+        setClaimError(`Invalid JSON response from server: ${responseText.substring(0, 100)}...`)
+        return
+      }
 
       if (airdropResult.success) {
         addDebugLog("=== CLAIM SUCCESSFUL ===")
