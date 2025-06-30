@@ -18,6 +18,9 @@ export async function POST(req: NextRequest) {
 
     const app_id = process.env.APP_ID as `app_${string}`
 
+    console.log("Expected APP_ID from Portal: app_a3a55ef32983350c67923dd57dc22c5e")
+    console.log("Current APP_ID from env:", app_id)
+
     if (!app_id) {
       console.error("APP_ID environment variable not set")
       return NextResponse.json({
@@ -25,6 +28,11 @@ export async function POST(req: NextRequest) {
         error: "Server configuration error",
         status: 500,
       })
+    }
+
+    // Verificar se o APP_ID corresponde ao configurado no Portal
+    if (app_id !== "app_a3a55ef32983350c67923dd57dc22c5e") {
+      console.warn("APP_ID mismatch! Check your environment variables.")
     }
 
     console.log("Using APP_ID:", app_id)
