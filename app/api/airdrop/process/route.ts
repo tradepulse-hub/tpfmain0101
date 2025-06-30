@@ -1,15 +1,5 @@
 import { NextResponse } from "next/server"
 
-export async function GET() {
-  return NextResponse.json(
-    {
-      success: false,
-      error: "Use POST method for airdrop claims",
-    },
-    { status: 405 },
-  )
-}
-
 export async function POST(request: Request) {
   try {
     const data = await request.json()
