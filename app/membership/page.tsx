@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Crown, Copy, CheckCircle, Award, Sparkles } from "lucide-react"
+import { Crown, Copy, CheckCircle, Award, Sparkles, Clock } from "lucide-react"
 import { useTranslation } from "@/lib/i18n"
 import { motion } from "framer-motion"
 import { BackgroundEffect } from "@/components/background-effect"
@@ -12,11 +12,43 @@ export default function MembershipPage() {
   const [walletCopied, setWalletCopied] = useState(false)
   const [emailCopied, setEmailCopied] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [timeLeft, setTimeLeft] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  })
 
   const destinationWallet = "0xf04a78df4cc3017c0c23f37528d7b6cbbeea6677"
   const supportEmail = "support@tradepulsetoken.com"
 
   useEffect(() => setMounted(true), [])
+
+  // Countdown timer effect
+  useEffect(() => {
+    // Set target date to 7 days from now
+    const targetDate = new Date()
+    targetDate.setDate(targetDate.getDate() + 7)
+
+    const timer = setInterval(() => {
+      const now = new Date().getTime()
+      const distance = targetDate.getTime() - now
+
+      if (distance > 0) {
+        const days = Math.floor(distance / (1000 * 60 * 60 * 24))
+        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60))
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000)
+
+        setTimeLeft({ days, hours, minutes, seconds })
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+        clearInterval(timer)
+      }
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [])
 
   const copyToClipboard = (text: string, type: "wallet" | "email") => {
     navigator.clipboard.writeText(text)
@@ -62,6 +94,10 @@ export default function MembershipPage() {
     </motion.button>
   )
 
+  const formatTime = (time: number) => {
+    return time < 10 ? `0${time}` : time
+  }
+
   if (!mounted) return null
 
   return (
@@ -84,6 +120,73 @@ export default function MembershipPage() {
         </motion.div>
 
         <div className="max-w-2xl mx-auto space-y-3">
+          {/* Price Increase Warning with Countdown */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="relative overflow-hidden rounded-xl bg-gradient-to-r from-red-500 to-orange-500 p-1"
+          >
+            <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm p-4 rounded-lg">
+              <div className="text-center">
+                <motion.div
+                  animate={{
+                    x: [-2, 2, -2, 2, 0],
+                    transition: {
+                      duration: 0.5,
+                      repeat: Number.POSITIVE_INFINITY,
+                      repeatDelay: 2,
+                    },
+                  }}
+                  className="flex items-center justify-center mb-3"
+                >
+                  <Clock className="h-6 w-6 text-red-500 mr-2" />
+                  <h2 className="text-lg font-bold text-red-600 dark:text-red-400">
+                    The membership price will increase soon to 30 WLD
+                  </h2>
+                </motion.div>
+
+                {/* Countdown Display */}
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  <div className="bg-red-50 dark:bg-red-900/30 p-2 rounded-lg text-center">
+                    <div className="text-xl font-bold text-red-600 dark:text-red-400">{formatTime(timeLeft.days)}</div>
+                    <div className="text-xs text-red-500 dark:text-red-400">Days</div>
+                  </div>
+                  <div className="bg-red-50 dark:bg-red-900/30 p-2 rounded-lg text-center">
+                    <div className="text-xl font-bold text-red-600 dark:text-red-400">{formatTime(timeLeft.hours)}</div>
+                    <div className="text-xs text-red-500 dark:text-red-400">Hours</div>
+                  </div>
+                  <div className="bg-red-50 dark:bg-red-900/30 p-2 rounded-lg text-center">
+                    <div className="text-xl font-bold text-red-600 dark:text-red-400">
+                      {formatTime(timeLeft.minutes)}
+                    </div>
+                    <div className="text-xs text-red-500 dark:text-red-400">Minutes</div>
+                  </div>
+                  <div className="bg-red-50 dark:bg-red-900/30 p-2 rounded-lg text-center">
+                    <div className="text-xl font-bold text-red-600 dark:text-red-400">
+                      {formatTime(timeLeft.seconds)}
+                    </div>
+                    <div className="text-xs text-red-500 dark:text-red-400">Seconds</div>
+                  </div>
+                </div>
+
+                <motion.p
+                  animate={{
+                    scale: [1, 1.05, 1],
+                    transition: {
+                      duration: 1,
+                      repeat: Number.POSITIVE_INFINITY,
+                      repeatDelay: 1,
+                    },
+                  }}
+                  className="text-sm font-medium text-red-700 dark:text-red-300"
+                >
+                  🔥 Get your membership now for only 20 WLD before the price goes up! 🔥
+                </motion.p>
+              </div>
+            </div>
+          </motion.div>
+
           {/* Compact Benefits & Price */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -103,6 +206,7 @@ export default function MembershipPage() {
                   20
                 </div>
                 <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">WLD forever!</p>
+                <p className="text-xs text-red-500 line-through">30 WLD soon</p>
               </div>
             </div>
             <p className="text-sm text-gray-700 dark:text-gray-200 mb-2">
