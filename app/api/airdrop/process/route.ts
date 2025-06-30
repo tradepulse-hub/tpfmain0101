@@ -3,26 +3,34 @@ import { NextResponse } from "next/server"
 export async function POST(request: Request) {
   try {
     const data = await request.json()
-    const { signature, userAddress, timestamp } = data
+    const { userAddress, worldIdVerified } = data
 
-    if (!signature || !userAddress || !timestamp) {
+    if (!userAddress) {
       return NextResponse.json(
         {
           success: false,
-          error: "Parâmetros inválidos",
+          error: "Endereço do usuário é obrigatório",
         },
         { status: 400 },
       )
     }
 
-    // Verificar se a assinatura é válida
-    // Em um ambiente real, você verificaria a assinatura aqui
-    // Mas para simplificar, vamos apenas registrar a solicitação
+    // Verificar se o usuário passou pela verificação World ID
+    if (!worldIdVerified) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Verificação World ID é obrigatória",
+        },
+        { status: 400 },
+      )
+    }
 
-    console.log(`Processando airdrop para o endereço ${userAddress} com assinatura ${signature}`)
+    console.log(`Processando airdrop para o endereço ${userAddress} (World ID verificado)`)
 
     // Criar um ID de transação simulado
-    const txId = `sig_${timestamp}_${signature.slice(0, 8)}`
+    const timestamp = Date.now()
+    const txId = `worldid_${timestamp}_${userAddress.slice(0, 8)}`
 
     // Em um ambiente real, você usaria uma chave privada para enviar a transação
     // Aqui estamos apenas simulando o sucesso
