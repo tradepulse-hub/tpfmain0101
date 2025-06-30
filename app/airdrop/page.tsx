@@ -321,8 +321,9 @@ export default function AirdropPage() {
       // PASSO 1: Verificação World ID
       addDebugLog("=== STEP 1: World ID Verification ===")
 
+      // CORREÇÃO: Usar apenas o nome da action, sem prefixos
       const verifyPayload: VerifyCommandInput = {
-        action: "claim-tpf-tokens",
+        action: "claim", // ← MUDANÇA: action simplificada
         signal: userAddress,
         verification_level: VerificationLevel.Orb,
       }
@@ -338,7 +339,24 @@ export default function AirdropPage() {
 
       if (finalPayload.status === "error") {
         addDebugLog("World ID verification failed", finalPayload)
-        setClaimError(`World ID verification failed: ${JSON.stringify(finalPayload)}`)
+
+        // Melhor tratamento de erros específicos
+        let errorMessage = "World ID verification failed"
+        switch (finalPayload.error_code) {
+          case "malformed_request":
+            errorMessage = "Invalid request format. Please check your World ID app configuration."
+            break
+          case "already_verified":
+            errorMessage = "You have already verified for this action."
+            break
+          case "verification_rejected":
+            errorMessage = "Verification was rejected or cancelled."
+            break
+          default:
+            errorMessage = `World ID error: ${finalPayload.error_code || "Unknown error"}`
+        }
+
+        setClaimError(errorMessage)
         return
       }
 
@@ -349,7 +367,7 @@ export default function AirdropPage() {
 
       const verifyRequestBody = {
         payload: finalPayload as ISuccessResult,
-        action: "claim-tpf-tokens",
+        action: "claim", // ← MUDANÇA: usar a mesma action
         signal: userAddress,
       }
 
@@ -371,7 +389,7 @@ export default function AirdropPage() {
 
       if (verifyResponseJson.status !== 200) {
         addDebugLog("Backend verification failed", verifyResponseJson)
-        setClaimError(`Verification failed: ${JSON.stringify(verifyResponseJson)}`)
+        setClaimError(`Verification failed: ${verifyResponseJson.error || "Unknown backend error"}`)
         return
       }
 
