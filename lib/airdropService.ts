@@ -31,12 +31,39 @@ export async function getAirdropStatus(address: string) {
         // Usar a nova função canUserClaim do contrato atualizado
         const [canClaim, timeUntilNextClaim] = await contract.canUserClaim(address)
         const dailyAirdrop = await contract.dailyAirdrop()
+        const isBlocked = await contract.isAddressBlocked(address)
+        const emergencyPaused = await contract.emergencyPaused()
 
         console.log("Contract data retrieved:", {
           canClaim: canClaim,
           timeUntilNextClaim: Number(timeUntilNextClaim),
           dailyAirdrop: dailyAirdrop.toString(),
+          isBlocked: isBlocked,
+          emergencyPaused: emergencyPaused,
         })
+
+        // Verificar se está bloqueado ou pausado
+        if (isBlocked) {
+          return {
+            success: false,
+            error: "Address is blocked from claiming airdrops",
+            canClaim: false,
+            timeRemaining: 0,
+            airdropAmount: ethers.formatUnits(dailyAirdrop, 18),
+            rpcUsed: rpcUrl,
+          }
+        }
+
+        if (emergencyPaused) {
+          return {
+            success: false,
+            error: "Airdrop claims are temporarily paused",
+            canClaim: false,
+            timeRemaining: 0,
+            airdropAmount: ethers.formatUnits(dailyAirdrop, 18),
+            rpcUsed: rpcUrl,
+          }
+        }
 
         return {
           success: true,
