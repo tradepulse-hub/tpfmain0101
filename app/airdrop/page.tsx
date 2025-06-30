@@ -450,11 +450,11 @@ export default function AirdropPage() {
     try {
       addDebugLog("=== CALLING CONTRACT CLAIM ===")
 
-      // Usar MiniKit para fazer a transação
+      // Usar MiniKit para fazer a transação - CORRIGIR O FORMATO
       const transaction = {
         to: CONTRACT_ADDRESS,
         data: "0x7c3a00fd", // claimAirdrop() function selector
-        value: "0",
+        value: "0x0", // MUDANÇA: usar "0x0" em vez de "0"
       }
 
       addDebugLog("Transaction data", transaction)
@@ -465,6 +465,7 @@ export default function AirdropPage() {
       if (result.finalPayload.status === "success") {
         setTxId(result.finalPayload.transaction_hash)
         setClaimSuccess(true)
+        setWorldIdVerified(false) // Reset para próximo claim
         addDebugLog("Contract claim successful!", result.finalPayload.transaction_hash)
 
         // Atualizar status após transação
