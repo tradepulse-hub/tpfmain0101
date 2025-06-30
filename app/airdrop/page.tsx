@@ -12,6 +12,7 @@ import type * as THREE from "three"
 import { useRouter } from "next/navigation"
 import { getAirdropStatus, getContractBalance, claimAirdrop } from "@/lib/airdropService"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
+import { MiniKit, type VerifyCommandInput, VerificationLevel, type ISuccessResult } from "@worldcoin/minikit-js"
 
 // Componente de carregamento
 function LoadingIndicator() {
@@ -241,9 +242,9 @@ export default function AirdropPage() {
     return () => clearInterval(timer)
   }, [canClaim])
 
-  // Simulação de reivindicação de tokens
+  // Simulação de reivindicação de tokens com World ID
   const handleClaim = async () => {
-    if (!canClaim || isClaiming) return
+    if (!canClaim || isClaiming || isContractBalanceLow) return
 
     try {
       setIsClaiming(true)
@@ -251,7 +252,50 @@ export default function AirdropPage() {
       setClaimSuccess(false)
       setTxId(null)
 
-      // Chamar a função claimAirdrop
+      // Verificar se MiniKit está instalado
+      if (!MiniKit.isInstalled()) {
+        setClaimError("World App is required for verification. Please install World App.")
+        return
+      }
+
+      // Configurar payload para World ID verification
+      const verifyPayload: VerifyCommandInput = {
+        action: "airdrop-claim", // Você precisa criar esta action no Developer Portal
+        signal: userAddress, // Usar o endereço do usuário como signal
+        verification_level: VerificationLevel.Orb, // Ou Device se preferir
+      }
+
+      // Executar verificação World ID
+      const { finalPayload } = await MiniKit.commandsAsync.verify(verifyPayload)
+
+      if (finalPayload.status === "error") {
+        console.log("World ID verification error:", finalPayload)
+        setClaimError("World ID verification failed. Please try again.")
+        return
+      }
+
+      // Verificar a prova no backend
+      const verifyResponse = await fetch("/api/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          payload: finalPayload as ISuccessResult,
+          action: "airdrop-claim",
+          signal: userAddress,
+        }),
+      })
+
+      const verifyResponseJson = await verifyResponse.json()
+
+      if (verifyResponseJson.status !== 200) {
+        console.error("Backend verification failed:", verifyResponseJson)
+        setClaimError("Verification failed. You may have already claimed or there was an error.")
+        return
+      }
+
+      // Se a verificação passou, proceder com o claim
       const result = await claimAirdrop(userAddress)
       console.log("Claim result:", result)
 
@@ -273,7 +317,7 @@ export default function AirdropPage() {
         setClaimError(result.error || "Failed to claim tokens. Please try again.")
       }
     } catch (error) {
-      console.error("Error claiming airdrop:", error)
+      console.error("Error during claim process:", error)
       setClaimError(error instanceof Error ? error.message : "An error occurred during the claim. Please try again.")
     } finally {
       setIsClaiming(false)
