@@ -209,7 +209,7 @@ export async function POST(request: Request) {
         userAddress: userAddress,
         verificationMethod: "World ID",
         contractAddress: CONTRACT_ADDRESS,
-        contractFunction: "claimAirdrop",
+        contractFunction: "claimAirdropSafe", // Atualizado para usar a função segura
         canClaim: canClaim,
         worldIdVerified: true,
       }
