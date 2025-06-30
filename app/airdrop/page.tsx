@@ -7,7 +7,7 @@ import { OrbitControls, useProgress, Html, Preload } from "@react-three/drei"
 import { BackgroundEffect } from "@/components/background-effect"
 import { BottomNav } from "@/components/bottom-nav"
 import { TPFLogoModel } from "@/components/tpf-logo-model"
-import { Coins, RefreshCw, Info, Copy, Bug, Search } from "lucide-react"
+import { Coins, RefreshCw, Copy, Bug, Search, ExternalLink } from "lucide-react"
 import type * as THREE from "three"
 import { useRouter } from "next/navigation"
 import { getAirdropStatus, getContractBalance } from "@/lib/airdropService"
@@ -34,37 +34,31 @@ function LoadingIndicator() {
 function RotatingCoin() {
   const coinRef = useRef<THREE.Group>(null)
 
-  // Usar useFrame para girar a moeda a cada frame
   useFrame((state, delta) => {
     if (coinRef.current) {
-      // Girar em torno do eixo Y para que a moeda gire como um pião
-      coinRef.current.rotation.y += delta * 0.6 // Velocidade reduzida para melhor visualização
+      coinRef.current.rotation.y += delta * 0.6
     }
   })
 
   return (
     <group position={[0.15, 0, 0]} ref={coinRef}>
-      <TPFLogoModel scale={0.6} castShadow /> {/* TAMANHO REDUZIDO de 0.8 para 0.6 */}
+      <TPFLogoModel scale={0.6} castShadow />
     </group>
   )
 }
 
-// Componente da cena melhorada com iluminação simplificada (sem Environment)
+// Componente da cena
 function Scene() {
   return (
     <>
-      {/* Iluminação melhorada para destacar os detalhes metálicos */}
-      <ambientLight intensity={0.8} /> {/* Aumentada a intensidade da luz ambiente */}
-      <directionalLight position={[5, 5, 5]} intensity={1.2} castShadow /> {/* Aumentada a intensidade */}
-      <directionalLight position={[-5, 5, -5]} intensity={1.2} castShadow /> {/* Aumentada a intensidade */}
-      <spotLight position={[0, 5, 5]} intensity={1.5} angle={0.4} penumbra={0.5} castShadow />{" "}
-      {/* Aumentada a intensidade */}
-      {/* Luzes pontuais para criar reflexos metálicos */}
-      <pointLight position={[3, 0, 3]} intensity={1.0} distance={10} /> {/* Aumentada a intensidade */}
-      <pointLight position={[-3, 0, -3]} intensity={1.0} distance={10} /> {/* Aumentada a intensidade */}
-      <pointLight position={[0, 3, 0]} intensity={1.0} distance={10} color="#ffffff" /> {/* Nova luz de cima */}
-      <pointLight position={[0, -3, 0]} intensity={0.8} distance={10} color="#e0e0ff" /> {/* Nova luz de baixo */}
-      {/* Moeda com rotação */}
+      <ambientLight intensity={0.8} />
+      <directionalLight position={[5, 5, 5]} intensity={1.2} castShadow />
+      <directionalLight position={[-5, 5, -5]} intensity={1.2} castShadow />
+      <spotLight position={[0, 5, 5]} intensity={1.5} angle={0.4} penumbra={0.5} castShadow />
+      <pointLight position={[3, 0, 3]} intensity={1.0} distance={10} />
+      <pointLight position={[-3, 0, -3]} intensity={1.0} distance={10} />
+      <pointLight position={[0, 3, 0]} intensity={1.0} distance={10} color="#ffffff" />
+      <pointLight position={[0, -3, 0]} intensity={0.8} distance={10} color="#e0e0ff" />
       <RotatingCoin />
     </>
   )
@@ -91,6 +85,10 @@ export default function AirdropPage() {
   const [user, setUser] = useState<any>(null)
   const [language, setLanguage] = useState<"en" | "pt">("en")
 
+  // World ID verification states
+  const [worldIdVerified, setWorldIdVerified] = useState(false)
+  const [worldIdProof, setWorldIdProof] = useState<any>(null)
+
   // Debug states
   const [debugLogs, setDebugLogs] = useState<string[]>([])
   const [showDebug, setShowDebug] = useState(false)
@@ -111,6 +109,9 @@ export default function AirdropPage() {
 
   const router = useRouter()
   const t = getTranslations(language)
+
+  // Contract info
+  const CONTRACT_ADDRESS = "0x7b7540d8a1713a5c7d7C9257573Bdf56E7488E05"
 
   // Debug function
   const addDebugLog = (message: string, data?: any) => {
@@ -135,6 +136,8 @@ export default function AirdropPage() {
       userAgent: navigator.userAgent,
       currentAction: actionsToTest[currentActionIndex],
       allActionsToTest: actionsToTest,
+      worldIdVerified,
+      contractAddress: CONTRACT_ADDRESS,
     }
 
     try {
@@ -256,7 +259,6 @@ export default function AirdropPage() {
         setApiError(null)
 
         if (!statusData.canClaim) {
-          // Garantir que temos um timeRemaining válido
           const timeRemainingSeconds = statusData.timeRemaining || 0
           if (timeRemainingSeconds > 0) {
             const hours = Math.floor(timeRemainingSeconds / 3600)
@@ -298,7 +300,6 @@ export default function AirdropPage() {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev.hours === 0 && prev.minutes === 0 && prev.seconds === 0) {
-          // Se o contador chegou a zero, verificar se pode reivindicar
           checkClaimStatus()
           return prev
         } else if (prev.seconds > 0) {
@@ -316,28 +317,22 @@ export default function AirdropPage() {
     return () => clearInterval(timer)
   }, [canClaim])
 
-  // Função de claim com World ID + Airdrop
-  const handleClaim = async () => {
+  // Função para verificar World ID
+  const handleWorldIdVerification = async () => {
     if (!canClaim || isClaiming || isContractBalanceLow) return
 
     try {
       setIsClaiming(true)
       setClaimError(null)
-      setClaimSuccess(false)
-      setTxId(null)
-      setDebugLogs([]) // Clear previous logs
+      setDebugLogs([])
 
       const currentAction = actionsToTest[currentActionIndex]
 
-      addDebugLog("=== STARTING CLAIM PROCESS ===")
+      addDebugLog("=== STARTING WORLD ID VERIFICATION ===")
       addDebugLog("User address", userAddress)
-      addDebugLog("Can claim", canClaim)
-      addDebugLog("Contract balance low", isContractBalanceLow)
       addDebugLog("Current action being tested", currentAction)
-      addDebugLog("Action index", `${currentActionIndex + 1}/${actionsToTest.length}`)
 
       // Verificar se MiniKit está instalado
-      addDebugLog("Checking MiniKit installation...")
       const miniKitInstalled = MiniKit.isInstalled()
       addDebugLog("MiniKit installed", miniKitInstalled)
 
@@ -358,7 +353,6 @@ export default function AirdropPage() {
       }
 
       addDebugLog("Verify payload", verifyPayload)
-      addDebugLog("Starting World ID verification...")
 
       const verifyResult = await MiniKit.commandsAsync.verify(verifyPayload)
       addDebugLog("World ID verification result", verifyResult)
@@ -369,23 +363,17 @@ export default function AirdropPage() {
       if (finalPayload.status === "error") {
         addDebugLog("World ID verification failed", finalPayload)
 
-        // Se for malformed_request, tentar próxima action automaticamente
         if (finalPayload.error_code === "malformed_request") {
-          addDebugLog("Malformed request detected, will try next action")
-
           let errorMessage = `Action "${currentAction}" failed with malformed_request. `
-
           if (currentActionIndex < actionsToTest.length - 1) {
             errorMessage += `Click "Try Next Action" to test "${actionsToTest[currentActionIndex + 1]}".`
           } else {
             errorMessage += "All actions tested. Please check your World ID Portal configuration."
           }
-
           setClaimError(errorMessage)
           return
         }
 
-        // Outros tipos de erro
         let errorMessage = "World ID verification failed"
         switch (finalPayload.error_code) {
           case "already_verified":
@@ -413,8 +401,6 @@ export default function AirdropPage() {
         signal: userAddress,
       }
 
-      addDebugLog("Verify request body", verifyRequestBody)
-
       const verifyResponse = await fetch("/api/verify", {
         method: "POST",
         headers: {
@@ -423,158 +409,76 @@ export default function AirdropPage() {
         body: JSON.stringify(verifyRequestBody),
       })
 
-      addDebugLog("Verify response status", verifyResponse.status)
-      addDebugLog("Verify response headers", Object.fromEntries(verifyResponse.headers.entries()))
-
       const verifyResponseJson = await verifyResponse.json()
       addDebugLog("Verify response JSON", verifyResponseJson)
 
       if (!verifyResponseJson.success) {
         addDebugLog("Backend verification failed", verifyResponseJson)
-
-        // Se for erro de action não encontrada, tentar próxima action
-        if (
-          verifyResponseJson.details?.code === "action_not_found" ||
-          verifyResponseJson.error?.includes("action") ||
-          verifyResponseJson.status === 404
-        ) {
-          let errorMessage = `Action "${currentAction}" not found in World ID Portal. `
-
-          if (currentActionIndex < actionsToTest.length - 1) {
-            errorMessage += `Click "Try Next Action" to test "${actionsToTest[currentActionIndex + 1]}".`
-          } else {
-            errorMessage += "All actions tested. Please check your World ID Portal configuration."
-          }
-
-          setClaimError(errorMessage)
-          return
-        }
-
         setClaimError(`Verification failed: ${verifyResponseJson.error || "Unknown backend error"}`)
         return
       }
 
       addDebugLog("Backend verification successful!")
 
-      // PASSO 3: Processar o airdrop
-      addDebugLog("=== STEP 3: Processing Airdrop ===")
+      // Salvar a prova do World ID
+      setWorldIdProof(finalPayload as ISuccessResult)
+      setWorldIdVerified(true)
+      setClaimSuccess(true)
 
-      const airdropRequestBody = {
-        userAddress: userAddress,
-        worldIdVerified: true,
+      addDebugLog("=== WORLD ID VERIFICATION COMPLETE ===")
+
+      // Limpa a mensagem de sucesso após 3 segundos
+      setTimeout(() => {
+        setClaimSuccess(false)
+      }, 3000)
+    } catch (error) {
+      addDebugLog("=== VERIFICATION ERROR ===", error)
+      console.error("Error during verification process:", error)
+      setClaimError(error instanceof Error ? error.message : "An error occurred during verification.")
+    } finally {
+      setIsClaiming(false)
+    }
+  }
+
+  // Função para fazer claim no contrato
+  const handleContractClaim = async () => {
+    if (!worldIdVerified || !worldIdProof) {
+      setClaimError("Please verify with World ID first")
+      return
+    }
+
+    try {
+      addDebugLog("=== CALLING CONTRACT CLAIM ===")
+
+      // Usar MiniKit para fazer a transação
+      const transaction = {
+        to: CONTRACT_ADDRESS,
+        data: "0x7c3a00fd", // claimAirdrop() function selector
+        value: "0",
       }
 
-      addDebugLog("Airdrop request body", airdropRequestBody)
+      addDebugLog("Transaction data", transaction)
 
-      addDebugLog("Calling airdrop API...")
+      const result = await MiniKit.commandsAsync.sendTransaction(transaction)
+      addDebugLog("Transaction result", result)
 
-      // Tentar primeiro a rota /api/airdrop
-      let airdropResponse: Response
-      let apiEndpoint = "/api/airdrop"
-
-      try {
-        addDebugLog("Trying /api/airdrop endpoint...")
-        airdropResponse = await fetch("/api/airdrop", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify(airdropRequestBody),
-        })
-
-        // Se der 405, tentar a rota alternativa
-        if (airdropResponse.status === 405) {
-          addDebugLog("405 error, trying alternative /api/claim endpoint...")
-          apiEndpoint = "/api/claim"
-          airdropResponse = await fetch("/api/claim", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify(airdropRequestBody),
-          })
-        }
-      } catch (fetchError) {
-        addDebugLog("Fetch error", fetchError)
-        throw new Error(`Network error: ${fetchError instanceof Error ? fetchError.message : "Unknown fetch error"}`)
-      }
-
-      addDebugLog("API endpoint used", apiEndpoint)
-
-      addDebugLog("Airdrop response status", airdropResponse.status)
-      addDebugLog("Airdrop response ok", airdropResponse.ok)
-      addDebugLog("Airdrop response headers", Object.fromEntries(airdropResponse.headers.entries()))
-
-      // Verificar se a resposta tem conteúdo
-      const contentLength = airdropResponse.headers.get("content-length")
-      const contentType = airdropResponse.headers.get("content-type")
-
-      addDebugLog("Content-Length", contentLength)
-      addDebugLog("Content-Type", contentType)
-
-      if (airdropResponse.status === 405) {
-        addDebugLog("405 Method Not Allowed - checking route configuration")
-        setClaimError("API route configuration error (405). Please check server logs.")
-        return
-      }
-
-      // Tentar ler a resposta como texto primeiro
-      let responseText: string
-      try {
-        responseText = await airdropResponse.text()
-        addDebugLog("Airdrop response text", responseText)
-      } catch (textError) {
-        addDebugLog("Error reading response text", textError)
-        setClaimError("Failed to read server response")
-        return
-      }
-
-      // Se não há conteúdo, reportar erro
-      if (!responseText || responseText.trim() === "") {
-        addDebugLog("Empty response received")
-        setClaimError("Server returned empty response")
-        return
-      }
-
-      // Tentar fazer parse do JSON
-      let airdropResult: any
-      try {
-        airdropResult = JSON.parse(responseText)
-        addDebugLog("Airdrop response JSON", airdropResult)
-      } catch (jsonError) {
-        addDebugLog("Failed to parse airdrop response JSON", { error: jsonError, responseText })
-        setClaimError(`Invalid JSON response from server: ${responseText.substring(0, 100)}...`)
-        return
-      }
-
-      if (airdropResult.success) {
-        addDebugLog("=== CLAIM SUCCESSFUL ===")
+      if (result.finalPayload.status === "success") {
+        setTxId(result.finalPayload.transaction_hash)
         setClaimSuccess(true)
-        setTxId(airdropResult.txId)
+        addDebugLog("Contract claim successful!", result.finalPayload.transaction_hash)
 
-        // Atualizar o status e o saldo após um claim bem-sucedido
+        // Atualizar status após transação
         setTimeout(async () => {
           await checkClaimStatus()
           await fetchContractBalance()
-        }, 2000)
-
-        // Limpa a mensagem de sucesso após 5 segundos
-        setTimeout(() => {
-          setClaimSuccess(false)
-        }, 5000)
+        }, 3000)
       } else {
-        addDebugLog("Airdrop processing failed", airdropResult)
-        setClaimError(airdropResult.error || "Failed to process airdrop. Please try again.")
+        setClaimError("Transaction failed or was rejected")
+        addDebugLog("Transaction failed", result.finalPayload)
       }
     } catch (error) {
-      addDebugLog("=== CLAIM ERROR ===", error)
-      console.error("Error during claim process:", error)
-      setClaimError(error instanceof Error ? error.message : "An error occurred during the claim. Please try again.")
-    } finally {
-      setIsClaiming(false)
-      addDebugLog("=== CLAIM PROCESS ENDED ===")
+      addDebugLog("Contract claim error", error)
+      setClaimError(error instanceof Error ? error.message : "Failed to execute contract transaction")
     }
   }
 
@@ -612,7 +516,6 @@ export default function AirdropPage() {
             </div>
           </div>
 
-          {/* Action Tester */}
           <div className="mb-4 p-2 bg-gray-800 rounded">
             <div className="text-white text-sm mb-2">
               Testing Action: <span className="text-yellow-400">{actionsToTest[currentActionIndex]}</span>
@@ -654,7 +557,6 @@ export default function AirdropPage() {
         </h1>
         <p className="text-gray-400 text-sm mt-1">{t.airdrop?.subtitle}</p>
 
-        {/* Debug Toggle Button */}
         <button
           onClick={() => setShowDebug(!showDebug)}
           className="absolute top-0 right-0 text-gray-500 hover:text-gray-300 transition-colors"
@@ -664,66 +566,36 @@ export default function AirdropPage() {
         </button>
       </motion.div>
 
-      {/* Action Status */}
+      {/* World ID Status */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.05 }}
         className="w-full max-w-md px-4 mb-4 relative z-10"
       >
-        <div className="bg-green-900/20 backdrop-blur-sm rounded-lg p-3 border border-green-500/30">
+        <div
+          className={`backdrop-blur-sm rounded-lg p-3 border ${
+            worldIdVerified ? "bg-green-900/20 border-green-500/30" : "bg-blue-900/20 border-blue-500/30"
+          }`}
+        >
           <div className="flex items-start gap-2">
-            <Search className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+            <Search
+              className={`h-4 w-4 mt-0.5 flex-shrink-0 ${worldIdVerified ? "text-green-400" : "text-blue-400"}`}
+            />
             <div className="flex-1">
-              <p className="text-green-200 text-xs leading-relaxed">
-                ✅ Using action: <span className="font-mono text-green-300">"claimtpf"</span> from your World ID Portal
-              </p>
-              <p className="text-green-300 text-xs mt-1">Ready to test with your configured action!</p>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Action Tester Info */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.05 }}
-        className="w-full max-w-md px-4 mb-4 relative z-10"
-      >
-        <div className="bg-purple-900/20 backdrop-blur-sm rounded-lg p-3 border border-purple-500/30">
-          <div className="flex items-start gap-2">
-            <Bug className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-purple-200 text-xs leading-relaxed">
-                Primary action: <span className="font-mono text-yellow-300">"claimtpf"</span> (from Portal)
-              </p>
-              <p className="text-purple-300 text-xs mt-1">
-                Fallback: {currentActionIndex + 1} of {actionsToTest.length} actions available
+              <p className={`text-xs leading-relaxed ${worldIdVerified ? "text-green-200" : "text-blue-200"}`}>
+                {worldIdVerified ? (
+                  <>✅ World ID verified! You can now claim from the contract.</>
+                ) : (
+                  <>🔐 World ID verification required to unlock claim button.</>
+                )}
               </p>
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* TPulseFi Control Notice */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.05 }}
-        className="w-full max-w-md px-4 mb-4 relative z-10"
-      >
-        <div className="bg-blue-900/20 backdrop-blur-sm rounded-lg p-3 border border-blue-500/30">
-          <div className="flex items-start gap-2">
-            <Info className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
-            <p className="text-blue-200 text-xs leading-relaxed">
-              Currently under maintenance, we promise to be brief.
-            </p>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Informações do contrato */}
+      {/* Contract Info */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -731,8 +603,8 @@ export default function AirdropPage() {
         className="w-full max-w-md px-4 mb-4 relative z-10"
       >
         <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-3 border border-gray-700/50">
-          <div className="flex justify-between items-center">
-            <span className="text-gray-400 text-xs">{t.airdrop?.availableForAirdrop}</span>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-gray-400 text-xs">Contract Balance</span>
             <div className="flex items-center">
               <span className="text-white font-medium">{formattedBalance}</span>
               <span className="text-gray-400 text-xs ml-1">TPF</span>
@@ -746,9 +618,26 @@ export default function AirdropPage() {
             </div>
           </div>
 
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-gray-400">Contract:</span>
+            <div className="flex items-center">
+              <span className="text-gray-300 font-mono">
+                {CONTRACT_ADDRESS.slice(0, 6)}...{CONTRACT_ADDRESS.slice(-4)}
+              </span>
+              <a
+                href={`https://worldscan.org/address/${CONTRACT_ADDRESS}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 text-blue-400 hover:text-blue-300"
+              >
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          </div>
+
           {!canClaim && (
             <div className="flex justify-between items-center mt-2">
-              <span className="text-gray-400 text-sm">{t.airdrop?.nextClaimIn}</span>
+              <span className="text-gray-400 text-sm">Next claim in:</span>
               <span className="text-white font-medium">
                 {formatTime(timeLeft.hours)}:{formatTime(timeLeft.minutes)}:{formatTime(timeLeft.seconds)}
               </span>
@@ -784,45 +673,45 @@ export default function AirdropPage() {
           transition={{ duration: 0.5 }}
           className="mt-6 relative z-10 flex flex-col items-center gap-3"
         >
-          <button
-            className={`w-56 py-3 px-5 rounded-full ${
-              canClaim && !isContractBalanceLow
-                ? "bg-gradient-to-b from-gray-300 to-gray-400 text-gray-800"
-                : "bg-gradient-to-b from-gray-700 to-gray-800 text-gray-400"
-            } font-bold text-xs shadow-lg border border-gray-300/30 relative overflow-hidden hover:scale-105 active:scale-95 transition-transform`}
-            onClick={handleClaim}
-            disabled={!canClaim || isClaiming || isContractBalanceLow}
-          >
-            <div
-              className={`absolute inset-0 bg-gradient-to-b ${canClaim && !isContractBalanceLow ? "from-white/30" : "from-white/10"} to-transparent opacity-70`}
-            />
-            <div
-              className={`absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent ${canClaim && !isContractBalanceLow ? "animate-shine" : ""}`}
-            />
-
-            <div className="relative flex items-center justify-center gap-2">
-              {isClaiming ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-t-gray-800 border-gray-400 rounded-full animate-spin" />
-                  <span>{t.airdrop?.processing}</span>
-                </>
-              ) : isContractBalanceLow ? (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
-                    <path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                  </svg>
-                  INSUFFICIENT BALANCE
-                </>
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
-                    <path d="M9.375 3a1.875 1.875 0 000 3.75h1.875v4.5H3.375A1.875 0 011.5 9.375v-.75c0-1.036.84-1.875 1.875-1.875h3.193A3.375 3.375 0 0112 2.753a3.375 3.375 0 015.432 3.997h3.943c1.035 0 1.875.84 1.875 1.875v.75c0 1.036-.84 1.875-1.875 1.875H12.75v-4.5h1.875a1.875 1.875 0 10-1.875-1.875V6.75h-1.5V4.875C11.25 3.839 10.41 3 9.375 3zM11.25 12.75H3v6.75a2.25 2.25 0 002.25 2.25h6v-9zM12.75 12.75v9h6.75a2.25 2.25 0 002.25-2.25v-6.75h-9z" />
-                  </svg>
-                  {t.airdrop?.claimButton}
-                </>
-              )}
-            </div>
-          </button>
+          {!worldIdVerified ? (
+            // Botão de verificação World ID
+            <button
+              className={`w-56 py-3 px-5 rounded-full ${
+                canClaim && !isContractBalanceLow
+                  ? "bg-gradient-to-b from-blue-500 to-blue-600 text-white"
+                  : "bg-gradient-to-b from-gray-700 to-gray-800 text-gray-400"
+              } font-bold text-xs shadow-lg border border-blue-300/30 relative overflow-hidden hover:scale-105 active:scale-95 transition-transform`}
+              onClick={handleWorldIdVerification}
+              disabled={!canClaim || isClaiming || isContractBalanceLow}
+            >
+              <div className="relative flex items-center justify-center gap-2">
+                {isClaiming ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-t-white border-blue-400 rounded-full animate-spin" />
+                    <span>Verifying...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+                      <path d="M18 1.5c2.9 0 5.25 2.35 5.25 5.25v3.75a.75.75 0 01-1.5 0V6.75a3.75 3.75 0 10-7.5 0v3a3 3 0 013 3v6.75a3 3 0 01-3 3H3.75a3 3 0 01-3-3v-6.75a3 3 0 013-3h9v-3c0-2.9 2.35-5.25 5.25-5.25z" />
+                    </svg>
+                    Verify with World ID
+                  </>
+                )}
+              </div>
+            </button>
+          ) : (
+            // Botão de claim do contrato
+            <button
+              className="w-56 py-3 px-5 rounded-full bg-gradient-to-b from-green-500 to-green-600 text-white font-bold text-xs shadow-lg border border-green-300/30 relative overflow-hidden hover:scale-105 active:scale-95 transition-transform"
+              onClick={handleContractClaim}
+            >
+              <div className="relative flex items-center justify-center gap-2">
+                <Coins className="w-3 h-3" />
+                Claim 50 TPF from Contract
+              </div>
+            </button>
+          )}
 
           {/* Try Next Action Button */}
           {claimError && claimError.includes("malformed_request") && (
@@ -847,11 +736,9 @@ export default function AirdropPage() {
             >
               <path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
             </svg>
-            <span className="font-medium text-yellow-400">Airdrop Depleted</span>
+            <span className="font-medium text-yellow-400">Contract Balance Low</span>
           </div>
-          <p className="text-yellow-200 text-xs">
-            The airdrop balance has run out, come back tomorrow for more rewards!
-          </p>
+          <p className="text-yellow-200 text-xs">The contract needs more TPF tokens to process airdrops.</p>
         </div>
       )}
 
@@ -859,8 +746,15 @@ export default function AirdropPage() {
         <div className="mt-4 p-2 bg-green-900/30 border border-green-500/30 rounded-lg text-center">
           <div className="flex items-center justify-center">
             <Coins className="mr-1 text-green-400" size={16} />
-            <span className="font-medium text-green-400">{t.airdrop?.tokensClaimedSuccess}</span>
+            <span className="font-medium text-green-400">
+              {worldIdVerified && !txId ? "World ID Verified!" : "Claim Successful!"}
+            </span>
           </div>
+          {txId && (
+            <p className="text-green-300 text-xs mt-1">
+              TX: {txId.slice(0, 10)}...{txId.slice(-6)}
+            </p>
+          )}
         </div>
       )}
 
