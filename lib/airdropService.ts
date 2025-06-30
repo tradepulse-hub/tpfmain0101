@@ -1,6 +1,7 @@
 import { ethers } from "ethers"
 import { MiniKit } from "@worldcoin/minikit-js"
 import { AIRDROP_CONTRACT_ADDRESS, RPC_ENDPOINTS, airdropContractABI } from "./airdropContractABI"
+import { SIMPLE_AIRDROP_ABI } from "./airdropContractSimple"
 
 // Função para obter o status do airdrop para um endereço
 export async function getAirdropStatus(address: string) {
@@ -191,14 +192,14 @@ export async function claimAirdrop(address: string) {
     console.log("Using ABI:", JSON.stringify(airdropContractABI))
 
     try {
-      // Usar o MiniKit para enviar a transação
-      console.log("Calling MiniKit.commandsAsync.sendTransaction...")
+      // Primeiro tentar com ABI completa
+      console.log("Trying with full ABI...")
       const { finalPayload } = await MiniKit.commandsAsync.sendTransaction({
         transaction: [
           {
             address: AIRDROP_CONTRACT_ADDRESS,
             abi: airdropContractABI,
-            functionName: "claimAirdrop",
+            functionName: "claimAirdropSafe",
             args: [],
           },
         ],
@@ -235,12 +236,52 @@ export async function claimAirdrop(address: string) {
         success: true,
         txId: finalPayload.transaction_id,
       }
-    } catch (error) {
-      console.error("Error in MiniKit transaction:", error)
+    } catch (fullAbiError) {
+      console.log("Full ABI failed, trying with simple ABI...")
 
-      // Tentar método alternativo se o MiniKit falhar
-      console.log("Trying alternative method via API...")
-      return await processAirdrop(address)
+      // Tentar com ABI simplificada
+      const { finalPayload } = await MiniKit.commandsAsync.sendTransaction({
+        transaction: [
+          {
+            address: AIRDROP_CONTRACT_ADDRESS,
+            abi: SIMPLE_AIRDROP_ABI,
+            functionName: "claimAirdrop", // Função básica
+            args: [],
+          },
+        ],
+      })
+
+      console.log("MiniKit transaction response:", finalPayload)
+
+      if (finalPayload.status === "error") {
+        console.error("Error claiming airdrop:", finalPayload.message)
+        throw new Error(finalPayload.message || "Failed to claim airdrop")
+      }
+
+      console.log("Airdrop claimed successfully:", finalPayload)
+
+      // Salvar o timestamp do claim no localStorage
+      localStorage.setItem(`lastClaim_${address}`, new Date().toISOString())
+
+      // Atualizar o saldo do usuário (simulação) - agora com 10 TPF
+      const currentBalance = localStorage.getItem("userDefinedTPFBalance")
+      if (currentBalance) {
+        const newBalance = Number(currentBalance) + 10 // Atualizado para 10 TPF
+        localStorage.setItem("userDefinedTPFBalance", newBalance.toString())
+
+        // Disparar evento para atualizar o saldo na UI
+        const event = new CustomEvent("tpf_balance_updated", {
+          detail: {
+            amount: newBalance,
+          },
+        })
+        window.dispatchEvent(event)
+      }
+
+      return {
+        success: true,
+        txId: finalPayload.transaction_id,
+      }
     }
   } catch (error) {
     console.error("Error claiming airdrop:", error)
