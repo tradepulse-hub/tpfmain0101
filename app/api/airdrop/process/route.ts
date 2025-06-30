@@ -1,20 +1,17 @@
 import { NextResponse } from "next/server"
+import { verifyCloudProof, type IVerifyResponse, type ISuccessResult } from "@worldcoin/minikit-js"
 
 export async function POST(request: Request) {
   try {
-    console.log("=== AIRDROP API CALLED ===")
-    console.log("Method:", request.method)
-    console.log("Headers:", Object.fromEntries(request.headers.entries()))
+    console.log("=== AIRDROP PROCESS API CALLED ===")
 
     const data = await request.json()
-    console.log("=== AIRDROP API DEBUG ===")
     console.log("Received data:", JSON.stringify(data, null, 2))
 
-    // Suporte para ambos os formatos: original (signature) e novo (worldIdVerified)
-    const { signature, userAddress, timestamp, worldIdVerified } = data
+    const { signature, userAddress, timestamp, worldIdPayload, action, signal } = data
 
+    // Verificar parâmetros básicos
     if (!userAddress) {
-      console.log("❌ Missing userAddress")
       return NextResponse.json(
         {
           success: false,
@@ -24,40 +21,97 @@ export async function POST(request: Request) {
       )
     }
 
-    // Verificar se tem verificação World ID ou assinatura (formato original)
-    if (!worldIdVerified && (!signature || !timestamp)) {
-      console.log("❌ Missing verification - need either worldIdVerified or signature+timestamp")
+    // Verificar se tem World ID payload (novo formato) ou assinatura (formato legado)
+    if (!worldIdPayload && (!signature || !timestamp)) {
       return NextResponse.json(
         {
           success: false,
-          error: "Verificação World ID ou assinatura é obrigatória",
+          error: "World ID verification ou assinatura é obrigatória",
         },
         { status: 400 },
       )
     }
 
-    console.log(`✅ Processando airdrop para o endereço ${userAddress}`)
+    let verificationMethod = "Signature"
+    let txId = ""
 
-    // Criar um ID de transação baseado no tipo de verificação
-    let txId: string
-    let verificationMethod: string
+    // Se tem World ID payload, verificar com World ID
+    if (worldIdPayload) {
+      console.log("=== WORLD ID VERIFICATION ===")
 
-    if (worldIdVerified) {
-      // Novo formato com World ID
-      const currentTimestamp = Date.now()
-      txId = `worldid_${currentTimestamp}_${userAddress.slice(0, 8)}`
-      verificationMethod = "World ID"
-      console.log(`✅ Using World ID verification`)
+      const app_id = process.env.APP_ID as `app_${string}`
+
+      if (!app_id) {
+        console.error("APP_ID environment variable not set")
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Server configuration error - APP_ID not configured",
+          },
+          { status: 500 },
+        )
+      }
+
+      const actionId = action || "claim-tpf"
+      const signalData = signal || userAddress
+
+      console.log("Verifying World ID with:")
+      console.log("- APP_ID:", app_id)
+      console.log("- Action:", actionId)
+      console.log("- Signal:", signalData)
+      console.log("- Payload:", JSON.stringify(worldIdPayload, null, 2))
+
+      try {
+        const verifyRes = (await verifyCloudProof(
+          worldIdPayload as ISuccessResult,
+          app_id,
+          actionId,
+          signalData,
+        )) as IVerifyResponse
+
+        console.log("World ID verification result:", verifyRes)
+
+        if (!verifyRes.success) {
+          console.error("World ID verification failed:", verifyRes)
+          return NextResponse.json(
+            {
+              success: false,
+              error: "World ID verification failed",
+              details: verifyRes.detail || "Invalid World ID proof",
+            },
+            { status: 400 },
+          )
+        }
+
+        console.log("✅ World ID verification successful!")
+        verificationMethod = "World ID"
+        txId = `worldid_${Date.now()}_${userAddress.slice(0, 8)}`
+      } catch (worldIdError) {
+        console.error("Error during World ID verification:", worldIdError)
+        return NextResponse.json(
+          {
+            success: false,
+            error: "World ID verification error",
+            details: worldIdError instanceof Error ? worldIdError.message : "Unknown World ID error",
+          },
+          { status: 500 },
+        )
+      }
     } else {
-      // Formato original com assinatura
-      txId = `sig_${timestamp}_${signature.slice(0, 8)}`
+      // Formato legado com assinatura
+      console.log("=== SIGNATURE VERIFICATION (LEGACY) ===")
+      console.log(`Processing airdrop for address ${userAddress} with signature ${signature}`)
+
+      // Verificar se a assinatura é válida
+      // Em um ambiente real, você verificaria a assinatura aqui
       verificationMethod = "Signature"
-      console.log(`✅ Using signature verification: ${signature}`)
+      txId = `sig_${timestamp}_${signature.slice(0, 8)}`
     }
 
     console.log(`✅ Airdrop processado com sucesso! TX ID: ${txId}`)
+    console.log(`Verification method: ${verificationMethod}`)
 
-    // Simular um pequeno delay
+    // Simular um pequeno delay para processamento
     await new Promise((resolve) => setTimeout(resolve, 500))
 
     const response = {
