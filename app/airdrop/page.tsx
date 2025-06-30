@@ -7,7 +7,7 @@ import { OrbitControls, useProgress, Html, Preload } from "@react-three/drei"
 import { BackgroundEffect } from "@/components/background-effect"
 import { BottomNav } from "@/components/bottom-nav"
 import { TPFLogoModel } from "@/components/tpf-logo-model"
-import { Coins, RefreshCw, Info } from "lucide-react"
+import { Coins, RefreshCw, Info, Copy, Bug } from "lucide-react"
 import type * as THREE from "three"
 import { useRouter } from "next/navigation"
 import { getAirdropStatus, getContractBalance } from "@/lib/airdropService"
@@ -91,8 +91,44 @@ export default function AirdropPage() {
   const [user, setUser] = useState<any>(null)
   const [language, setLanguage] = useState<"en" | "pt">("en")
 
+  // Debug states
+  const [debugLogs, setDebugLogs] = useState<string[]>([])
+  const [showDebug, setShowDebug] = useState(false)
+  const [debugData, setDebugData] = useState<any>(null)
+
   const router = useRouter()
   const t = getTranslations(language)
+
+  // Debug function
+  const addDebugLog = (message: string, data?: any) => {
+    const timestamp = new Date().toISOString()
+    const logMessage = `[${timestamp}] ${message}`
+    console.log(logMessage, data || "")
+    setDebugLogs((prev) => [...prev, logMessage + (data ? ` | Data: ${JSON.stringify(data)}` : "")])
+    if (data) {
+      setDebugData((prev) => ({ ...prev, [message]: data }))
+    }
+  }
+
+  // Copy debug info to clipboard
+  const copyDebugInfo = async () => {
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      userAddress,
+      logs: debugLogs,
+      debugData,
+      error: claimError,
+      miniKitInstalled: MiniKit.isInstalled(),
+      userAgent: navigator.userAgent,
+    }
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(debugInfo, null, 2))
+      alert("Debug info copied to clipboard!")
+    } catch (err) {
+      console.error("Failed to copy debug info:", err)
+    }
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -102,20 +138,28 @@ export default function AirdropPage() {
     // Verificar se o usuário está autenticado
     const checkAuth = async () => {
       try {
+        addDebugLog("Starting authentication check")
         const response = await fetch("/api/auth/session")
+        addDebugLog("Auth response status", response.status)
+
         if (response.ok) {
           const data = await response.json()
+          addDebugLog("Auth response data", data)
+
           if (data.user) {
             setUser(data.user)
             setUserAddress(data.user.walletAddress)
+            addDebugLog("User authenticated", { address: data.user.walletAddress })
           } else {
-            // Redirecionar para login se não estiver autenticado
+            addDebugLog("No user in response, redirecting to login")
             router.push("/")
           }
         } else {
+          addDebugLog("Auth response not OK, redirecting to login")
           router.push("/")
         }
       } catch (error) {
+        addDebugLog("Auth error", error)
         console.error("Erro ao verificar autenticação:", error)
         router.push("/")
       } finally {
@@ -126,6 +170,11 @@ export default function AirdropPage() {
     // Obter o idioma atual
     const currentLang = getCurrentLanguage()
     setLanguage(currentLang)
+    addDebugLog("Language set", currentLang)
+
+    // Check MiniKit installation
+    addDebugLog("MiniKit installed", MiniKit.isInstalled())
+    addDebugLog("User Agent", navigator.userAgent)
 
     checkAuth()
 
@@ -146,20 +195,20 @@ export default function AirdropPage() {
   const fetchContractBalance = async () => {
     try {
       setIsRefreshingBalance(true)
-      console.log("Fetching contract balance...")
+      addDebugLog("Fetching contract balance...")
       const balanceData = await getContractBalance()
-      console.log("Contract balance response:", balanceData)
+      addDebugLog("Contract balance response", balanceData)
 
       if (balanceData.success) {
         setContractBalance(balanceData.balance)
         setFormattedBalance(Number(balanceData.balance).toLocaleString())
         setApiError(null)
       } else {
-        console.error("Error fetching contract balance:", balanceData.error)
+        addDebugLog("Contract balance error", balanceData.error)
         setApiError(balanceData.error || "Failed to fetch contract balance")
       }
     } catch (error) {
-      console.error("Error fetching contract balance:", error)
+      addDebugLog("Contract balance fetch error", error)
       setApiError(error instanceof Error ? error.message : "Failed to fetch contract balance")
     } finally {
       setIsRefreshingBalance(false)
@@ -172,9 +221,9 @@ export default function AirdropPage() {
 
     try {
       setIsLoading(true)
-      console.log("Checking claim status for address:", userAddress)
+      addDebugLog("Checking claim status for address", userAddress)
       const statusData = await getAirdropStatus(userAddress)
-      console.log("Airdrop status response:", statusData)
+      addDebugLog("Airdrop status response", statusData)
 
       if (statusData.success) {
         setCanClaim(statusData.canClaim)
@@ -188,22 +237,21 @@ export default function AirdropPage() {
             const minutes = Math.floor((timeRemainingSeconds % 3600) / 60)
             const seconds = timeRemainingSeconds % 60
 
-            console.log("Setting countdown:", { hours, minutes, seconds })
+            addDebugLog("Setting countdown", { hours, minutes, seconds })
             setTimeLeft({ hours, minutes, seconds })
           } else {
-            // Se o tempo restante for negativo ou zero, verificar novamente
-            console.log("Time remaining is zero or negative, rechecking...")
+            addDebugLog("Time remaining is zero or negative, rechecking...")
             setTimeout(checkClaimStatus, 1000)
           }
         } else {
           setTimeLeft({ hours: 0, minutes: 0, seconds: 0 })
         }
       } else {
-        console.error("Error in airdrop status response:", statusData.error)
+        addDebugLog("Airdrop status error", statusData.error)
         setApiError(statusData.error || "Failed to fetch airdrop status")
       }
     } catch (error) {
-      console.error("Error checking claim status:", error)
+      addDebugLog("Claim status check error", error)
       setApiError(error instanceof Error ? error.message : "Failed to check claim status")
     } finally {
       setIsLoading(false)
@@ -251,70 +299,109 @@ export default function AirdropPage() {
       setClaimError(null)
       setClaimSuccess(false)
       setTxId(null)
+      setDebugLogs([]) // Clear previous logs
+
+      addDebugLog("=== STARTING CLAIM PROCESS ===")
+      addDebugLog("User address", userAddress)
+      addDebugLog("Can claim", canClaim)
+      addDebugLog("Contract balance low", isContractBalanceLow)
 
       // Verificar se MiniKit está instalado
-      if (!MiniKit.isInstalled()) {
-        setClaimError("World App is required for verification. Please install World App.")
+      addDebugLog("Checking MiniKit installation...")
+      const miniKitInstalled = MiniKit.isInstalled()
+      addDebugLog("MiniKit installed", miniKitInstalled)
+
+      if (!miniKitInstalled) {
+        const errorMsg = "World App is required for verification. Please install World App."
+        addDebugLog("MiniKit not installed", errorMsg)
+        setClaimError(errorMsg)
         return
       }
 
       // PASSO 1: Verificação World ID
-      console.log("Starting World ID verification...")
+      addDebugLog("=== STEP 1: World ID Verification ===")
 
       const verifyPayload: VerifyCommandInput = {
-        action: "claim-tpf-tokens", // ← Usar o nome correto da sua action
+        action: "claim-tpf-tokens",
         signal: userAddress,
         verification_level: VerificationLevel.Orb,
       }
 
-      const { finalPayload } = await MiniKit.commandsAsync.verify(verifyPayload)
+      addDebugLog("Verify payload", verifyPayload)
+      addDebugLog("Starting World ID verification...")
+
+      const verifyResult = await MiniKit.commandsAsync.verify(verifyPayload)
+      addDebugLog("World ID verification result", verifyResult)
+
+      const { finalPayload } = verifyResult
+      addDebugLog("Final payload", finalPayload)
 
       if (finalPayload.status === "error") {
-        console.log("World ID verification error:", finalPayload)
-        setClaimError("World ID verification failed. Please try again.")
+        addDebugLog("World ID verification failed", finalPayload)
+        setClaimError(`World ID verification failed: ${JSON.stringify(finalPayload)}`)
         return
       }
 
+      addDebugLog("World ID verification successful!")
+
       // PASSO 2: Verificar a prova no backend
-      console.log("Verifying proof on backend...")
+      addDebugLog("=== STEP 2: Backend Verification ===")
+
+      const verifyRequestBody = {
+        payload: finalPayload as ISuccessResult,
+        action: "claim-tpf-tokens",
+        signal: userAddress,
+      }
+
+      addDebugLog("Verify request body", verifyRequestBody)
 
       const verifyResponse = await fetch("/api/verify", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          payload: finalPayload as ISuccessResult,
-          action: "claim-tpf-tokens",
-          signal: userAddress,
-        }),
+        body: JSON.stringify(verifyRequestBody),
       })
 
+      addDebugLog("Verify response status", verifyResponse.status)
+      addDebugLog("Verify response headers", Object.fromEntries(verifyResponse.headers.entries()))
+
       const verifyResponseJson = await verifyResponse.json()
+      addDebugLog("Verify response JSON", verifyResponseJson)
 
       if (verifyResponseJson.status !== 200) {
-        console.error("Backend verification failed:", verifyResponseJson)
-        setClaimError("Verification failed. You may have already claimed or there was an error.")
+        addDebugLog("Backend verification failed", verifyResponseJson)
+        setClaimError(`Verification failed: ${JSON.stringify(verifyResponseJson)}`)
         return
       }
 
+      addDebugLog("Backend verification successful!")
+
       // PASSO 3: Processar o airdrop
-      console.log("Processing airdrop...")
+      addDebugLog("=== STEP 3: Processing Airdrop ===")
+
+      const airdropRequestBody = {
+        userAddress: userAddress,
+        worldIdVerified: true,
+      }
+
+      addDebugLog("Airdrop request body", airdropRequestBody)
 
       const airdropResponse = await fetch("/api/airdrop", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          userAddress: userAddress,
-          worldIdVerified: true,
-        }),
+        body: JSON.stringify(airdropRequestBody),
       })
 
+      addDebugLog("Airdrop response status", airdropResponse.status)
+
       const airdropResult = await airdropResponse.json()
+      addDebugLog("Airdrop response JSON", airdropResult)
 
       if (airdropResult.success) {
+        addDebugLog("=== CLAIM SUCCESSFUL ===")
         setClaimSuccess(true)
         setTxId(airdropResult.txId)
 
@@ -329,13 +416,16 @@ export default function AirdropPage() {
           setClaimSuccess(false)
         }, 5000)
       } else {
+        addDebugLog("Airdrop processing failed", airdropResult)
         setClaimError(airdropResult.error || "Failed to process airdrop. Please try again.")
       }
     } catch (error) {
+      addDebugLog("=== CLAIM ERROR ===", error)
       console.error("Error during claim process:", error)
       setClaimError(error instanceof Error ? error.message : "An error occurred during the claim. Please try again.")
     } finally {
       setIsClaiming(false)
+      addDebugLog("=== CLAIM PROCESS ENDED ===")
     }
   }
 
@@ -350,6 +440,38 @@ export default function AirdropPage() {
     <main className="relative flex min-h-screen flex-col items-center pt-6 pb-20 overflow-hidden">
       <BackgroundEffect />
 
+      {/* Debug Panel */}
+      {showDebug && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed top-4 left-4 right-4 z-50 bg-black/90 backdrop-blur-sm rounded-lg p-4 max-h-96 overflow-y-auto"
+        >
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-white font-bold">Debug Console</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={copyDebugInfo}
+                className="text-blue-400 hover:text-blue-300 transition-colors"
+                title="Copy debug info"
+              >
+                <Copy className="h-4 w-4" />
+              </button>
+              <button onClick={() => setShowDebug(false)} className="text-red-400 hover:text-red-300 transition-colors">
+                ✕
+              </button>
+            </div>
+          </div>
+          <div className="text-xs text-gray-300 space-y-1 font-mono">
+            {debugLogs.map((log, index) => (
+              <div key={index} className="break-all">
+                {log}
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
       <motion.div
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -362,6 +484,15 @@ export default function AirdropPage() {
           </span>
         </h1>
         <p className="text-gray-400 text-sm mt-1">{t.airdrop?.subtitle}</p>
+
+        {/* Debug Toggle Button */}
+        <button
+          onClick={() => setShowDebug(!showDebug)}
+          className="absolute top-0 right-0 text-gray-500 hover:text-gray-300 transition-colors"
+          title="Toggle debug console"
+        >
+          <Bug className="h-4 w-4" />
+        </button>
       </motion.div>
 
       {/* TPulseFi Control Notice */}
@@ -513,8 +644,17 @@ export default function AirdropPage() {
       )}
 
       {claimError && (
-        <div className="mt-4 p-2 bg-red-900/30 border border-red-500/30 rounded-lg text-center">
-          <span className="text-red-400">{claimError}</span>
+        <div className="mt-4 p-2 bg-red-900/30 border border-red-500/30 rounded-lg text-center max-w-md">
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-red-400 text-xs break-all">{claimError}</span>
+            <button
+              onClick={copyDebugInfo}
+              className="text-red-300 hover:text-red-200 transition-colors flex-shrink-0"
+              title="Copy error details"
+            >
+              <Copy className="h-3 w-3" />
+            </button>
+          </div>
         </div>
       )}
 
