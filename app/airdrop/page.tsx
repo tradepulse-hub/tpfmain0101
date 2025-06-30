@@ -95,6 +95,10 @@ export default function AirdropPage() {
   const [debugLogs, setDebugLogs] = useState<string[]>([])
   const [showDebug, setShowDebug] = useState(false)
   const [debugData, setDebugData] = useState<any>(null)
+  const [currentActionIndex, setCurrentActionIndex] = useState(0)
+
+  // Lista de actions para testar
+  const actionsToTest = ["claim", "airdrop", "claim-tpf", "claim-tokens", "tpf-claim", "daily-claim", "token-claim"]
 
   const router = useRouter()
   const t = getTranslations(language)
@@ -120,6 +124,8 @@ export default function AirdropPage() {
       error: claimError,
       miniKitInstalled: MiniKit.isInstalled(),
       userAgent: navigator.userAgent,
+      currentAction: actionsToTest[currentActionIndex],
+      allActionsToTest: actionsToTest,
     }
 
     try {
@@ -290,6 +296,17 @@ export default function AirdropPage() {
     return () => clearInterval(timer)
   }, [canClaim])
 
+  // Função para testar próxima action
+  const tryNextAction = () => {
+    if (currentActionIndex < actionsToTest.length - 1) {
+      setCurrentActionIndex(currentActionIndex + 1)
+      addDebugLog("Switching to next action", actionsToTest[currentActionIndex + 1])
+    } else {
+      addDebugLog("All actions tested, resetting to first")
+      setCurrentActionIndex(0)
+    }
+  }
+
   // Função de claim com World ID + Airdrop
   const handleClaim = async () => {
     if (!canClaim || isClaiming || isContractBalanceLow) return
@@ -301,10 +318,14 @@ export default function AirdropPage() {
       setTxId(null)
       setDebugLogs([]) // Clear previous logs
 
+      const currentAction = actionsToTest[currentActionIndex]
+
       addDebugLog("=== STARTING CLAIM PROCESS ===")
       addDebugLog("User address", userAddress)
       addDebugLog("Can claim", canClaim)
       addDebugLog("Contract balance low", isContractBalanceLow)
+      addDebugLog("Current action being tested", currentAction)
+      addDebugLog("Action index", `${currentActionIndex + 1}/${actionsToTest.length}`)
 
       // Verificar se MiniKit está instalado
       addDebugLog("Checking MiniKit installation...")
@@ -321,9 +342,8 @@ export default function AirdropPage() {
       // PASSO 1: Verificação World ID
       addDebugLog("=== STEP 1: World ID Verification ===")
 
-      // CORREÇÃO: Usar apenas o nome da action, sem prefixos
       const verifyPayload: VerifyCommandInput = {
-        action: "claim", // ← MUDANÇA: action simplificada
+        action: currentAction,
         signal: userAddress,
         verification_level: VerificationLevel.Orb,
       }
@@ -340,12 +360,25 @@ export default function AirdropPage() {
       if (finalPayload.status === "error") {
         addDebugLog("World ID verification failed", finalPayload)
 
-        // Melhor tratamento de erros específicos
+        // Se for malformed_request, tentar próxima action automaticamente
+        if (finalPayload.error_code === "malformed_request") {
+          addDebugLog("Malformed request detected, will try next action")
+
+          let errorMessage = `Action "${currentAction}" failed with malformed_request. `
+
+          if (currentActionIndex < actionsToTest.length - 1) {
+            errorMessage += `Click "Try Next Action" to test "${actionsToTest[currentActionIndex + 1]}".`
+          } else {
+            errorMessage += "All actions tested. Please check your World ID Portal configuration."
+          }
+
+          setClaimError(errorMessage)
+          return
+        }
+
+        // Outros tipos de erro
         let errorMessage = "World ID verification failed"
         switch (finalPayload.error_code) {
-          case "malformed_request":
-            errorMessage = "Invalid request format. Please check your World ID app configuration."
-            break
           case "already_verified":
             errorMessage = "You have already verified for this action."
             break
@@ -367,7 +400,7 @@ export default function AirdropPage() {
 
       const verifyRequestBody = {
         payload: finalPayload as ISuccessResult,
-        action: "claim", // ← MUDANÇA: usar a mesma action
+        action: currentAction,
         signal: userAddress,
       }
 
@@ -387,8 +420,27 @@ export default function AirdropPage() {
       const verifyResponseJson = await verifyResponse.json()
       addDebugLog("Verify response JSON", verifyResponseJson)
 
-      if (verifyResponseJson.status !== 200) {
+      if (!verifyResponseJson.success) {
         addDebugLog("Backend verification failed", verifyResponseJson)
+
+        // Se for erro de action não encontrada, tentar próxima action
+        if (
+          verifyResponseJson.details?.code === "action_not_found" ||
+          verifyResponseJson.error?.includes("action") ||
+          verifyResponseJson.status === 404
+        ) {
+          let errorMessage = `Action "${currentAction}" not found in World ID Portal. `
+
+          if (currentActionIndex < actionsToTest.length - 1) {
+            errorMessage += `Click "Try Next Action" to test "${actionsToTest[currentActionIndex + 1]}".`
+          } else {
+            errorMessage += "All actions tested. Please check your World ID Portal configuration."
+          }
+
+          setClaimError(errorMessage)
+          return
+        }
+
         setClaimError(`Verification failed: ${verifyResponseJson.error || "Unknown backend error"}`)
         return
       }
@@ -480,6 +532,24 @@ export default function AirdropPage() {
               </button>
             </div>
           </div>
+
+          {/* Action Tester */}
+          <div className="mb-4 p-2 bg-gray-800 rounded">
+            <div className="text-white text-sm mb-2">
+              Testing Action: <span className="text-yellow-400">{actionsToTest[currentActionIndex]}</span>
+              <span className="text-gray-400">
+                {" "}
+                ({currentActionIndex + 1}/{actionsToTest.length})
+              </span>
+            </div>
+            <button
+              onClick={tryNextAction}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded"
+            >
+              Try Next Action: {actionsToTest[(currentActionIndex + 1) % actionsToTest.length]}
+            </button>
+          </div>
+
           <div className="text-xs text-gray-300 space-y-1 font-mono">
             {debugLogs.map((log, index) => (
               <div key={index} className="break-all">
@@ -511,6 +581,28 @@ export default function AirdropPage() {
         >
           <Bug className="h-4 w-4" />
         </button>
+      </motion.div>
+
+      {/* Action Tester Info */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.05 }}
+        className="w-full max-w-md px-4 mb-4 relative z-10"
+      >
+        <div className="bg-purple-900/20 backdrop-blur-sm rounded-lg p-3 border border-purple-500/30">
+          <div className="flex items-start gap-2">
+            <Bug className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-purple-200 text-xs leading-relaxed">
+                Testing action: <span className="font-mono text-yellow-300">"{actionsToTest[currentActionIndex]}"</span>
+              </p>
+              <p className="text-purple-300 text-xs mt-1">
+                {currentActionIndex + 1} of {actionsToTest.length} actions tested
+              </p>
+            </div>
+          </div>
+        </div>
       </motion.div>
 
       {/* TPulseFi Control Notice */}
@@ -589,7 +681,7 @@ export default function AirdropPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="mt-6 relative z-10"
+          className="mt-6 relative z-10 flex flex-col items-center gap-3"
         >
           <button
             className={`w-56 py-3 px-5 rounded-full ${
@@ -630,6 +722,16 @@ export default function AirdropPage() {
               )}
             </div>
           </button>
+
+          {/* Try Next Action Button */}
+          {claimError && claimError.includes("malformed_request") && (
+            <button
+              onClick={tryNextAction}
+              className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-4 py-2 rounded-full transition-colors"
+            >
+              Try Next Action: {actionsToTest[(currentActionIndex + 1) % actionsToTest.length]}
+            </button>
+          )}
         </motion.div>
       )}
 
