@@ -21,6 +21,8 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    console.log("Verifying World ID proof for action:", action, "signal:", signal)
+
     // Verificar a prova com World ID
     const verifyRes = (await verifyCloudProof(payload, app_id, action, signal)) as IVerifyResponse
 
