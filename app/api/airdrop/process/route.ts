@@ -52,7 +52,7 @@ export async function POST(request: Request) {
         )
       }
 
-      const actionId = action || "claim-tpf"
+      const actionId = action || "claimtpf" // Usar "claimtpf" como padrão
       const signalData = signal || userAddress
 
       console.log("Verifying World ID with:")
