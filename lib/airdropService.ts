@@ -28,29 +28,20 @@ export async function getAirdropStatus(address: string) {
 
         const contract = new ethers.Contract(AIRDROP_CONTRACT_ADDRESS, airdropContractABI, provider)
 
-        // Buscar dados do contrato
-        const [lastClaimTime, claimInterval, dailyAirdrop] = await Promise.all([
-          contract.lastClaimTime(address),
-          contract.CLAIM_INTERVAL(),
-          contract.DAILY_AIRDROP(),
-        ])
+        // Usar a nova função canUserClaim do contrato atualizado
+        const [canClaim, timeUntilNextClaim] = await contract.canUserClaim(address)
+        const dailyAirdrop = await contract.dailyAirdrop()
 
         console.log("Contract data retrieved:", {
-          lastClaimTime: Number(lastClaimTime),
-          claimInterval: Number(claimInterval),
+          canClaim: canClaim,
+          timeUntilNextClaim: Number(timeUntilNextClaim),
           dailyAirdrop: dailyAirdrop.toString(),
         })
 
-        const now = Math.floor(Date.now() / 1000)
-        const nextClaimTime = Number(lastClaimTime) + Number(claimInterval)
-        const canClaim = Number(lastClaimTime) === 0 || now >= nextClaimTime
-
         return {
           success: true,
-          lastClaimTime: Number(lastClaimTime),
-          nextClaimTime: nextClaimTime,
           canClaim: canClaim,
-          timeRemaining: canClaim ? 0 : nextClaimTime - now,
+          timeRemaining: Number(timeUntilNextClaim),
           airdropAmount: ethers.formatUnits(dailyAirdrop, 18),
           rpcUsed: rpcUrl,
         }
@@ -77,11 +68,9 @@ export async function getAirdropStatus(address: string) {
 
       return {
         success: true,
-        lastClaimTime: lastClaimTime,
-        nextClaimTime: nextClaimTime,
         canClaim: canClaim,
         timeRemaining: canClaim ? 0 : nextClaimTime - now,
-        airdropAmount: "50",
+        airdropAmount: "10", // Atualizado para 10 TPF
         rpcUsed: "simulation",
       }
     }
@@ -89,11 +78,9 @@ export async function getAirdropStatus(address: string) {
     // Se não há registro de claim anterior, permitir o claim
     return {
       success: true,
-      lastClaimTime: 0,
-      nextClaimTime: 0,
       canClaim: true,
       timeRemaining: 0,
-      airdropAmount: "50",
+      airdropAmount: "10", // Atualizado para 10 TPF
       rpcUsed: "simulation",
     }
   } catch (error) {
@@ -202,10 +189,10 @@ export async function claimAirdrop(address: string) {
       // Salvar o timestamp do claim no localStorage
       localStorage.setItem(`lastClaim_${address}`, new Date().toISOString())
 
-      // Atualizar o saldo do usuário (simulação)
+      // Atualizar o saldo do usuário (simulação) - agora com 10 TPF
       const currentBalance = localStorage.getItem("userDefinedTPFBalance")
       if (currentBalance) {
-        const newBalance = Number(currentBalance) + 50
+        const newBalance = Number(currentBalance) + 10 // Atualizado para 10 TPF
         localStorage.setItem("userDefinedTPFBalance", newBalance.toString())
 
         // Disparar evento para atualizar o saldo na UI
@@ -242,20 +229,15 @@ export async function processAirdrop(address: string) {
   try {
     console.log(`Processing airdrop via API for address: ${address}`)
 
-    // Gerar uma assinatura simulada
-    const timestamp = Date.now()
-    const signature = Math.random().toString(36).substring(2, 15)
-
-    // Chamar a API para processar o airdrop
+    // Chamar a API para processar o airdrop com World ID
     const response = await fetch("/api/airdrop/process", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        signature,
         userAddress: address,
-        timestamp,
+        worldIdVerified: true, // Assumindo que World ID já foi verificado
       }),
     })
 
@@ -268,10 +250,10 @@ export async function processAirdrop(address: string) {
     // Salvar o timestamp do claim no localStorage
     localStorage.setItem(`lastClaim_${address}`, new Date().toISOString())
 
-    // Atualizar o saldo do usuário (simulação)
+    // Atualizar o saldo do usuário (simulação) - agora com 10 TPF
     const currentBalance = localStorage.getItem("userDefinedTPFBalance")
     if (currentBalance) {
-      const newBalance = Number(currentBalance) + 50
+      const newBalance = Number(currentBalance) + 10 // Atualizado para 10 TPF
       localStorage.setItem("userDefinedTPFBalance", newBalance.toString())
 
       // Disparar evento para atualizar o saldo na UI
