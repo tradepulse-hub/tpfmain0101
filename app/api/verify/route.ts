@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { verifyCloudProof, type IVerifyResponse, type ISuccessResult } from "@worldcoin/minikit-js"
+import type { ISuccessResult } from "@worldcoin/minikit-js"
+import { hashToField } from "@worldcoin/idkit-core/hashing"
 
 interface IRequestPayload {
   payload: ISuccessResult
@@ -18,31 +19,75 @@ export async function POST(req: NextRequest) {
     console.log("Signal:", signal)
 
     // APP_ID fixo baseado no que você forneceu
-    const app_id = "app_a3a55e132983350c67923dd57dc22c5e" as `app_${string}`
+    const app_id = "app_a3a55e132983350c67923dd57dc22c5e"
 
     console.log("Using APP_ID:", app_id)
-    console.log("Verifying World ID proof for action:", action, "signal:", signal)
 
-    // Verificar a prova com World ID
-    const verifyRes = (await verifyCloudProof(payload, app_id, action, signal)) as IVerifyResponse
+    // Hash do signal usando a função oficial da World ID
+    const signal_hash = signal ? hashToField(signal).digest : hashToField("").digest
+    console.log("Signal hash:", signal_hash)
 
-    console.log("World ID verification result:", JSON.stringify(verifyRes, null, 2))
+    // Preparar dados para a API v2 da World ID
+    const verifyData = {
+      nullifier_hash: payload.nullifier_hash,
+      merkle_root: payload.merkle_root,
+      proof: payload.proof,
+      verification_level: payload.verification_level,
+      action: action,
+      signal_hash: signal_hash,
+    }
 
-    if (verifyRes.success) {
-      // Aqui você pode adicionar lógica adicional, como:
-      // - Salvar no banco de dados que o usuário foi verificado
-      // - Verificar se já reivindicou antes
-      // - Outras validações de negócio
+    console.log("Sending to World ID API v2:", JSON.stringify(verifyData, null, 2))
 
+    // Chamar a API v2 da World ID Developer Portal
+    const worldIdResponse = await fetch(`https://developer.worldcoin.org/api/v2/verify/${app_id}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "TPulseFi-Airdrop/1.0",
+      },
+      body: JSON.stringify(verifyData),
+    })
+
+    console.log("World ID API response status:", worldIdResponse.status)
+
+    const worldIdResult = await worldIdResponse.json()
+    console.log("World ID API response:", JSON.stringify(worldIdResult, null, 2))
+
+    if (worldIdResponse.ok && worldIdResult.success) {
+      // Verificação bem-sucedida
       console.log("World ID verification successful for:", signal)
-      return NextResponse.json({ verifyRes, status: 200 })
-    } else {
-      // Usuário já verificou ou erro na verificação
-      console.log("World ID verification failed:", verifyRes)
       return NextResponse.json({
-        verifyRes,
-        status: 400,
-        error: verifyRes.detail || "Verification failed. You may have already claimed.",
+        success: true,
+        verifyRes: worldIdResult,
+        status: 200,
+      })
+    } else {
+      // Verificação falhou
+      console.log("World ID verification failed:", worldIdResult)
+
+      // Determinar a mensagem de erro baseada na resposta
+      let errorMessage = "Verification failed"
+
+      if (worldIdResponse.status === 400) {
+        if (worldIdResult.code === "already_verified") {
+          errorMessage = "You have already verified for this action."
+        } else if (worldIdResult.code === "invalid_proof") {
+          errorMessage = "Invalid proof provided."
+        } else if (worldIdResult.code === "invalid_merkle_root") {
+          errorMessage = "Invalid merkle root."
+        } else if (worldIdResult.code === "max_verifications_reached") {
+          errorMessage = "Maximum verifications reached for this action."
+        } else {
+          errorMessage = worldIdResult.detail || worldIdResult.message || "Verification failed"
+        }
+      }
+
+      return NextResponse.json({
+        success: false,
+        error: errorMessage,
+        details: worldIdResult,
+        status: worldIdResponse.status,
       })
     }
   } catch (error) {
@@ -55,6 +100,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({
+      success: false,
       error: "Internal server error",
       details: error instanceof Error ? error.message : "Unknown error",
       status: 500,
