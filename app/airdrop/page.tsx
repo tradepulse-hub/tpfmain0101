@@ -476,7 +476,15 @@ export default function AirdropPage() {
 
       addDebugLog("Airdrop response status", airdropResponse.status)
 
-      const airdropResult = await airdropResponse.json()
+      let airdropResult
+      try {
+        airdropResult = await airdropResponse.json()
+      } catch (jsonError) {
+        addDebugLog("Failed to parse airdrop response JSON", jsonError)
+        setClaimError("Invalid response from airdrop API")
+        return
+      }
+
       addDebugLog("Airdrop response JSON", airdropResult)
 
       if (airdropResult.success) {
