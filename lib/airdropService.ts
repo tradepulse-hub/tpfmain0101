@@ -1,7 +1,7 @@
 import { ethers } from "ethers"
 import { MiniKit } from "@worldcoin/minikit-js"
 import { AIRDROP_CONTRACT_ADDRESS, RPC_ENDPOINTS, airdropContractABI } from "./airdropContractABI"
-import { SIMPLE_AIRDROP_ABI } from "./airdropContractSimple"
+import { MINIKIT_AIRDROP_ABI, CONTRACT_ADDRESS } from "./contractInterfaces"
 
 // Função para obter o status do airdrop para um endereço
 export async function getAirdropStatus(address: string) {
@@ -184,22 +184,22 @@ export async function claimAirdrop(address: string) {
     console.log(`Claiming airdrop for address: ${address}`)
 
     if (!MiniKit.isInstalled()) {
-      throw new Error("MiniKit is not installed")
+      console.log("MiniKit not installed, using API fallback")
+      return await processAirdrop(address)
     }
 
     console.log("MiniKit is installed, preparing to claim airdrop...")
-    console.log("Contract address:", AIRDROP_CONTRACT_ADDRESS)
-    console.log("Using ABI:", JSON.stringify(airdropContractABI))
+    console.log("Contract address:", CONTRACT_ADDRESS)
 
     try {
-      // Primeiro tentar com ABI completa
-      console.log("Trying with full ABI...")
+      // Usar ABI mínima para evitar problemas de serialização
+      console.log("Calling MiniKit with minimal ABI...")
       const { finalPayload } = await MiniKit.commandsAsync.sendTransaction({
         transaction: [
           {
-            address: AIRDROP_CONTRACT_ADDRESS,
-            abi: airdropContractABI,
-            functionName: "claimAirdropSafe",
+            address: CONTRACT_ADDRESS,
+            abi: MINIKIT_AIRDROP_ABI,
+            functionName: "claimAirdrop",
             args: [],
           },
         ],
@@ -208,11 +208,13 @@ export async function claimAirdrop(address: string) {
       console.log("MiniKit transaction response:", finalPayload)
 
       if (finalPayload.status === "error") {
-        console.error("Error claiming airdrop:", finalPayload.message)
-        throw new Error(finalPayload.message || "Failed to claim airdrop")
+        console.error("MiniKit error:", finalPayload.message)
+        // Tentar com API como fallback
+        console.log("Trying API fallback...")
+        return await processAirdrop(address)
       }
 
-      console.log("Airdrop claimed successfully:", finalPayload)
+      console.log("Airdrop claimed successfully via MiniKit:", finalPayload)
 
       // Salvar o timestamp do claim no localStorage
       localStorage.setItem(`lastClaim_${address}`, new Date().toISOString())
@@ -220,7 +222,7 @@ export async function claimAirdrop(address: string) {
       // Atualizar o saldo do usuário (simulação) - agora com 10 TPF
       const currentBalance = localStorage.getItem("userDefinedTPFBalance")
       if (currentBalance) {
-        const newBalance = Number(currentBalance) + 10 // Atualizado para 10 TPF
+        const newBalance = Number(currentBalance) + 10
         localStorage.setItem("userDefinedTPFBalance", newBalance.toString())
 
         // Disparar evento para atualizar o saldo na UI
@@ -234,54 +236,13 @@ export async function claimAirdrop(address: string) {
 
       return {
         success: true,
-        txId: finalPayload.transaction_id,
+        txId: finalPayload.transaction_id || finalPayload.transactionId,
+        method: "minikit",
       }
-    } catch (fullAbiError) {
-      console.log("Full ABI failed, trying with simple ABI...")
-
-      // Tentar com ABI simplificada
-      const { finalPayload } = await MiniKit.commandsAsync.sendTransaction({
-        transaction: [
-          {
-            address: AIRDROP_CONTRACT_ADDRESS,
-            abi: SIMPLE_AIRDROP_ABI,
-            functionName: "claimAirdrop", // Função básica
-            args: [],
-          },
-        ],
-      })
-
-      console.log("MiniKit transaction response:", finalPayload)
-
-      if (finalPayload.status === "error") {
-        console.error("Error claiming airdrop:", finalPayload.message)
-        throw new Error(finalPayload.message || "Failed to claim airdrop")
-      }
-
-      console.log("Airdrop claimed successfully:", finalPayload)
-
-      // Salvar o timestamp do claim no localStorage
-      localStorage.setItem(`lastClaim_${address}`, new Date().toISOString())
-
-      // Atualizar o saldo do usuário (simulação) - agora com 10 TPF
-      const currentBalance = localStorage.getItem("userDefinedTPFBalance")
-      if (currentBalance) {
-        const newBalance = Number(currentBalance) + 10 // Atualizado para 10 TPF
-        localStorage.setItem("userDefinedTPFBalance", newBalance.toString())
-
-        // Disparar evento para atualizar o saldo na UI
-        const event = new CustomEvent("tpf_balance_updated", {
-          detail: {
-            amount: newBalance,
-          },
-        })
-        window.dispatchEvent(event)
-      }
-
-      return {
-        success: true,
-        txId: finalPayload.transaction_id,
-      }
+    } catch (minikitError) {
+      console.error("MiniKit transaction failed:", minikitError)
+      console.log("Falling back to API method...")
+      return await processAirdrop(address)
     }
   } catch (error) {
     console.error("Error claiming airdrop:", error)
@@ -321,7 +282,7 @@ export async function processAirdrop(address: string) {
     // Atualizar o saldo do usuário (simulação) - agora com 10 TPF
     const currentBalance = localStorage.getItem("userDefinedTPFBalance")
     if (currentBalance) {
-      const newBalance = Number(currentBalance) + 10 // Atualizado para 10 TPF
+      const newBalance = Number(currentBalance) + 10
       localStorage.setItem("userDefinedTPFBalance", newBalance.toString())
 
       // Disparar evento para atualizar o saldo na UI
@@ -336,12 +297,48 @@ export async function processAirdrop(address: string) {
     return {
       success: true,
       txId: data.txId,
+      method: "api",
     }
   } catch (error) {
     console.error("Error processing airdrop via API:", error)
     return {
       success: false,
       error: error instanceof Error ? error.message : "An error occurred during API processing",
+    }
+  }
+}
+
+// Função para verificar transação (usando o endpoint que vi nos teus ficheiros)
+export async function verifyTransaction(transactionId: string) {
+  try {
+    console.log(`Verifying transaction: ${transactionId}`)
+
+    const response = await fetch("/api/transaction/verify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        transaction_id: transactionId,
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to verify transaction")
+    }
+
+    console.log("Transaction verified:", data)
+    return {
+      success: true,
+      transaction: data,
+    }
+  } catch (error) {
+    console.error("Error verifying transaction:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to verify transaction",
     }
   }
 }
