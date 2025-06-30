@@ -2,30 +2,31 @@ import { ethers } from "ethers"
 import { MiniKit } from "@worldcoin/minikit-js"
 import { AIRDROP_CONTRACT_ADDRESS, RPC_ENDPOINTS, airdropContractABI } from "./airdropContractABI"
 import { MINIKIT_AIRDROP_ABI, CONTRACT_ADDRESS } from "./contractInterfaces"
+import { debugLogger } from "./debugLogger"
 
 // Função para obter o status do airdrop para um endereço
 export async function getAirdropStatus(address: string) {
   try {
-    console.log(`Checking airdrop status for address: ${address}`)
-    console.log(`Using contract address: ${AIRDROP_CONTRACT_ADDRESS}`)
+    debugLogger.info(`Checking airdrop status for address: ${address}`)
+    debugLogger.info(`Using contract address: ${AIRDROP_CONTRACT_ADDRESS}`)
 
     // Tentar cada RPC até encontrar um que funcione
     let lastError = null
 
     for (const rpcUrl of RPC_ENDPOINTS) {
       try {
-        console.log(`Trying RPC endpoint: ${rpcUrl}`)
+        debugLogger.info(`Trying RPC endpoint: ${rpcUrl}`)
 
         const provider = new ethers.JsonRpcProvider(rpcUrl)
 
         // Verificar se o contrato existe
         const code = await provider.getCode(AIRDROP_CONTRACT_ADDRESS)
         if (code === "0x") {
-          console.log(`Contract not found at ${AIRDROP_CONTRACT_ADDRESS} using RPC ${rpcUrl}`)
+          debugLogger.warn(`Contract not found at ${AIRDROP_CONTRACT_ADDRESS} using RPC ${rpcUrl}`)
           continue // Tentar próximo RPC
         }
 
-        console.log(`Contract found at ${AIRDROP_CONTRACT_ADDRESS} using RPC ${rpcUrl}`)
+        debugLogger.success(`Contract found at ${AIRDROP_CONTRACT_ADDRESS} using RPC ${rpcUrl}`)
 
         const contract = new ethers.Contract(AIRDROP_CONTRACT_ADDRESS, airdropContractABI, provider)
 
@@ -35,16 +36,19 @@ export async function getAirdropStatus(address: string) {
         const isBlocked = await contract.isAddressBlocked(address)
         const emergencyPaused = await contract.emergencyPaused()
 
-        console.log("Contract data retrieved:", {
+        const contractData = {
           canClaim: canClaim,
           timeUntilNextClaim: Number(timeUntilNextClaim),
           dailyAirdrop: dailyAirdrop.toString(),
           isBlocked: isBlocked,
           emergencyPaused: emergencyPaused,
-        })
+        }
+
+        debugLogger.success("Contract data retrieved successfully", contractData)
 
         // Verificar se está bloqueado ou pausado
         if (isBlocked) {
+          debugLogger.error("Address is blocked from claiming airdrops")
           return {
             success: false,
             error: "Address is blocked from claiming airdrops",
@@ -56,6 +60,7 @@ export async function getAirdropStatus(address: string) {
         }
 
         if (emergencyPaused) {
+          debugLogger.error("Airdrop claims are temporarily paused")
           return {
             success: false,
             error: "Airdrop claims are temporarily paused",
@@ -66,23 +71,25 @@ export async function getAirdropStatus(address: string) {
           }
         }
 
-        return {
+        const result = {
           success: true,
           canClaim: canClaim,
           timeRemaining: Number(timeUntilNextClaim),
           airdropAmount: ethers.formatUnits(dailyAirdrop, 18),
           rpcUsed: rpcUrl,
         }
+
+        debugLogger.success("Airdrop status check completed", result)
+        return result
       } catch (error) {
-        console.error(`Error with RPC ${rpcUrl}:`, error)
+        debugLogger.error(`Error with RPC ${rpcUrl}`, error)
         lastError = error
         // Continuar para o próximo RPC
       }
     }
 
     // Se chegamos aqui, nenhum RPC funcionou
-    // Vamos usar uma simulação para desenvolvimento
-    console.log("All RPCs failed, using simulation mode")
+    debugLogger.warn("All RPCs failed, using simulation mode")
 
     // Verificar se há um último claim no localStorage
     const lastClaimTimeStr = localStorage.getItem(`lastClaim_${address}`)
@@ -94,25 +101,31 @@ export async function getAirdropStatus(address: string) {
       const nextClaimTime = lastClaimTime + claimInterval
       const canClaim = now >= nextClaimTime
 
-      return {
+      const simulationResult = {
         success: true,
         canClaim: canClaim,
         timeRemaining: canClaim ? 0 : nextClaimTime - now,
-        airdropAmount: "10", // Atualizado para 10 TPF
+        airdropAmount: "10",
         rpcUsed: "simulation",
       }
+
+      debugLogger.info("Using simulation mode with previous claim data", simulationResult)
+      return simulationResult
     }
 
     // Se não há registro de claim anterior, permitir o claim
-    return {
+    const simulationResult = {
       success: true,
       canClaim: true,
       timeRemaining: 0,
-      airdropAmount: "10", // Atualizado para 10 TPF
+      airdropAmount: "10",
       rpcUsed: "simulation",
     }
+
+    debugLogger.info("Using simulation mode - first time claim", simulationResult)
+    return simulationResult
   } catch (error) {
-    console.error("Error fetching airdrop status:", error)
+    debugLogger.error("Error fetching airdrop status", error)
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to fetch airdrop status",
@@ -123,32 +136,32 @@ export async function getAirdropStatus(address: string) {
 // Função para obter o saldo do contrato
 export async function getContractBalance() {
   try {
-    console.log(`Fetching contract balance from address: ${AIRDROP_CONTRACT_ADDRESS}`)
+    debugLogger.info(`Fetching contract balance from address: ${AIRDROP_CONTRACT_ADDRESS}`)
 
     // Tentar cada RPC até encontrar um que funcione
     let lastError = null
 
     for (const rpcUrl of RPC_ENDPOINTS) {
       try {
-        console.log(`Trying RPC endpoint: ${rpcUrl}`)
+        debugLogger.info(`Trying RPC endpoint: ${rpcUrl}`)
 
         const provider = new ethers.JsonRpcProvider(rpcUrl)
 
         // Verificar se o contrato existe
         const code = await provider.getCode(AIRDROP_CONTRACT_ADDRESS)
         if (code === "0x") {
-          console.log(`Contract not found at ${AIRDROP_CONTRACT_ADDRESS} using RPC ${rpcUrl}`)
+          debugLogger.warn(`Contract not found at ${AIRDROP_CONTRACT_ADDRESS} using RPC ${rpcUrl}`)
           continue // Tentar próximo RPC
         }
 
-        console.log(`Contract found at ${AIRDROP_CONTRACT_ADDRESS} using RPC ${rpcUrl}`)
+        debugLogger.success(`Contract found at ${AIRDROP_CONTRACT_ADDRESS} using RPC ${rpcUrl}`)
 
         const contract = new ethers.Contract(AIRDROP_CONTRACT_ADDRESS, airdropContractABI, provider)
 
         const balance = await contract.contractBalance()
         const formattedBalance = ethers.formatUnits(balance, 18)
 
-        console.log(`Contract balance: ${formattedBalance} TPF`)
+        debugLogger.success(`Contract balance: ${formattedBalance} TPF`)
 
         return {
           success: true,
@@ -156,20 +169,21 @@ export async function getContractBalance() {
           rpcUsed: rpcUrl,
         }
       } catch (error) {
-        console.error(`Error with RPC ${rpcUrl}:`, error)
+        debugLogger.error(`Error with RPC ${rpcUrl}`, error)
         lastError = error
         // Continuar para o próximo RPC
       }
     }
 
     // Se chegamos aqui, nenhum RPC funcionou, usar valor simulado
+    debugLogger.warn("All RPCs failed for balance, using simulation")
     return {
       success: true,
       balance: "1000000",
       rpcUsed: "simulation",
     }
   } catch (error) {
-    console.error("Error fetching airdrop contract balance:", error)
+    debugLogger.error("Error fetching airdrop contract balance", error)
     return {
       success: false,
       error: "Failed to fetch airdrop contract balance",
@@ -181,20 +195,22 @@ export async function getContractBalance() {
 // Função para reivindicar o airdrop
 export async function claimAirdrop(address: string) {
   try {
-    console.log(`Claiming airdrop for address: ${address}`)
+    debugLogger.info(`Starting airdrop claim for address: ${address}`)
 
     if (!MiniKit.isInstalled()) {
-      console.log("MiniKit not installed, using API fallback")
+      debugLogger.warn("MiniKit not installed, using API fallback")
       return await processAirdrop(address)
     }
 
-    console.log("MiniKit is installed, preparing to claim airdrop...")
-    console.log("Contract address:", CONTRACT_ADDRESS)
+    debugLogger.info("MiniKit is installed, preparing to claim airdrop...")
+    debugLogger.info("Contract address", { address: CONTRACT_ADDRESS })
+    debugLogger.info("Using ABI", { abi: MINIKIT_AIRDROP_ABI })
 
     try {
       // Usar ABI mínima para evitar problemas de serialização
-      console.log("Calling MiniKit with minimal ABI...")
-      const { finalPayload } = await MiniKit.commandsAsync.sendTransaction({
+      debugLogger.info("Calling MiniKit with minimal ABI...")
+
+      const transactionPayload = {
         transaction: [
           {
             address: CONTRACT_ADDRESS,
@@ -203,18 +219,25 @@ export async function claimAirdrop(address: string) {
             args: [],
           },
         ],
-      })
+      }
 
-      console.log("MiniKit transaction response:", finalPayload)
+      debugLogger.info("Transaction payload", transactionPayload)
+
+      const { finalPayload } = await MiniKit.commandsAsync.sendTransaction(transactionPayload)
+
+      debugLogger.info("MiniKit transaction response", finalPayload)
 
       if (finalPayload.status === "error") {
-        console.error("MiniKit error:", finalPayload.message)
+        debugLogger.error("MiniKit error", {
+          message: finalPayload.message,
+          error_code: finalPayload.error_code,
+        })
         // Tentar com API como fallback
-        console.log("Trying API fallback...")
+        debugLogger.info("Trying API fallback...")
         return await processAirdrop(address)
       }
 
-      console.log("Airdrop claimed successfully via MiniKit:", finalPayload)
+      debugLogger.success("Airdrop claimed successfully via MiniKit", finalPayload)
 
       // Salvar o timestamp do claim no localStorage
       localStorage.setItem(`lastClaim_${address}`, new Date().toISOString())
@@ -240,12 +263,12 @@ export async function claimAirdrop(address: string) {
         method: "minikit",
       }
     } catch (minikitError) {
-      console.error("MiniKit transaction failed:", minikitError)
-      console.log("Falling back to API method...")
+      debugLogger.error("MiniKit transaction failed", minikitError)
+      debugLogger.info("Falling back to API method...")
       return await processAirdrop(address)
     }
   } catch (error) {
-    console.error("Error claiming airdrop:", error)
+    debugLogger.error("Error claiming airdrop", error)
     return {
       success: false,
       error: error instanceof Error ? error.message : "An error occurred during the claim",
@@ -256,7 +279,14 @@ export async function claimAirdrop(address: string) {
 // Método alternativo para processar o airdrop via API
 export async function processAirdrop(address: string) {
   try {
-    console.log(`Processing airdrop via API for address: ${address}`)
+    debugLogger.info(`Processing airdrop via API for address: ${address}`)
+
+    const requestBody = {
+      userAddress: address,
+      worldIdVerified: true,
+    }
+
+    debugLogger.info("API request body", requestBody)
 
     // Chamar a API para processar o airdrop com World ID
     const response = await fetch("/api/airdrop/process", {
@@ -264,17 +294,24 @@ export async function processAirdrop(address: string) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        userAddress: address,
-        worldIdVerified: true, // Assumindo que World ID já foi verificado
-      }),
+      body: JSON.stringify(requestBody),
+    })
+
+    debugLogger.info("API response status", {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
     })
 
     const data = await response.json()
+    debugLogger.info("API response data", data)
 
     if (!data.success) {
+      debugLogger.error("API returned error", data)
       throw new Error(data.error || "Failed to process airdrop")
     }
+
+    debugLogger.success("Airdrop processed successfully via API", data)
 
     // Salvar o timestamp do claim no localStorage
     localStorage.setItem(`lastClaim_${address}`, new Date().toISOString())
@@ -300,7 +337,7 @@ export async function processAirdrop(address: string) {
       method: "api",
     }
   } catch (error) {
-    console.error("Error processing airdrop via API:", error)
+    debugLogger.error("Error processing airdrop via API", error)
     return {
       success: false,
       error: error instanceof Error ? error.message : "An error occurred during API processing",
@@ -311,7 +348,7 @@ export async function processAirdrop(address: string) {
 // Função para verificar transação (usando o endpoint que vi nos teus ficheiros)
 export async function verifyTransaction(transactionId: string) {
   try {
-    console.log(`Verifying transaction: ${transactionId}`)
+    debugLogger.info(`Verifying transaction: ${transactionId}`)
 
     const response = await fetch("/api/transaction/verify", {
       method: "POST",
@@ -325,17 +362,22 @@ export async function verifyTransaction(transactionId: string) {
 
     const data = await response.json()
 
+    debugLogger.info("Transaction verification response", {
+      status: response.status,
+      data: data,
+    })
+
     if (!response.ok) {
       throw new Error(data.error || "Failed to verify transaction")
     }
 
-    console.log("Transaction verified:", data)
+    debugLogger.success("Transaction verified", data)
     return {
       success: true,
       transaction: data,
     }
   } catch (error) {
-    console.error("Error verifying transaction:", error)
+    debugLogger.error("Error verifying transaction", error)
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to verify transaction",
