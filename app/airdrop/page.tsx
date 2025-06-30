@@ -7,7 +7,7 @@ import { OrbitControls, useProgress, Html, Preload } from "@react-three/drei"
 import { BackgroundEffect } from "@/components/background-effect"
 import { BottomNav } from "@/components/bottom-nav"
 import { TPFLogoModel } from "@/components/tpf-logo-model"
-import { Coins, RefreshCw } from "lucide-react"
+import { Coins, RefreshCw, Info } from "lucide-react"
 import type * as THREE from "three"
 import { useRouter } from "next/navigation"
 import { getAirdropStatus, getContractBalance, claimAirdrop } from "@/lib/airdropService"
@@ -89,6 +89,7 @@ export default function AirdropPage() {
   const [formattedBalance, setFormattedBalance] = useState<string>("0")
   const [user, setUser] = useState<any>(null)
   const [language, setLanguage] = useState<"en" | "pt">("en")
+
   const router = useRouter()
   const t = getTranslations(language)
 
@@ -145,7 +146,6 @@ export default function AirdropPage() {
     try {
       setIsRefreshingBalance(true)
       console.log("Fetching contract balance...")
-
       const balanceData = await getContractBalance()
       console.log("Contract balance response:", balanceData)
 
@@ -172,7 +172,6 @@ export default function AirdropPage() {
     try {
       setIsLoading(true)
       console.log("Checking claim status for address:", userAddress)
-
       const statusData = await getAirdropStatus(userAddress)
       console.log("Airdrop status response:", statusData)
 
@@ -183,7 +182,6 @@ export default function AirdropPage() {
         if (!statusData.canClaim) {
           // Garantir que temos um timeRemaining válido
           const timeRemainingSeconds = statusData.timeRemaining || 0
-
           if (timeRemainingSeconds > 0) {
             const hours = Math.floor(timeRemainingSeconds / 3600)
             const minutes = Math.floor((timeRemainingSeconds % 3600) / 60)
@@ -304,6 +302,23 @@ export default function AirdropPage() {
         <p className="text-gray-400 text-sm mt-1">{t.airdrop?.subtitle}</p>
       </motion.div>
 
+      {/* TPulseFi Control Notice */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.05 }}
+        className="w-full max-w-md px-4 mb-4 relative z-10"
+      >
+        <div className="bg-blue-900/20 backdrop-blur-sm rounded-lg p-3 border border-blue-500/30">
+          <div className="flex items-start gap-2">
+            <Info className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+            <p className="text-blue-200 text-xs leading-relaxed">
+              Due to TPulseFi control, we inform that we will limit the airdrop to 1M per day.
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Informações do contrato */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -326,6 +341,7 @@ export default function AirdropPage() {
               </button>
             </div>
           </div>
+
           {!canClaim && (
             <div className="flex justify-between items-center mt-2">
               <span className="text-gray-400 text-sm">{t.airdrop?.nextClaimIn}</span>
@@ -379,6 +395,7 @@ export default function AirdropPage() {
             <div
               className={`absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent ${canClaim ? "animate-shine" : ""}`}
             />
+
             <div className="relative flex items-center justify-center gap-2">
               {isClaiming ? (
                 <>
