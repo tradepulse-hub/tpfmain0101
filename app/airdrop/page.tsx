@@ -468,8 +468,12 @@ export default function AirdropPage() {
 
       addDebugLog("Calling airdrop API...")
 
+      // Tentar primeiro a rota /api/airdrop
       let airdropResponse: Response
+      let apiEndpoint = "/api/airdrop"
+
       try {
+        addDebugLog("Trying /api/airdrop endpoint...")
         airdropResponse = await fetch("/api/airdrop", {
           method: "POST",
           headers: {
@@ -478,10 +482,26 @@ export default function AirdropPage() {
           },
           body: JSON.stringify(airdropRequestBody),
         })
+
+        // Se der 405, tentar a rota alternativa
+        if (airdropResponse.status === 405) {
+          addDebugLog("405 error, trying alternative /api/claim endpoint...")
+          apiEndpoint = "/api/claim"
+          airdropResponse = await fetch("/api/claim", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify(airdropRequestBody),
+          })
+        }
       } catch (fetchError) {
         addDebugLog("Fetch error", fetchError)
         throw new Error(`Network error: ${fetchError instanceof Error ? fetchError.message : "Unknown fetch error"}`)
       }
+
+      addDebugLog("API endpoint used", apiEndpoint)
 
       addDebugLog("Airdrop response status", airdropResponse.status)
       addDebugLog("Airdrop response ok", airdropResponse.ok)
