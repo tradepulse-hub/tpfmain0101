@@ -284,6 +284,9 @@ export default function AirdropPage() {
     return time < 10 ? `0${time}` : time
   }
 
+  // Verificar se o saldo do contrato é suficiente
+  const isContractBalanceLow = Number(contractBalance) <= 2000
+
   return (
     <main className="relative flex min-h-screen flex-col items-center pt-6 pb-20 overflow-hidden">
       <BackgroundEffect />
@@ -382,18 +385,18 @@ export default function AirdropPage() {
         >
           <button
             className={`w-56 py-3 px-5 rounded-full ${
-              canClaim
+              canClaim && !isContractBalanceLow
                 ? "bg-gradient-to-b from-gray-300 to-gray-400 text-gray-800"
                 : "bg-gradient-to-b from-gray-700 to-gray-800 text-gray-400"
             } font-bold text-xs shadow-lg border border-gray-300/30 relative overflow-hidden hover:scale-105 active:scale-95 transition-transform`}
             onClick={handleClaim}
-            disabled={!canClaim || isClaiming}
+            disabled={!canClaim || isClaiming || isContractBalanceLow}
           >
             <div
-              className={`absolute inset-0 bg-gradient-to-b ${canClaim ? "from-white/30" : "from-white/10"} to-transparent opacity-70`}
+              className={`absolute inset-0 bg-gradient-to-b ${canClaim && !isContractBalanceLow ? "from-white/30" : "from-white/10"} to-transparent opacity-70`}
             />
             <div
-              className={`absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent ${canClaim ? "animate-shine" : ""}`}
+              className={`absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent ${canClaim && !isContractBalanceLow ? "animate-shine" : ""}`}
             />
 
             <div className="relative flex items-center justify-center gap-2">
@@ -402,10 +405,17 @@ export default function AirdropPage() {
                   <div className="w-4 h-4 border-2 border-t-gray-800 border-gray-400 rounded-full animate-spin" />
                   <span>{t.airdrop?.processing}</span>
                 </>
+              ) : isContractBalanceLow ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+                    <path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                  </svg>
+                  INSUFFICIENT BALANCE
+                </>
               ) : (
                 <>
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
-                    <path d="M9.375 3a1.875 1.875 0 000 3.75h1.875v4.5H3.375A1.875 1.875 0 011.5 9.375v-.75c0-1.036.84-1.875 1.875-1.875h3.193A3.375 3.375 0 0112 2.753a3.375 3.375 0 015.432 3.997h3.943c1.035 0 1.875.84 1.875 1.875v.75c0 1.036-.84 1.875-1.875 1.875H12.75v-4.5h1.875a1.875 1.875 0 10-1.875-1.875V6.75h-1.5V4.875C11.25 3.839 10.41 3 9.375 3zM11.25 12.75H3v6.75a2.25 2.25 0 002.25 2.25h6v-9zM12.75 12.75v9h6.75a2.25 2.25 0 002.25-2.25v-6.75h-9z" />
+                    <path d="M9.375 3a1.875 1.875 0 000 3.75h1.875v4.5H3.375A1.875 0 011.5 9.375v-.75c0-1.036.84-1.875 1.875-1.875h3.193A3.375 3.375 0 0112 2.753a3.375 3.375 0 015.432 3.997h3.943c1.035 0 1.875.84 1.875 1.875v.75c0 1.036-.84 1.875-1.875 1.875H12.75v-4.5h1.875a1.875 1.875 0 10-1.875-1.875V6.75h-1.5V4.875C11.25 3.839 10.41 3 9.375 3zM11.25 12.75H3v6.75a2.25 2.25 0 002.25 2.25h6v-9zM12.75 12.75v9h6.75a2.25 2.25 0 002.25-2.25v-6.75h-9z" />
                   </svg>
                   {t.airdrop?.claimButton}
                 </>
@@ -413,6 +423,25 @@ export default function AirdropPage() {
             </div>
           </button>
         </motion.div>
+      )}
+
+      {isContractBalanceLow && (
+        <div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-500/30 rounded-lg text-center max-w-md">
+          <div className="flex items-center justify-center mb-1">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-4 h-4 text-yellow-400 mr-2"
+            >
+              <path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <span className="font-medium text-yellow-400">Contract Balance Too Low</span>
+          </div>
+          <p className="text-yellow-200 text-xs">
+            Claims are temporarily disabled. Contract balance must be above 2,000 TPF to enable claims.
+          </p>
+        </div>
       )}
 
       {claimSuccess && (
