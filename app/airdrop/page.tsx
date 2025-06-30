@@ -440,7 +440,7 @@ export default function AirdropPage() {
     }
   }
 
-  // Função para fazer claim no contrato
+  // Função para fazer claim no contrato - CORRIGIDA
   const handleContractClaim = async () => {
     if (!worldIdVerified || !worldIdProof) {
       setClaimError("Please verify with World ID first")
@@ -450,36 +450,83 @@ export default function AirdropPage() {
     try {
       addDebugLog("=== CALLING CONTRACT CLAIM ===")
 
-      // Usar MiniKit para fazer a transação - CORRIGIR O FORMATO
+      // Usar MiniKit para fazer a transação - FORMATO CORRETO
       const transaction = {
         to: CONTRACT_ADDRESS,
         data: "0x7c3a00fd", // claimAirdrop() function selector
-        value: "0x0", // MUDANÇA: usar "0x0" em vez de "0"
+        value: "0x0", // Valor em hex
       }
 
       addDebugLog("Transaction data", transaction)
 
-      const result = await MiniKit.commandsAsync.sendTransaction(transaction)
-      addDebugLog("Transaction result", result)
+      // TRATAMENTO DE ERRO MELHORADO
+      let result
+      try {
+        result = await MiniKit.commandsAsync.sendTransaction(transaction)
+        addDebugLog("Transaction result", result)
+      } catch (miniKitError) {
+        addDebugLog("MiniKit sendTransaction error", miniKitError)
+
+        // Verificar se é um erro específico do MiniKit
+        if (miniKitError && typeof miniKitError === "object") {
+          const errorObj = miniKitError as any
+          if (errorObj.message) {
+            throw new Error(`MiniKit Error: ${errorObj.message}`)
+          } else if (errorObj.code) {
+            throw new Error(`MiniKit Error Code: ${errorObj.code}`)
+          }
+        }
+
+        throw new Error(`MiniKit transaction failed: ${String(miniKitError)}`)
+      }
+
+      // Verificar se result existe e tem a estrutura esperada
+      if (!result) {
+        throw new Error("No result returned from MiniKit")
+      }
+
+      if (!result.finalPayload) {
+        addDebugLog("No finalPayload in result", result)
+        throw new Error("Invalid response structure from MiniKit")
+      }
+
+      addDebugLog("Final payload from transaction", result.finalPayload)
 
       if (result.finalPayload.status === "success") {
-        setTxId(result.finalPayload.transaction_hash)
-        setClaimSuccess(true)
-        setWorldIdVerified(false) // Reset para próximo claim
-        addDebugLog("Contract claim successful!", result.finalPayload.transaction_hash)
+        const txHash = result.finalPayload.transaction_hash
+        if (txHash) {
+          setTxId(txHash)
+          setClaimSuccess(true)
+          setWorldIdVerified(false) // Reset para próximo claim
+          addDebugLog("Contract claim successful!", txHash)
 
-        // Atualizar status após transação
-        setTimeout(async () => {
-          await checkClaimStatus()
-          await fetchContractBalance()
-        }, 3000)
+          // Atualizar status após transação
+          setTimeout(async () => {
+            await checkClaimStatus()
+            await fetchContractBalance()
+          }, 3000)
+        } else {
+          throw new Error("No transaction hash in successful response")
+        }
+      } else if (result.finalPayload.status === "error") {
+        const errorMsg = result.finalPayload.error_code || result.finalPayload.message || "Transaction failed"
+        addDebugLog("Transaction failed with error", result.finalPayload)
+        throw new Error(`Transaction failed: ${errorMsg}`)
       } else {
-        setClaimError("Transaction failed or was rejected")
-        addDebugLog("Transaction failed", result.finalPayload)
+        addDebugLog("Unknown transaction status", result.finalPayload)
+        throw new Error(`Unknown transaction status: ${result.finalPayload.status}`)
       }
     } catch (error) {
       addDebugLog("Contract claim error", error)
-      setClaimError(error instanceof Error ? error.message : "Failed to execute contract transaction")
+
+      let errorMessage = "Failed to execute contract transaction"
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === "string") {
+        errorMessage = error
+      }
+
+      setClaimError(errorMessage)
     }
   }
 
