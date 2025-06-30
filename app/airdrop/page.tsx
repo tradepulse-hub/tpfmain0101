@@ -7,12 +7,14 @@ import { OrbitControls, useProgress, Html, Preload } from "@react-three/drei"
 import { BackgroundEffect } from "@/components/background-effect"
 import { BottomNav } from "@/components/bottom-nav"
 import { TPFLogoModel } from "@/components/tpf-logo-model"
+import { DebugConsole } from "@/components/debug-console"
 import { Coins, RefreshCw, ExternalLink } from "lucide-react"
 import type * as THREE from "three"
 import { useRouter } from "next/navigation"
 import { getAirdropStatus, getContractBalance, claimAirdrop, verifyTransaction } from "@/lib/airdropService"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
 import { MiniKit, type VerifyCommandInput, VerificationLevel, type ISuccessResult } from "@worldcoin/minikit-js"
+import { debugLogger } from "@/lib/debugLogger"
 
 // Componente de carregamento
 function LoadingIndicator() {
@@ -100,32 +102,49 @@ export default function AirdropPage() {
   const [transactionHash, setTransactionHash] = useState<string | null>(null)
   const [claimMethod, setClaimMethod] = useState<string | null>(null)
 
+  // Debug states
+  const [debugLogs, setDebugLogs] = useState<any[]>([])
+
   const router = useRouter()
   const t = getTranslations(language)
 
   useEffect(() => {
+    // Subscribe to debug logs
+    const unsubscribe = debugLogger.subscribe(setDebugLogs)
+
+    debugLogger.info("Airdrop page initialized")
+
     const timer = setTimeout(() => {
       setAnimationComplete(true)
+      debugLogger.info("Animation completed")
     }, 3000)
 
     // Verificar se o usuário está autenticado
     const checkAuth = async () => {
       try {
+        debugLogger.info("Checking user authentication...")
         const response = await fetch("/api/auth/session")
         if (response.ok) {
           const data = await response.json()
           if (data.user) {
             setUser(data.user)
             setUserAddress(data.user.walletAddress)
+            debugLogger.success("User authenticated", {
+              walletAddress: data.user.walletAddress,
+            })
           } else {
-            // Redirecionar para login se não estiver autenticado
+            debugLogger.warn("User not authenticated, redirecting to login")
             router.push("/")
           }
         } else {
+          debugLogger.error("Authentication check failed", {
+            status: response.status,
+            statusText: response.statusText,
+          })
           router.push("/")
         }
       } catch (error) {
-        console.error("Erro ao verificar autenticação:", error)
+        debugLogger.error("Error checking authentication", error)
         router.push("/")
       } finally {
         setIsLoading(false)
@@ -135,6 +154,7 @@ export default function AirdropPage() {
     // Obter o idioma atual
     const currentLang = getCurrentLanguage()
     setLanguage(currentLang)
+    debugLogger.info("Language set", { language: currentLang })
 
     checkAuth()
 
@@ -148,6 +168,7 @@ export default function AirdropPage() {
     return () => {
       clearTimeout(timer)
       window.removeEventListener("languageChange", handleLanguageChange)
+      unsubscribe()
     }
   }, [router])
 
@@ -155,21 +176,21 @@ export default function AirdropPage() {
   const fetchContractBalance = async () => {
     try {
       setIsRefreshingBalance(true)
-      console.log("Fetching contract balance...")
+      debugLogger.info("Fetching contract balance...")
 
       const balanceData = await getContractBalance()
-      console.log("Contract balance response:", balanceData)
 
       if (balanceData.success) {
         setContractBalance(balanceData.balance)
         setFormattedBalance(Number(balanceData.balance).toLocaleString())
         setApiError(null)
+        debugLogger.success("Contract balance fetched successfully", balanceData)
       } else {
-        console.error("Error fetching contract balance:", balanceData.error)
+        debugLogger.error("Error fetching contract balance", balanceData)
         setApiError(balanceData.error || "Failed to fetch contract balance")
       }
     } catch (error) {
-      console.error("Error fetching contract balance:", error)
+      debugLogger.error("Error fetching contract balance", error)
       setApiError(error instanceof Error ? error.message : "Failed to fetch contract balance")
     } finally {
       setIsRefreshingBalance(false)
@@ -182,10 +203,9 @@ export default function AirdropPage() {
 
     try {
       setIsLoading(true)
-      console.log("Checking claim status for address:", userAddress)
+      debugLogger.info("Checking claim status", { userAddress })
 
       const statusData = await getAirdropStatus(userAddress)
-      console.log("Airdrop status response:", statusData)
 
       if (statusData.success) {
         setCanClaim(statusData.canClaim)
@@ -200,22 +220,22 @@ export default function AirdropPage() {
             const minutes = Math.floor((timeRemainingSeconds % 3600) / 60)
             const seconds = timeRemainingSeconds % 60
 
-            console.log("Setting countdown:", { hours, minutes, seconds })
+            debugLogger.info("Setting countdown", { hours, minutes, seconds })
             setTimeLeft({ hours, minutes, seconds })
           } else {
             // Se o tempo restante for negativo ou zero, verificar novamente
-            console.log("Time remaining is zero or negative, rechecking...")
+            debugLogger.info("Time remaining is zero or negative, rechecking...")
             setTimeout(checkClaimStatus, 1000)
           }
         } else {
           setTimeLeft({ hours: 0, minutes: 0, seconds: 0 })
         }
       } else {
-        console.error("Error in airdrop status response:", statusData.error)
+        debugLogger.error("Error in airdrop status response", statusData)
         setApiError(statusData.error || "Failed to fetch airdrop status")
       }
     } catch (error) {
-      console.error("Error checking claim status:", error)
+      debugLogger.error("Error checking claim status", error)
       setApiError(error instanceof Error ? error.message : "Failed to check claim status")
     } finally {
       setIsLoading(false)
@@ -257,13 +277,16 @@ export default function AirdropPage() {
   // World ID Verification Function
   const handleWorldIdVerification = async () => {
     if (!MiniKit.isInstalled()) {
-      setVerificationError("World App is required for verification. Please install World App.")
+      const errorMsg = "World App is required for verification. Please install World App."
+      setVerificationError(errorMsg)
+      debugLogger.error("MiniKit not installed", { error: errorMsg })
       return
     }
 
     try {
       setIsVerifying(true)
       setVerificationError(null)
+      debugLogger.info("Starting World ID verification...")
 
       const verifyPayload: VerifyCommandInput = {
         action: "claimtpf", // Deve corresponder ao Action Name no Portal
@@ -271,8 +294,12 @@ export default function AirdropPage() {
         verification_level: VerificationLevel.Orb, // Corresponde ao nível selecionado
       }
 
+      debugLogger.info("World ID verify payload", verifyPayload)
+
       const verifyResult = await MiniKit.commandsAsync.verify(verifyPayload)
       const { finalPayload } = verifyResult
+
+      debugLogger.info("World ID verification result", finalPayload)
 
       if (finalPayload.status === "error") {
         let errorMessage = "World ID verification failed"
@@ -290,10 +317,15 @@ export default function AirdropPage() {
             errorMessage = `World ID error: ${finalPayload.error_code || "Unknown error"}`
         }
         setVerificationError(errorMessage)
+        debugLogger.error("World ID verification failed", {
+          error_code: finalPayload.error_code,
+          message: errorMessage,
+        })
         return
       }
 
       // Backend verification
+      debugLogger.info("Sending verification to backend...")
       const verifyResponse = await fetch("/api/verify", {
         method: "POST",
         headers: {
@@ -307,17 +339,24 @@ export default function AirdropPage() {
       })
 
       const verifyResponseJson = await verifyResponse.json()
+      debugLogger.info("Backend verification response", {
+        status: verifyResponse.status,
+        data: verifyResponseJson,
+      })
 
       if (!verifyResponseJson.success) {
-        setVerificationError(`Verification failed: ${verifyResponseJson.error || "Unknown backend error"}`)
+        const errorMsg = `Verification failed: ${verifyResponseJson.error || "Unknown backend error"}`
+        setVerificationError(errorMsg)
+        debugLogger.error("Backend verification failed", verifyResponseJson)
         return
       }
 
       // Success - unlock claim button
       setWorldIdVerified(true)
       setVerificationError(null)
+      debugLogger.success("World ID verification completed successfully")
     } catch (error) {
-      console.error("Error during World ID verification:", error)
+      debugLogger.error("Error during World ID verification", error)
       setVerificationError(error instanceof Error ? error.message : "An error occurred during verification.")
     } finally {
       setIsVerifying(false)
@@ -326,7 +365,14 @@ export default function AirdropPage() {
 
   // Simulação de reivindicação de tokens
   const handleClaim = async () => {
-    if (!canClaim || isClaiming || !worldIdVerified) return
+    if (!canClaim || isClaiming || !worldIdVerified) {
+      debugLogger.warn("Claim conditions not met", {
+        canClaim,
+        isClaiming,
+        worldIdVerified,
+      })
+      return
+    }
 
     try {
       setIsClaiming(true)
@@ -336,9 +382,10 @@ export default function AirdropPage() {
       setTransactionHash(null)
       setClaimMethod(null)
 
+      debugLogger.info("Starting claim process...")
+
       // Chamar a função claimAirdrop
       const result = await claimAirdrop(userAddress)
-      console.log("Claim result:", result)
 
       if (result.success) {
         setClaimSuccess(true)
@@ -346,15 +393,21 @@ export default function AirdropPage() {
         setClaimMethod(result.method || "unknown")
         setWorldIdVerified(false) // Reset World ID verification for next claim
 
+        debugLogger.success("Claim successful", result)
+
         // Se temos um transaction ID, tentar verificar a transação
         if (result.txId && result.method === "minikit") {
           try {
+            debugLogger.info("Verifying transaction...")
             const verifyResult = await verifyTransaction(result.txId)
             if (verifyResult.success && verifyResult.transaction.hash) {
               setTransactionHash(verifyResult.transaction.hash)
+              debugLogger.success("Transaction hash obtained", {
+                hash: verifyResult.transaction.hash,
+              })
             }
           } catch (verifyError) {
-            console.log("Could not verify transaction, but claim was successful")
+            debugLogger.warn("Could not verify transaction, but claim was successful", verifyError)
           }
         }
 
@@ -372,11 +425,14 @@ export default function AirdropPage() {
           setClaimMethod(null)
         }, 10000)
       } else {
-        setClaimError(result.error || "Failed to claim tokens. Please try again.")
+        const errorMsg = result.error || "Failed to claim tokens. Please try again."
+        setClaimError(errorMsg)
+        debugLogger.error("Claim failed", result)
       }
     } catch (error) {
-      console.error("Error claiming airdrop:", error)
-      setClaimError(error instanceof Error ? error.message : "An error occurred during the claim. Please try again.")
+      const errorMsg = error instanceof Error ? error.message : "An error occurred during the claim. Please try again."
+      debugLogger.error("Error claiming airdrop", error)
+      setClaimError(errorMsg)
     } finally {
       setIsClaiming(false)
     }
@@ -384,6 +440,10 @@ export default function AirdropPage() {
 
   const formatTime = (time: number) => {
     return time < 10 ? `0${time}` : time
+  }
+
+  const clearDebugLogs = () => {
+    debugLogger.clear()
   }
 
   return (
@@ -584,6 +644,9 @@ export default function AirdropPage() {
           <span className="text-red-400 text-xs">{claimError}</span>
         </div>
       )}
+
+      {/* Debug Console */}
+      <DebugConsole logs={debugLogs} onClear={clearDebugLogs} />
 
       {user && <BottomNav activeTab="airdrop" />}
     </main>
