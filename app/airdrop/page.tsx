@@ -7,7 +7,7 @@ import { OrbitControls, useProgress, Html, Preload } from "@react-three/drei"
 import { BackgroundEffect } from "@/components/background-effect"
 import { BottomNav } from "@/components/bottom-nav"
 import { TPFLogoModel } from "@/components/tpf-logo-model"
-import { Coins, RefreshCw, Info, Copy, Bug } from "lucide-react"
+import { Coins, RefreshCw, Info, Copy, Bug, Search } from "lucide-react"
 import type * as THREE from "three"
 import { useRouter } from "next/navigation"
 import { getAirdropStatus, getContractBalance } from "@/lib/airdropService"
@@ -96,6 +96,8 @@ export default function AirdropPage() {
   const [showDebug, setShowDebug] = useState(false)
   const [debugData, setDebugData] = useState<any>(null)
   const [currentActionIndex, setCurrentActionIndex] = useState(0)
+  const [isCheckingActions, setIsCheckingActions] = useState(false)
+  const [validActions, setValidActions] = useState<string[]>([])
 
   // Lista de actions para testar
   const actionsToTest = ["claim", "airdrop", "claim-tpf", "claim-tokens", "tpf-claim", "daily-claim", "token-claim"]
@@ -126,6 +128,7 @@ export default function AirdropPage() {
       userAgent: navigator.userAgent,
       currentAction: actionsToTest[currentActionIndex],
       allActionsToTest: actionsToTest,
+      validActions,
     }
 
     try {
@@ -134,6 +137,56 @@ export default function AirdropPage() {
     } catch (err) {
       console.error("Failed to copy debug info:", err)
     }
+  }
+
+  // Função para verificar quais actions existem no Portal
+  const checkAllActions = async () => {
+    setIsCheckingActions(true)
+    addDebugLog("=== CHECKING ALL ACTIONS ===")
+
+    const validActionsFound: string[] = []
+
+    for (const action of actionsToTest) {
+      try {
+        addDebugLog(`Checking action: ${action}`)
+
+        const response = await fetch("/api/precheck", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: action,
+            nullifier_hash: "",
+          }),
+        })
+
+        const result = await response.json()
+        addDebugLog(`Precheck result for ${action}`, result)
+
+        if (result.success && result.data?.action?.status === "active") {
+          validActionsFound.push(action)
+          addDebugLog(`✅ Action "${action}" is VALID and ACTIVE`)
+        } else {
+          addDebugLog(`❌ Action "${action}" is INVALID or INACTIVE`)
+        }
+      } catch (error) {
+        addDebugLog(`Error checking action ${action}`, error)
+      }
+    }
+
+    setValidActions(validActionsFound)
+    addDebugLog("Valid actions found", validActionsFound)
+
+    if (validActionsFound.length > 0) {
+      addDebugLog(`Found ${validActionsFound.length} valid actions. Setting first one as current.`)
+      const firstValidIndex = actionsToTest.indexOf(validActionsFound[0])
+      setCurrentActionIndex(firstValidIndex)
+    } else {
+      addDebugLog("❌ NO VALID ACTIONS FOUND! Check your World ID Portal configuration.")
+    }
+
+    setIsCheckingActions(false)
   }
 
   useEffect(() => {
@@ -326,6 +379,7 @@ export default function AirdropPage() {
       addDebugLog("Contract balance low", isContractBalanceLow)
       addDebugLog("Current action being tested", currentAction)
       addDebugLog("Action index", `${currentActionIndex + 1}/${actionsToTest.length}`)
+      addDebugLog("Valid actions found", validActions)
 
       // Verificar se MiniKit está instalado
       addDebugLog("Checking MiniKit installation...")
@@ -542,12 +596,24 @@ export default function AirdropPage() {
                 ({currentActionIndex + 1}/{actionsToTest.length})
               </span>
             </div>
-            <button
-              onClick={tryNextAction}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded"
-            >
-              Try Next Action: {actionsToTest[(currentActionIndex + 1) % actionsToTest.length]}
-            </button>
+            <div className="flex gap-2 mb-2">
+              <button
+                onClick={tryNextAction}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded"
+              >
+                Try Next Action: {actionsToTest[(currentActionIndex + 1) % actionsToTest.length]}
+              </button>
+              <button
+                onClick={checkAllActions}
+                disabled={isCheckingActions}
+                className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded disabled:opacity-50"
+              >
+                {isCheckingActions ? "Checking..." : "Check All Actions"}
+              </button>
+            </div>
+            {validActions.length > 0 && (
+              <div className="text-green-400 text-xs">✅ Valid actions: {validActions.join(", ")}</div>
+            )}
           </div>
 
           <div className="text-xs text-gray-300 space-y-1 font-mono">
@@ -581,6 +647,37 @@ export default function AirdropPage() {
         >
           <Bug className="h-4 w-4" />
         </button>
+      </motion.div>
+
+      {/* Action Checker */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.05 }}
+        className="w-full max-w-md px-4 mb-4 relative z-10"
+      >
+        <div className="bg-green-900/20 backdrop-blur-sm rounded-lg p-3 border border-green-500/30">
+          <div className="flex items-start gap-2">
+            <Search className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-green-200 text-xs leading-relaxed">
+                Click "Check All Actions" to find valid actions in your World ID Portal
+              </p>
+              <button
+                onClick={checkAllActions}
+                disabled={isCheckingActions}
+                className="mt-2 bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded disabled:opacity-50"
+              >
+                {isCheckingActions ? "Checking..." : "Check All Actions"}
+              </button>
+              {validActions.length > 0 && (
+                <div className="mt-2 text-green-300 text-xs">
+                  ✅ Found {validActions.length} valid action(s): {validActions.join(", ")}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </motion.div>
 
       {/* Action Tester Info */}
