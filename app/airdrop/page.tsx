@@ -262,9 +262,9 @@ export default function AirdropPage() {
       setVerificationError(null)
 
       const verifyPayload: VerifyCommandInput = {
-        action: "claim-tpf",
+        action: "claimtpf", // Deve corresponder ao Action Name no Portal
         signal: userAddress,
-        verification_level: VerificationLevel.Orb,
+        verification_level: VerificationLevel.Orb, // Corresponde ao nível selecionado
       }
 
       const verifyResult = await MiniKit.commandsAsync.verify(verifyPayload)
@@ -297,7 +297,7 @@ export default function AirdropPage() {
         },
         body: JSON.stringify({
           payload: finalPayload as ISuccessResult,
-          action: "claim-tpf",
+          action: "claimtpf", // Mesmo action name
           signal: userAddress,
         }),
       })
