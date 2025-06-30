@@ -3,12 +3,11 @@ import { NextResponse } from "next/server"
 export async function POST(request: Request) {
   try {
     const data = await request.json()
-    const { userAddress, worldIdVerified } = data
-
     console.log("=== AIRDROP API DEBUG ===")
-    console.log("Request data:", data)
-    console.log("User address:", userAddress)
-    console.log("World ID verified:", worldIdVerified)
+    console.log("Received data:", data)
+
+    // Aceitar tanto o formato antigo (signature) quanto o novo (worldIdVerified)
+    const { signature, userAddress, timestamp, worldIdVerified } = data
 
     if (!userAddress) {
       return NextResponse.json(
@@ -20,22 +19,27 @@ export async function POST(request: Request) {
       )
     }
 
-    // Verificar se o usuário passou pela verificação World ID
-    if (!worldIdVerified) {
+    // Verificar se tem verificação World ID ou assinatura
+    if (!worldIdVerified && !signature) {
       return NextResponse.json(
         {
           success: false,
-          error: "Verificação World ID é obrigatória",
+          error: "Verificação World ID ou assinatura é obrigatória",
         },
         { status: 400 },
       )
     }
 
-    console.log(`✅ Processando airdrop para o endereço ${userAddress} (World ID verificado)`)
+    console.log(`✅ Processando airdrop para o endereço ${userAddress}`)
 
-    // Criar um ID de transação simulado
-    const timestamp = Date.now()
-    const txId = `worldid_${timestamp}_${userAddress.slice(0, 8)}`
+    // Criar um ID de transação baseado no tipo de verificação
+    let txId: string
+    if (worldIdVerified) {
+      const currentTimestamp = Date.now()
+      txId = `worldid_${currentTimestamp}_${userAddress.slice(0, 8)}`
+    } else {
+      txId = `sig_${timestamp}_${signature.slice(0, 8)}`
+    }
 
     console.log(`✅ Airdrop processado com sucesso! TX ID: ${txId}`)
 
