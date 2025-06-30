@@ -10,7 +10,7 @@ import { TPFLogoModel } from "@/components/tpf-logo-model"
 import { Coins, RefreshCw, Info } from "lucide-react"
 import type * as THREE from "three"
 import { useRouter } from "next/navigation"
-import { getAirdropStatus, getContractBalance, claimAirdrop } from "@/lib/airdropService"
+import { getAirdropStatus, getContractBalance } from "@/lib/airdropService"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
 import { MiniKit, type VerifyCommandInput, VerificationLevel, type ISuccessResult } from "@worldcoin/minikit-js"
 
@@ -242,7 +242,7 @@ export default function AirdropPage() {
     return () => clearInterval(timer)
   }, [canClaim])
 
-  // Simulação de reivindicação de tokens com World ID
+  // Função de claim com World ID + Airdrop
   const handleClaim = async () => {
     if (!canClaim || isClaiming || isContractBalanceLow) return
 
@@ -258,14 +258,15 @@ export default function AirdropPage() {
         return
       }
 
-      // Configurar payload para World ID verification
+      // PASSO 1: Verificação World ID
+      console.log("Starting World ID verification...")
+
       const verifyPayload: VerifyCommandInput = {
-        action: "airdrop-claim", // Você precisa criar esta action no Developer Portal
-        signal: userAddress, // Usar o endereço do usuário como signal
-        verification_level: VerificationLevel.Orb, // Ou Device se preferir
+        action: "claim-tpf-tokens", // ← Usar o nome correto da sua action
+        signal: userAddress,
+        verification_level: VerificationLevel.Orb,
       }
 
-      // Executar verificação World ID
       const { finalPayload } = await MiniKit.commandsAsync.verify(verifyPayload)
 
       if (finalPayload.status === "error") {
@@ -274,7 +275,9 @@ export default function AirdropPage() {
         return
       }
 
-      // Verificar a prova no backend
+      // PASSO 2: Verificar a prova no backend
+      console.log("Verifying proof on backend...")
+
       const verifyResponse = await fetch("/api/verify", {
         method: "POST",
         headers: {
@@ -282,7 +285,7 @@ export default function AirdropPage() {
         },
         body: JSON.stringify({
           payload: finalPayload as ISuccessResult,
-          action: "airdrop-claim",
+          action: "claim-tpf-tokens",
           signal: userAddress,
         }),
       })
@@ -295,13 +298,25 @@ export default function AirdropPage() {
         return
       }
 
-      // Se a verificação passou, proceder com o claim
-      const result = await claimAirdrop(userAddress)
-      console.log("Claim result:", result)
+      // PASSO 3: Processar o airdrop
+      console.log("Processing airdrop...")
 
-      if (result.success) {
+      const airdropResponse = await fetch("/api/airdrop", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userAddress: userAddress,
+          worldIdVerified: true,
+        }),
+      })
+
+      const airdropResult = await airdropResponse.json()
+
+      if (airdropResult.success) {
         setClaimSuccess(true)
-        setTxId(result.txId)
+        setTxId(airdropResult.txId)
 
         // Atualizar o status e o saldo após um claim bem-sucedido
         setTimeout(async () => {
@@ -314,7 +329,7 @@ export default function AirdropPage() {
           setClaimSuccess(false)
         }, 5000)
       } else {
-        setClaimError(result.error || "Failed to claim tokens. Please try again.")
+        setClaimError(airdropResult.error || "Failed to process airdrop. Please try again.")
       }
     } catch (error) {
       console.error("Error during claim process:", error)
