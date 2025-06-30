@@ -7,10 +7,10 @@ import { OrbitControls, useProgress, Html, Preload } from "@react-three/drei"
 import { BackgroundEffect } from "@/components/background-effect"
 import { BottomNav } from "@/components/bottom-nav"
 import { TPFLogoModel } from "@/components/tpf-logo-model"
-import { Coins, RefreshCw } from "lucide-react"
+import { Coins, RefreshCw, ExternalLink } from "lucide-react"
 import type * as THREE from "three"
 import { useRouter } from "next/navigation"
-import { getAirdropStatus, getContractBalance, claimAirdrop } from "@/lib/airdropService"
+import { getAirdropStatus, getContractBalance, claimAirdrop, verifyTransaction } from "@/lib/airdropService"
 import { getCurrentLanguage, getTranslations } from "@/lib/i18n"
 import { MiniKit, type VerifyCommandInput, VerificationLevel, type ISuccessResult } from "@worldcoin/minikit-js"
 
@@ -95,6 +95,10 @@ export default function AirdropPage() {
   const [worldIdVerified, setWorldIdVerified] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
   const [verificationError, setVerificationError] = useState<string | null>(null)
+
+  // Transaction states
+  const [transactionHash, setTransactionHash] = useState<string | null>(null)
+  const [claimMethod, setClaimMethod] = useState<string | null>(null)
 
   const router = useRouter()
   const t = getTranslations(language)
@@ -329,6 +333,8 @@ export default function AirdropPage() {
       setClaimError(null)
       setClaimSuccess(false)
       setTxId(null)
+      setTransactionHash(null)
+      setClaimMethod(null)
 
       // Chamar a função claimAirdrop
       const result = await claimAirdrop(userAddress)
@@ -337,7 +343,20 @@ export default function AirdropPage() {
       if (result.success) {
         setClaimSuccess(true)
         setTxId(result.txId)
+        setClaimMethod(result.method || "unknown")
         setWorldIdVerified(false) // Reset World ID verification for next claim
+
+        // Se temos um transaction ID, tentar verificar a transação
+        if (result.txId && result.method === "minikit") {
+          try {
+            const verifyResult = await verifyTransaction(result.txId)
+            if (verifyResult.success && verifyResult.transaction.hash) {
+              setTransactionHash(verifyResult.transaction.hash)
+            }
+          } catch (verifyError) {
+            console.log("Could not verify transaction, but claim was successful")
+          }
+        }
 
         // Atualizar o status e o saldo após um claim bem-sucedido
         setTimeout(async () => {
@@ -345,10 +364,13 @@ export default function AirdropPage() {
           await fetchContractBalance()
         }, 2000)
 
-        // Limpa a mensagem de sucesso após 5 segundos
+        // Limpa a mensagem de sucesso após 10 segundos
         setTimeout(() => {
           setClaimSuccess(false)
-        }, 5000)
+          setTxId(null)
+          setTransactionHash(null)
+          setClaimMethod(null)
+        }, 10000)
       } else {
         setClaimError(result.error || "Failed to claim tokens. Please try again.")
       }
@@ -533,17 +555,33 @@ export default function AirdropPage() {
       )}
 
       {claimSuccess && (
-        <div className="mt-4 p-2 bg-green-900/30 border border-green-500/30 rounded-lg text-center">
-          <div className="flex items-center justify-center">
+        <div className="mt-4 p-3 bg-green-900/30 border border-green-500/30 rounded-lg text-center max-w-md">
+          <div className="flex items-center justify-center mb-2">
             <Coins className="mr-1 text-green-400" size={16} />
             <span className="font-medium text-green-400">{t.airdrop?.tokensClaimedSuccess}</span>
           </div>
+          {txId && (
+            <div className="text-xs text-green-300 mb-1">
+              TX ID: {txId.slice(0, 8)}...{txId.slice(-8)}
+            </div>
+          )}
+          {claimMethod && <div className="text-xs text-green-300 mb-1">Method: {claimMethod}</div>}
+          {transactionHash && (
+            <a
+              href={`https://worldchain-mainnet.explorer.alchemy.com/tx/${transactionHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center text-xs text-green-300 hover:text-green-200 underline"
+            >
+              View on Explorer <ExternalLink className="ml-1 w-3 h-3" />
+            </a>
+          )}
         </div>
       )}
 
       {claimError && (
-        <div className="mt-4 p-2 bg-red-900/30 border border-red-500/30 rounded-lg text-center">
-          <span className="text-red-400">{claimError}</span>
+        <div className="mt-4 p-2 bg-red-900/30 border border-red-500/30 rounded-lg text-center max-w-md">
+          <span className="text-red-400 text-xs">{claimError}</span>
         </div>
       )}
 
