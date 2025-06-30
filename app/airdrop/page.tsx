@@ -466,18 +466,6 @@ export default function AirdropPage() {
 
       addDebugLog("Airdrop request body", airdropRequestBody)
 
-      // Testar se a API está funcionando primeiro
-      addDebugLog("Testing API endpoint...")
-      try {
-        const testResponse = await fetch("/api/test", { method: "POST" })
-        const testResult = await testResponse.json()
-        addDebugLog("Test API response", { status: testResponse.status, result: testResult })
-      } catch (testError) {
-        addDebugLog("Test API error", testError)
-      }
-
-      addDebugLog("Calling airdrop API...")
-
       const airdropResponse = await fetch("/api/airdrop", {
         method: "POST",
         headers: {
@@ -488,19 +476,8 @@ export default function AirdropPage() {
 
       addDebugLog("Airdrop response status", airdropResponse.status)
 
-      // Log da resposta completa para debug
-      const responseText = await airdropResponse.text()
-      addDebugLog("Airdrop response text", responseText)
-
-      // Tentar fazer parse do JSON
-      let airdropResult
-      try {
-        airdropResult = JSON.parse(responseText)
-      } catch (jsonError) {
-        addDebugLog("Failed to parse airdrop response JSON", { error: jsonError, responseText })
-        setClaimError(`Invalid response from airdrop API: ${responseText}`)
-        return
-      }
+      const airdropResult = await airdropResponse.json()
+      addDebugLog("Airdrop response JSON", airdropResult)
 
       if (airdropResult.success) {
         addDebugLog("=== CLAIM SUCCESSFUL ===")
